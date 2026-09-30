@@ -1,0 +1,1527 @@
+// b.c — OUR build system. Not CMake. Not Ninja. Not Tsoding's nob teehee.
+//
+// One C23 program that:
+//   1. holds the target graph in C,
+//   2. asks the compiler what is stale (-MMD depfiles),
+//   3. reuses a content-addressed object cache,
+//   4. drives clang / ar / ld directly, and
+//   5. launches the result as a real, release-quality binary — directly.
+//
+// North star: `b run <app>` should feel instant and ship-grade on any machine
+// — never a CLion/IDE runtime process.
+//
+// v0.1 proof: the vexspoke repo (static lib + owner tests).
+//
+// Laws honoured: Platform Support Floor Law (arm64 / macOS 14.0 / apple-m1),
+// Build & Naming Conventions Law (-Wall -Wextra -Werror, C23).
+//
+// Subcommands:
+//   b build [target...]     build targets (default: all)
+//   b run   <target> [args] build then exec the binary directly
+//   b test  [substr]        build + run every test
+//   b cc                    (re)write b.json (clangd database)
+//   b clean                 remove build state
+//   b doctor                print the resolved toolchain + flags
+//   b targets               list declared targets
+//
+// Flags: -j N  --release  -v/--verbose
+
+#define _DARWIN_C_SOURCE
+
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <dirent.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+// ─────────────────────────────────────────────────────────────────────────────
+// small utilities
+// ─────────────────────────────────────────────────────────────────────────────
+
+static void die(const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    fprintf(stderr, "b: error: ");
+    vfprintf(stderr, fmt, ap);
+    fprintf(stderr, "\n");
+    va_end(ap);
+    exit(1);
+}
+
+static void *xmalloc(size_t n) {
+    void *p = malloc(n ? n : 1);
+    if (!p) die("out of memory");
+    return p;
+}
+
+static void *xrealloc(void *p, size_t n) {
+    void *q = realloc(p, n ? n : 1);
+    if (!q) die("out of memory");
+    return q;
+}
+
+static char *xstrdup(const char *s) {
+    size_t n = strlen(s) + 1;
+    char *p = xmalloc(n);
+    memcpy(p, s, n);
+    return p;
+}
+
+static char *strf(const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    va_list ap2;
+    va_copy(ap2, ap);
+    int n = vsnprintf(NULL, 0, fmt, ap);
+    va_end(ap);
+    char *s = xmalloc((size_t)n + 1);
+    vsnprintf(s, (size_t)n + 1, fmt, ap2);
+    va_end(ap2);
+    return s;
+}
+
+static bool path_exists(const char *p) {
+    struct stat st;
+    return stat(p, &st) == 0;
+}
+
+static bool is_dir(const char *p) {
+    struct stat st;
+    return stat(p, &st) == 0 && S_ISDIR(st.st_mode);
+}
+
+static void mkdir_p(const char *path) {
+    char *tmp = xstrdup(path);
+    for (char *p = tmp + 1; *p; p++) {
+        if (*p == '/') {
+            *p = 0;
+            mkdir(tmp, 0755);
+            *p = '/';
+        }
+    }
+    mkdir(tmp, 0755);
+    free(tmp);
+}
+
+static void mkdir_parent(const char *path) {
+    char *tmp = xstrdup(path);
+    char *slash = strrchr(tmp, '/');
+    if (slash) {
+        *slash = 0;
+        mkdir_p(tmp);
+    }
+    free(tmp);
+}
+
+static char *read_file(const char *path, size_t *len_out) {
+    FILE *f = fopen(path, "rb");
+    if (!f) return NULL;
+    fseek(f, 0, SEEK_END);
+    long n = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    char *buf = xmalloc((size_t)n + 1);
+    size_t got = fread(buf, 1, (size_t)n, f);
+    buf[got] = 0;
+    fclose(f);
+    if (len_out) *len_out = got;
+    return buf;
+}
+
+static bool write_file(const char *path, const char *data) {
+    mkdir_parent(path);
+    FILE *f = fopen(path, "wb");
+    if (!f) return false;
+    fwrite(data, 1, strlen(data), f);
+    fclose(f);
+    return true;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// string list + command
+// ─────────────────────────────────────────────────────────────────────────────
+
+typedef struct {
+    char **items;
+    int count, cap;
+} StrList;
+
+static void strl_push(StrList *l, const char *s) {
+    if (l->count == l->cap) {
+        l->cap = l->cap ? l->cap * 2 : 8;
+        l->items = xrealloc(l->items, (size_t)l->cap * sizeof(char *));
+    }
+    l->items[l->count++] = xstrdup(s);
+}
+
+static void strl_pushf(StrList *l, const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    va_list ap2;
+    va_copy(ap2, ap);
+    int n = vsnprintf(NULL, 0, fmt, ap);
+    va_end(ap);
+    char *s = xmalloc((size_t)n + 1);
+    vsnprintf(s, (size_t)n + 1, fmt, ap2);
+    va_end(ap2);
+    strl_push(l, s);
+    free(s);
+}
+
+static void strl_extend(StrList *dst, const StrList *src) {
+    for (int i = 0; i < src->count; i++) strl_push(dst, src->items[i]);
+}
+
+static int cmp_str(const void *a, const void *b) {
+    return strcmp(*(const char *const *)a, *(const char *const *)b);
+}
+
+static void strl_sort(StrList *l) {
+    if (l->count) qsort(l->items, (size_t)l->count, sizeof(char *), cmp_str);
+}
+
+// a command is just a list of argv entries
+typedef StrList Cmd;
+
+static char **cmd_argv(const Cmd *c) {
+    char **argv = xmalloc(((size_t)c->count + 1) * sizeof(char *));
+    for (int i = 0; i < c->count; i++) argv[i] = c->items[i];
+    argv[c->count] = NULL;
+    return argv;
+}
+
+static char *cmd_join(const Cmd *c) {
+    size_t n = 1;
+    for (int i = 0; i < c->count; i++) n += strlen(c->items[i]) + 1;
+    char *s = xmalloc(n);
+    s[0] = 0;
+    for (int i = 0; i < c->count; i++) {
+        if (i) strcat(s, " ");
+        strcat(s, c->items[i]);
+    }
+    return s;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// hashing (FNV-1a 64)
+// ─────────────────────────────────────────────────────────────────────────────
+
+static uint64_t fnv1a(uint64_t h, const void *data, size_t n) {
+    const unsigned char *p = data;
+    for (size_t i = 0; i < n; i++) {
+        h ^= p[i];
+        h *= 1099511628211ULL;
+    }
+    return h;
+}
+
+static uint64_t hash_str(uint64_t h, const char *s) {
+    return fnv1a(h, s, strlen(s));
+}
+
+#define HASH_SEED 1469598103934665603ULL
+
+// hash file contents; returns false if unreadable
+static bool hash_file(uint64_t *h, const char *path) {
+    FILE *f = fopen(path, "rb");
+    if (!f) return false;
+    unsigned char buf[65536];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof buf, f)) > 0) *h = fnv1a(*h, buf, n);
+    fclose(f);
+    return true;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// file mtime/size signature (for the fast up-to-date path)
+// ─────────────────────────────────────────────────────────────────────────────
+
+typedef struct {
+    long long sec, nsec, size;
+} Stamp;
+
+static bool stamp_of(const char *path, Stamp *out) {
+    struct stat st;
+    if (stat(path, &st) != 0) return false;
+    out->sec = (long long)st.st_mtime;
+    out->nsec = (long long)st.st_mtimespec.tv_nsec;
+    out->size = (long long)st.st_size;
+    return true;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// process execution (fork/exec, output captured to a log file)
+// ─────────────────────────────────────────────────────────────────────────────
+
+typedef struct {
+    Cmd cmd;
+    char *log_path;
+    pid_t pid;
+    int status;
+    bool started;
+    const char *label;
+} Job;
+
+static int g_max_jobs = 0;
+
+static void run_sync(const Cmd *cmd) {
+    char **argv = cmd_argv(cmd);
+    pid_t pid = fork();
+    if (pid < 0) die("fork failed: %s", strerror(errno));
+    if (pid == 0) {
+        execvp(argv[0], argv);
+        fprintf(stderr, "b: exec failed: %s: %s\n", argv[0], strerror(errno));
+        _exit(127);
+    }
+    free(argv);
+    int st;
+    waitpid(pid, &st, 0);
+    if (!WIFEXITED(st) || WEXITSTATUS(st) != 0)
+        die("command failed: %s", cmd_join(cmd));
+}
+
+static int run_capture(const Cmd *cmd, char **out_stdout) {
+    int pipefd[2];
+    if (pipe(pipefd) != 0) die("pipe failed");
+    char **argv = cmd_argv(cmd);
+    pid_t pid = fork();
+    if (pid < 0) die("fork failed");
+    if (pid == 0) {
+        close(pipefd[0]);
+        dup2(pipefd[1], 1);
+        close(pipefd[1]);
+        execvp(argv[0], argv);
+        _exit(127);
+    }
+    free(argv);
+    close(pipefd[1]);
+    size_t cap = 4096, len = 0;
+    char *buf = xmalloc(cap);
+    ssize_t n;
+    while ((n = read(pipefd[0], buf + len, cap - len - 1)) > 0) {
+        len += (size_t)n;
+        if (len + 1 >= cap) {
+            cap *= 2;
+            buf = xrealloc(buf, cap);
+        }
+    }
+    buf[len] = 0;
+    close(pipefd[0]);
+    int st;
+    waitpid(pid, &st, 0);
+    if (out_stdout) *out_stdout = buf;
+    else free(buf);
+    if (!WIFEXITED(st)) return -1;
+    return WEXITSTATUS(st);
+}
+
+static void job_start(Job *j) {
+    mkdir_parent(j->log_path);
+    int fd = open(j->log_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd < 0) die("cannot open log %s", j->log_path);
+    char **argv = cmd_argv(&j->cmd);
+    pid_t pid = fork();
+    if (pid < 0) die("fork failed");
+    if (pid == 0) {
+        dup2(fd, 1);
+        dup2(fd, 2);
+        close(fd);
+        execvp(argv[0], argv);
+        fprintf(stderr, "exec failed: %s\n", strerror(errno));
+        _exit(127);
+    }
+    free(argv);
+    close(fd);
+    j->pid = pid;
+    j->started = true;
+}
+
+// run a batch of jobs with at most max_par in flight; returns failure count
+static int run_jobs(Job *jobs, int n, int max_par, bool verbose) {
+    if (n == 0) return 0;
+    int next = 0, running = 0, failed = 0;
+    while (next < n || running > 0) {
+        while (running < max_par && next < n) {
+            job_start(&jobs[next]);
+            running++;
+            next++;
+        }
+        int st;
+        pid_t done = waitpid(-1, &st, 0);
+        if (done < 0) break;
+        running--;
+        for (int i = 0; i < n; i++) {
+            if (jobs[i].started && jobs[i].pid == done) {
+                jobs[i].status = st;
+                bool ok = WIFEXITED(st) && WEXITSTATUS(st) == 0;
+                if (!ok) {
+                    failed++;
+                    fprintf(stderr, "\nb: FAILED: %s\n", cmd_join(&jobs[i].cmd));
+                    size_t len = 0;
+                    char *log = read_file(jobs[i].log_path, &len);
+                    if (log) {
+                        fwrite(log, 1, len, stderr);
+                        free(log);
+                    }
+                } else if (verbose) {
+                    printf("  ok  %s\n", jobs[i].label);
+                }
+                break;
+            }
+        }
+    }
+    return failed;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// recursive source glob
+// ─────────────────────────────────────────────────────────────────────────────
+
+static void glob_rec(const char *dir, const char *suffix, StrList *out) {
+    DIR *d = opendir(dir);
+    if (!d) return;
+    char *names[4096];
+    int n = 0;
+    struct dirent *e;
+    while ((e = readdir(d)) && n < 4096) {
+        if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue;
+        names[n++] = xstrdup(e->d_name);
+    }
+    closedir(d);
+    for (int i = 0; i < n; i++) {
+        char *full = strf("%s/%s", dir, names[i]);
+        if (is_dir(full)) {
+            glob_rec(full, suffix, out);
+        } else {
+            size_t lf = strlen(full), ls = strlen(suffix);
+            if (lf >= ls && !strcmp(full + lf - ls, suffix)) strl_push(out, full);
+        }
+        free(full);
+        free(names[i]);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// target graph
+// ─────────────────────────────────────────────────────────────────────────────
+
+typedef enum { T_LIB, T_MOD, T_EXE, T_APP } TKind;
+
+typedef struct {
+    const char *name;
+    TKind kind;
+    StrList srcs;        // absolute source paths
+    StrList includes;    // absolute include dirs
+    StrList defs;        // -D... applied to this target
+    StrList pub_defs;    // -D... propagated to dependents (PUBLIC)
+    StrList cflags;      // extra compile flags
+    StrList deps;        // names of target-level libs this links
+    StrList syslibs;     // raw link args (-lpthread, "-framework Cocoa", ...)
+    StrList objc_arc;    // sources needing -fobjc-arc
+    char *out_path;      // resolved archive/binary path
+    bool is_test;        // runnable by `b test`
+    bool selected;       // included in the current build
+} Target;
+
+typedef struct {
+    Target *items;
+    int count, cap;
+} TargetList;
+
+static void tl_push(TargetList *tl, Target t) {
+    if (tl->count == tl->cap) {
+        tl->cap = tl->cap ? tl->cap * 2 : 8;
+        tl->items = xrealloc(tl->items, (size_t)tl->cap * sizeof(Target));
+    }
+    tl->items[tl->count++] = t;
+}
+
+static Target *find_target(TargetList *tl, const char *name) {
+    for (int i = 0; i < tl->count; i++)
+        if (!strcmp(tl->items[i].name, name)) return &tl->items[i];
+    return NULL;
+}
+
+// the global target list (declared here so unit_build_cmd can resolve deps)
+static TargetList g_targets_ref;
+
+#ifdef __APPLE__
+static void apple_frameworks(StrList *l) {
+    const char *fw[] = {
+        "Foundation", "LocalAuthentication", "Network", "Security", "AVFoundation",
+        "Cocoa", "AppKit", "CoreGraphics", "Metal", "IOKit", "CoreAudio",
+        "AudioToolbox", "Contacts", "EventKit", "Photos", "CoreLocation",
+        "UserNotifications", "CoreServices",
+    };
+    for (size_t i = 0; i < sizeof fw / sizeof fw[0]; i++) {
+        strl_push(l, "-framework");
+        strl_push(l, fw[i]);
+    }
+}
+#endif
+
+// ─────────────────────────────────────────────────────────────────────────────
+// workspace + configuration
+// ─────────────────────────────────────────────────────────────────────────────
+
+static char *g_root;             // repo root (absolute)
+static char *g_state;            // b home: binary + build state (out of the source tree)
+static char *g_out;              // <state>/out/<cfg>
+static char *g_deps;             // <state>/deps/<cfg>
+static char *g_meta;             // <state>/meta/<cfg>
+static char *g_cache;            // <state>/cache/objects
+static bool g_release = false;
+static bool g_verbose = false;
+static char *g_cc_version = NULL;
+
+static const char *VEXSPOKE = "ecosystem/vexspoke";
+
+static void setup_paths(void) {
+    const char *cfg = g_release ? "release" : "debug";
+    g_out = strf("%s/out/%s", g_state, cfg);
+    g_deps = strf("%s/deps/%s", g_state, cfg);
+    g_meta = strf("%s/meta/%s", g_state, cfg);
+    g_cache = strf("%s/cache/objects", g_state);
+    mkdir_p(g_out);
+    mkdir_p(strf("%s/obj", g_out));
+    mkdir_p(strf("%s/lib", g_out));
+    mkdir_p(strf("%s/bin", g_out));
+    mkdir_p(g_deps);
+    mkdir_p(g_meta);
+    mkdir_p(g_cache);
+    mkdir_p(strf("%s/logs", g_state));
+}
+
+static char *cc_version(void) {
+    if (g_cc_version) return g_cc_version;
+    Cmd c = {0};
+    strl_push(&c, "cc");
+    strl_push(&c, "--version");
+    char *out = NULL;
+    if (run_capture(&c, &out) != 0) out = xstrdup("unknown");
+    char *nl = strchr(out, '\n');
+    if (nl) *nl = 0;
+    g_cc_version = out;
+    return out;
+}
+
+// base flags: the Build & Naming Conventions Law + Platform Support Floor Law
+static void base_cflags(StrList *out) {
+    strl_push(out, "-std=gnu23");
+    strl_push(out, "-Wall");
+    strl_push(out, "-Wextra");
+    strl_push(out, "-Werror");
+#ifdef __APPLE__
+    strl_push(out, "-arch");
+    strl_push(out, "arm64");
+    strl_push(out, "-mmacosx-version-min=14.0");
+#endif
+    if (g_release) {
+        strl_push(out, "-O2");
+#ifdef __APPLE__
+        strl_push(out, "-ffunction-sections");
+        strl_push(out, "-fdata-sections");
+#endif
+    } else {
+        strl_push(out, "-O0");
+        strl_push(out, "-g");
+    }
+}
+
+static void base_lflags(StrList *out) {
+    if (g_release) {
+#ifdef __APPLE__
+        strl_push(out, "-Wl,-dead_strip");
+#endif
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// the vexspoke module (v0.1 proof; later this becomes per-repo declarations)
+// ─────────────────────────────────────────────────────────────────────────────
+
+static char *abspath(const char *rel) {
+    return strf("%s/%s", g_root, rel);
+}
+
+static Target *target_new(TargetList *tl, const char *name, TKind kind) {
+    Target t = {0};
+    t.name = name;
+    t.kind = kind;
+    t.selected = true;
+    t.out_path = kind == T_LIB ? strf("%s/lib/lib%s.a", g_out, name)
+               : kind == T_MOD ? strf("%s/modules/%s.so", g_out, name)
+                               : strf("%s/bin/%s", g_out, name);
+    tl_push(tl, t);
+    return &tl->items[tl->count - 1];
+}
+
+static void add_exe_libs(Target *t) {
+    strl_push(&t->syslibs, "-lpthread");
+#ifdef __APPLE__
+    apple_frameworks(&t->syslibs);
+#endif
+}
+
+// ── ecosystem/vexspoke ──────────────────────────────────────────────────────
+static void setup_vexspoke(TargetList *tl) {
+    Target *v = target_new(tl, "vexspoke", T_LIB);
+    StrList c = {0};
+    glob_rec(abspath(strf("%s/src", VEXSPOKE)), ".c", &c);
+#ifdef __APPLE__
+    glob_rec(abspath(strf("%s/src", VEXSPOKE)), ".m", &c);
+#endif
+    strl_sort(&c);
+    v->srcs = c;
+    strl_push(&v->includes, abspath(strf("%s/src", VEXSPOKE)));
+#ifdef __APPLE__
+    strl_push(&v->cflags, "-mcpu=apple-m1");
+    apple_frameworks(&v->syslibs);
+#endif
+    strl_push(&v->syslibs, "-lpthread");
+    if (!g_release) strl_push(&v->pub_defs, "DEBUG_BORROW_CHECK=1");
+}
+
+static void setup_vexspoke_tests(TargetList *tl) {
+    char *tests = strf("%s/tests/vexspoke", g_root);
+    StrList srcs = {0};
+    glob_rec(tests, ".c", &srcs);
+    strl_sort(&srcs);
+    StrList seen = {0};
+    for (int i = 0; i < srcs.count; i++) {
+        const char *s = srcs.items[i];
+        const char *base = strrchr(s, '/');
+        base = base ? base + 1 : s;
+        size_t bl = strlen(base);
+        bool is_test = bl > 7 && !strcmp(base + bl - 7, "_test.c");
+        if (!is_test && strcmp(base, "touchid_demo.c")) continue;
+        char *name = xstrdup(base);
+        name[strlen(name) - 2] = 0;
+        bool dup = false;
+        for (int k = 0; k < seen.count; k++)
+            if (!strcmp(seen.items[k], name)) { dup = true; break; }
+        if (dup) { free(name); continue; }
+        strl_push(&seen, name);
+
+        Target *t = target_new(tl, name, T_EXE);
+        t->is_test = is_test;
+        strl_push(&t->srcs, s);
+        strl_push(&t->includes, abspath(strf("%s/src", VEXSPOKE)));
+        strl_push(&t->defs, "UNDEBUG");
+        strl_push(&t->deps, "vexspoke");
+        add_exe_libs(t);
+    }
+}
+
+// ── ecosystem/sesh (header-only until sources land) ─────────────────────────
+static void setup_sesh(TargetList *tl) {
+    char *src = abspath("ecosystem/sesh/src");
+    StrList c = {0};
+    glob_rec(src, ".c", &c);
+    if (c.count == 0) return;
+    strl_sort(&c);
+    Target *t = target_new(tl, "sesh", T_LIB);
+    t->srcs = c;
+    strl_push(&t->includes, src);
+    strl_push(&t->includes, abspath("ecosystem/sesh"));
+    strl_push(&t->deps, "vexspoke");
+}
+
+// ── projects/impedance ──────────────────────────────────────────────────────
+static void setup_impedance(TargetList *tl) {
+    char *base = abspath("projects/impedance");
+    Target *lib = target_new(tl, "impedance", T_LIB);
+    strl_push(&lib->srcs, strf("%s/src/impedance.c", base));
+    strl_push(&lib->includes, strf("%s/src", base));
+    strl_push(&lib->includes, abspath(strf("%s/src", VEXSPOKE)));
+    strl_push(&lib->deps, "vexspoke");
+
+    char *mainc = strf("%s/src/main.c", base);
+    if (path_exists(mainc)) {
+        Target *app = target_new(tl, "impedance_app", T_EXE);
+        strl_push(&app->srcs, mainc);
+        strl_push(&app->includes, strf("%s/src", base));
+        strl_push(&app->includes, abspath(strf("%s/src", VEXSPOKE)));
+        strl_push(&app->deps, "impedance");
+        strl_push(&app->deps, "vexspoke");
+        add_exe_libs(app);
+    }
+}
+
+// ── ecosystem/api-haven ─────────────────────────────────────────────────────
+static void setup_apihaven(TargetList *tl) {
+    char *base = abspath("ecosystem/api-haven");
+    const char *libs[] = {
+        "src/api/client.c", "src/api/auth.c", "src/api/rest.c",
+        "src/api/haven_ws_fanout.c", "src/com/discord/discord.c",
+        "src/com/slack/slack.c", "src/ai/ai_provider.c", "src/ai/ai_chat.c",
+        "src/ai/ai_chat_anthropic.c", "src/ai/ai_chat_gemini.c", "src/ai/ai_sse.c",
+        "src/asset/asset_provider.c", "src/asset/asset_broker.c",
+        "src/database/db_provider.c", "src/database/db_sqlite_file.c",
+        "src/harness/engine_provider.c", "src/harness/harness.c",
+        "src/app/app_provider.c", "src/app/app_broker.c",
+        "src/search/search_provider.c", "src/mcp/mcp_server.c",
+    };
+    Target *lib = target_new(tl, "api_haven", T_LIB);
+    for (size_t i = 0; i < sizeof libs / sizeof libs[0]; i++)
+        strl_push(&lib->srcs, strf("%s/%s", base, libs[i]));
+    strl_push(&lib->includes, strf("%s/src", base));
+    strl_push(&lib->deps, "vexspoke");
+
+    Target *mcp = target_new(tl, "mcp_server", T_EXE);
+    strl_push(&mcp->srcs, strf("%s/src/main/mcp_main.c", base));
+    strl_push(&mcp->includes, strf("%s/src", base));
+    strl_push(&mcp->includes, abspath(strf("%s/src", VEXSPOKE)));
+    strl_push(&mcp->deps, "api_haven");
+    strl_push(&mcp->deps, "vexspoke");
+    add_exe_libs(mcp);
+
+    char *tdir = strf("%s/tests/api-haven", g_root);
+    StrList ts = {0};
+    glob_rec(tdir, "_test.c", &ts);
+    strl_sort(&ts);
+    for (int i = 0; i < ts.count; i++) {
+        const char *bn = strrchr(ts.items[i], '/');
+        bn = bn ? bn + 1 : ts.items[i];
+        char *name = xstrdup(bn);
+        name[strlen(name) - 2] = 0;
+        Target *t = target_new(tl, name, T_EXE);
+        t->is_test = true;
+        strl_push(&t->srcs, ts.items[i]);
+        strl_push(&t->includes, strf("%s/src", base));
+        strl_push(&t->includes, abspath(strf("%s/src", VEXSPOKE)));
+        strl_push(&t->deps, "api_haven");
+        strl_push(&t->deps, "vexspoke");
+        add_exe_libs(t);
+    }
+}
+
+// ── ecosystem/hotcwap (R1: kernel host + hotload machinery) ─────────────────
+static void setup_hotcwap(TargetList *tl) {
+    char *base = abspath("ecosystem/hotcwap");
+    Target *lib = target_new(tl, "hotcwap", T_LIB);
+    const char *csrc[] = {
+        "kernel/application.c", "kernel/process.c", "kernel/console.c",
+        "kernel/kernel.c", "spoke/lifetime.c", "hot/hot.c",
+        "hot/hot_trampoline.c", "hot/hot_retire.c", "hot/manifest.c",
+        "hot/ledger.c", "hot/throwable.c", "window/window_event.c",
+        "permission/permission.c", "capability/capability.c",
+    };
+    for (size_t i = 0; i < sizeof csrc / sizeof csrc[0]; i++)
+        strl_push(&lib->srcs, strf("%s/%s", base, csrc[i]));
+    strl_push(&lib->includes, base);
+    strl_push(&lib->deps, "vexspoke");
+#ifdef __APPLE__
+    const char *msrc[] = {
+        "window/window_cocoa.m", "window/traffic_light_cocoa.m",
+        "permission/objc/permission_cocoa.m",
+    };
+    for (size_t i = 0; i < sizeof msrc / sizeof msrc[0]; i++)
+        strl_push(&lib->srcs, strf("%s/%s", base, msrc[i]));
+    apple_frameworks(&lib->syslibs);
+#endif
+    strl_push(&lib->syslibs, "-lpthread");
+
+    // hotload modules: the same source twice, once with a foreign schema magic
+    Target *mod = target_new(tl, "hot_behavior", T_MOD);
+    strl_push(&mod->srcs, strf("%s/hot/hot_behavior.c", base));
+    strl_push(&mod->includes, base);
+    strl_push(&mod->includes, abspath(strf("%s/src", VEXSPOKE)));
+    char *modpath = xstrdup(mod->out_path);  // copying: tl_push below may realloc
+
+    Target *bad = target_new(tl, "hot_behavior_bad", T_MOD);
+    strl_push(&bad->srcs, strf("%s/hot/hot_behavior.c", base));
+    strl_push(&bad->includes, base);
+    strl_push(&bad->includes, abspath(strf("%s/src", VEXSPOKE)));
+    strl_push(&bad->defs, "HOT_BEHAVIOR_SCHEMA_MAGIC=0xBADC0DE5u");
+    bad->out_path = strf("%s/modules_bad/hot_behavior.so", g_out);
+
+    const char *needs_mod[] = {
+        "manifest_hot_test", "two_dylib_swap_test", "wrong_binary_test",
+        "retire_ring_overflow_test", "shutdown_order_test", "manifest_rollback_test",
+        "hot_behavior_test",
+    };
+
+    char *tdir = strf("%s/tests/hotcwap", g_root);
+    StrList ts = {0};
+    glob_rec(tdir, "_test.c", &ts);
+    strl_sort(&ts);
+    for (int i = 0; i < ts.count; i++) {
+        const char *bn = strrchr(ts.items[i], '/');
+        bn = bn ? bn + 1 : ts.items[i];
+        char *name = xstrdup(bn);
+        name[strlen(name) - 2] = 0;
+        Target *t = target_new(tl, name, T_EXE);
+        t->is_test = true;
+        strl_push(&t->srcs, ts.items[i]);
+        strl_push(&t->includes, base);
+        strl_push(&t->defs, "UNDEBUG");
+        if (!strcmp(name, "spoke_test")) {
+            strl_push(&t->srcs, strf("%s/spoke/lifetime.c", base));
+            strl_push(&t->deps, "vexspoke");
+        } else {
+            strl_push(&t->deps, "hotcwap");
+        }
+        add_exe_libs(t);
+        for (size_t k = 0; k < sizeof needs_mod / sizeof needs_mod[0]; k++)
+            if (!strcmp(name, needs_mod[k]))
+                strl_pushf(&t->defs, "HOT_BEHAVIOR_MODULE=\"%s\"", modpath);
+    }
+}
+
+static bool has_main(const char *path) {
+    char *s = read_file(path, NULL);
+    if (!s) return false;
+    bool found = strstr(s, "int main") != NULL;
+    free(s);
+    return found;
+}
+
+// auto-discover apps: every _main/<name>.c with a main() becomes a bundleable
+// app, built together with any main-less sibling TU (shared scenes, helpers).
+static void setup_apps(TargetList *tl) {
+    char *dir = abspath("_main");
+    StrList all = {0};
+    glob_rec(dir, ".c", &all);
+    strl_sort(&all);
+    StrList apps = {0}, shared = {0};
+    for (int i = 0; i < all.count; i++) {
+        if (has_main(all.items[i])) strl_push(&apps, all.items[i]);
+        else strl_push(&shared, all.items[i]);
+    }
+    for (int i = 0; i < apps.count; i++) {
+        const char *bn = strrchr(apps.items[i], '/');
+        bn = bn ? bn + 1 : apps.items[i];
+        char *name = xstrdup(bn);
+        name[strlen(name) - 2] = 0;
+        Target *t = target_new(tl, name, T_APP);
+        strl_push(&t->srcs, apps.items[i]);
+        for (int k = 0; k < shared.count; k++) strl_push(&t->srcs, shared.items[k]);
+        strl_push(&t->includes, dir);
+        strl_push(&t->includes, abspath("ecosystem/hotcwap"));
+        strl_push(&t->includes, abspath(strf("%s/src", VEXSPOKE)));
+        strl_push(&t->deps, "vexspoke");
+        strl_push(&t->deps, "hotcwap");
+        add_exe_libs(t);
+    }
+}
+
+static void setup_targets(TargetList *tl) {
+    setup_vexspoke(tl);        // libs first
+    setup_hotcwap(tl);
+    setup_sesh(tl);
+    setup_impedance(tl);
+    setup_apihaven(tl);
+    setup_apps(tl);            // _main/*.c apps
+    setup_vexspoke_tests(tl);  // executables last
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// unit compile + cache
+// ─────────────────────────────────────────────────────────────────────────────
+
+typedef struct {
+    Target *t;
+    const char *src;
+    char *obj;
+    char *dep;
+    char *meta;
+    char *ohash_path;
+    Cmd cmd;
+    uint64_t cmdhash;
+    bool need_build;
+    Job job;
+} Unit;
+
+static char *mangle(const char *src) {
+    char *s = xstrdup(src);
+    for (char *p = s; *p; p++) {
+        if (*p == '/') *p = '_';
+    }
+    char *dot = strrchr(s, '.');
+    if (dot) *dot = 0;
+    return s;
+}
+
+static void unit_paths(Unit *u) {
+    // make obj/dep names stable & unique to the target
+    char *m = mangle(u->src);
+    u->obj = strf("%s/obj/%s/%s.o", g_out, u->t->name, m);
+    u->dep = strf("%s/%s/%s.d", g_deps, u->t->name, m);
+    u->meta = strf("%s/%s/%s.meta", g_meta, u->t->name, m);
+    u->ohash_path = strf("%s/obj/%s/%s.ohash", g_out, u->t->name, m);
+    mkdir_parent(u->obj);
+    mkdir_parent(u->dep);
+    mkdir_parent(u->meta);
+    free(m);
+}
+
+static void strl_push_unique(StrList *l, const char *s) {
+    for (int i = 0; i < l->count; i++)
+        if (!strcmp(l->items[i], s)) return;
+    strl_push(l, s);
+}
+
+// gather a dep's PUBLIC include dirs + defs, transitively (CMake's PUBLIC propagation)
+static void collect_pub(const Target *t, StrList *incs, StrList *defs, int depth) {
+    if (depth > 8) return;
+    for (int i = 0; i < t->includes.count; i++) strl_push_unique(incs, t->includes.items[i]);
+    for (int i = 0; i < t->pub_defs.count; i++) strl_push_unique(defs, t->pub_defs.items[i]);
+    for (int d = 0; d < t->deps.count; d++) {
+        Target *dt = find_target(&g_targets_ref, t->deps.items[d]);
+        if (dt) collect_pub(dt, incs, defs, depth + 1);
+    }
+}
+
+static void unit_build_cmd(Unit *u) {
+    Cmd *cmd = &u->cmd;
+    strl_push(cmd, "cc");
+    StrList base = {0};
+    base_cflags(&base);
+    strl_extend(cmd, &base);
+    strl_extend(cmd, &u->t->cflags);
+    for (int i = 0; i < u->t->defs.count; i++)
+        strl_pushf(cmd, "-D%s", u->t->defs.items[i]);
+    // transitive PUBLIC defs + includes from deps
+    StrList incs = {0};
+    for (int i = 0; i < u->t->includes.count; i++) strl_push_unique(&incs, u->t->includes.items[i]);
+    StrList pubd = {0};
+    for (int d = 0; d < u->t->deps.count; d++) {
+        Target *dt = find_target(&g_targets_ref, u->t->deps.items[d]);
+        if (dt) collect_pub(dt, &incs, &pubd, 0);
+    }
+    for (int i = 0; i < pubd.count; i++) strl_pushf(cmd, "-D%s", pubd.items[i]);
+    for (int i = 0; i < incs.count; i++) {
+        strl_push(cmd, "-I");
+        strl_push(cmd, incs.items[i]);
+    }
+    size_t sl = strlen(u->src);
+    if (sl > 2 && !strcmp(u->src + sl - 2, ".m")) strl_push(cmd, "-fobjc-arc");
+    strl_push(cmd, "-MMD");
+    strl_push(cmd, "-MF");
+    strl_push(cmd, u->dep);
+    strl_push(cmd, "-c");
+    strl_push(cmd, u->src);
+    strl_push(cmd, "-o");
+    strl_push(cmd, u->obj);
+
+    uint64_t h = hash_str(HASH_SEED, cc_version());
+    char *j = cmd_join(cmd);
+    h = hash_str(h, j);
+    free(j);
+    u->cmdhash = h;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// depfile parsing (compiler-emitted truth)
+// ─────────────────────────────────────────────────────────────────────────────
+
+static void parse_depfile(const char *path, StrList *headers) {
+    size_t len = 0;
+    char *buf = read_file(path, &len);
+    if (!buf) return;
+    // collapse continuations and newlines to spaces (our paths have no spaces)
+    for (size_t i = 0; i < len; i++)
+        if (buf[i] == '\\' || buf[i] == '\n' || buf[i] == '\r') buf[i] = ' ';
+    char *colon = strchr(buf, ':');
+    if (!colon) {
+        free(buf);
+        return;
+    }
+    char *p = colon + 1;
+    bool first = true;
+    while (*p) {
+        while (*p == ' ') p++;
+        if (!*p) break;
+        char *tok = p;
+        while (*p && *p != ' ') p++;
+        if (*p) *p++ = 0;
+        if (first) {
+            first = false;  // the object target itself
+        } else if (*tok) {
+            strl_push(headers, tok);
+        }
+    }
+    free(buf);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// up-to-date decision + content cache
+// ─────────────────────────────────────────────────────────────────────────────
+
+// meta file layout:
+//   cmd <hex>
+//   in <sec> <nsec> <size> <path>     (source first, then each header)
+//   obj <hex>                         (object content hash)
+static bool unit_up_to_date(Unit *u) {
+    uint64_t stored = 0;
+    size_t len = 0;
+    char *meta = read_file(u->meta, &len);
+    if (!meta) return false;
+    if (!path_exists(u->obj)) {
+        free(meta);
+        return false;
+    }
+    bool ok = true;
+    char *save = NULL;
+    for (char *line = strtok_r(meta, "\n", &save); line; line = strtok_r(NULL, "\n", &save)) {
+        if (!strncmp(line, "cmd ", 4)) {
+            stored = strtoull(line + 4, NULL, 16);
+        } else if (!strncmp(line, "in ", 3)) {
+            long long sec, nsec, size;
+            char path[4096];
+            if (sscanf(line + 3, "%lld %lld %lld %4095[^\n]", &sec, &nsec, &size, path) == 4) {
+                char *full = path[0] == '/' ? xstrdup(path) : strf("%s/%s", g_root, path);
+                Stamp st;
+                if (!stamp_of(full, &st)) {
+                    ok = false;
+                } else if (st.sec != sec || st.nsec != nsec || st.size != size) {
+                    ok = false;
+                }
+                free(full);
+            }
+        }
+        if (!ok) break;
+    }
+    free(meta);
+    if (!ok || stored != u->cmdhash) return false;
+    return true;
+}
+
+static void write_meta(Unit *u, uint64_t obj_hash) {
+    StrList hdrs = {0};
+    parse_depfile(u->dep, &hdrs);
+    StrList lines = {0};
+    strl_pushf(&lines, "cmd %llx", (unsigned long long)u->cmdhash);
+    Stamp st;
+    if (stamp_of(u->src, &st))
+        strl_pushf(&lines, "in %lld %lld %lld %s", st.sec, st.nsec, st.size, u->src);
+    for (int i = 0; i < hdrs.count; i++) {
+        if (stamp_of(hdrs.items[i], &st))
+            strl_pushf(&lines, "in %lld %lld %lld %s", st.sec, st.nsec, st.size, hdrs.items[i]);
+    }
+    strl_pushf(&lines, "obj %llx", (unsigned long long)obj_hash);
+
+    size_t n = 1;
+    for (int i = 0; i < lines.count; i++) n += strlen(lines.items[i]) + 1;
+    char *buf = xmalloc(n);
+    buf[0] = 0;
+    for (int i = 0; i < lines.count; i++) {
+        strcat(buf, lines.items[i]);
+        strcat(buf, "\n");
+    }
+    write_file(u->meta, buf);
+    free(buf);
+}
+
+// content hash over the exact inputs the compiler will see
+static uint64_t unit_content_hash(Unit *u) {
+    uint64_t h = u->cmdhash;
+    hash_file(&h, u->src);
+    StrList hdrs = {0};
+    parse_depfile(u->dep, &hdrs);
+    for (int i = 0; i < hdrs.count; i++) {
+        h = hash_str(h, hdrs.items[i]);
+        hash_file(&h, hdrs.items[i]);
+    }
+    return h;
+}
+
+static char *cache_path(uint64_t h) {
+    return strf("%s/%016llx.o", g_cache, (unsigned long long)h);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// build driver
+// ─────────────────────────────────────────────────────────────────────────────
+
+static Unit *g_units = NULL;
+static int g_unit_count = 0;
+
+static void compile_all(void) {
+    // build the unit list for every target
+    int total = 0;
+    for (int i = 0; i < g_targets_ref.count; i++)
+        total += g_targets_ref.items[i].srcs.count;
+    g_units = xmalloc((size_t)total * sizeof(Unit));
+    g_unit_count = 0;
+
+    Job *jobs = xmalloc((size_t)total * sizeof(Job));
+    int job_count = 0;
+    int fresh = 0;
+
+    for (int i = 0; i < g_targets_ref.count; i++) {
+        Target *t = &g_targets_ref.items[i];
+        for (int s = 0; s < t->srcs.count; s++) {
+            Unit *u = &g_units[g_unit_count++];
+            memset(u, 0, sizeof *u);
+            u->t = t;
+            u->src = t->srcs.items[s];
+            unit_paths(u);
+            unit_build_cmd(u);
+            u->need_build = !unit_up_to_date(u);
+            if (u->need_build) {
+                Job j = {0};
+                j.cmd = u->cmd;
+                char *m = mangle(t->srcs.items[s]);
+                j.log_path = strf("%s/logs/%s_%s.log", g_state, t->name, m);
+                free(m);
+                j.label = t->srcs.items[s];
+                jobs[job_count++] = j;
+            } else {
+                fresh++;
+            }
+        }
+    }
+
+    if (job_count == 0) {
+        printf("b: %d unit(s) up to date\n", fresh);
+        free(jobs);
+        return;
+    }
+    printf("b: compiling %d unit(s) [%d up to date] with -j%d\n", job_count, fresh,
+           g_max_jobs);
+    int failed = run_jobs(jobs, job_count, g_max_jobs, g_verbose);
+    if (failed) die("%d compilation(s) failed", failed);
+
+    // post-process each compiled unit: meta + content cache
+    for (int i = 0; i < g_unit_count; i++) {
+        Unit *u = &g_units[i];
+        if (!u->need_build) continue;
+        uint64_t h = unit_content_hash(u);
+        char *cp = cache_path(h);
+        if (!path_exists(cp)) {
+            Cmd c = {0};
+            strl_push(&c, "cp");
+            strl_push(&c, u->obj);
+            strl_push(&c, cp);
+            run_sync(&c);
+        }
+        write_meta(u, h);
+        free(cp);
+    }
+    free(jobs);
+}
+
+static bool target_objs_changed(const Target *t) {
+    for (int i = 0; i < g_unit_count; i++) {
+        if (g_units[i].t == t && g_units[i].need_build) return true;
+    }
+    return false;
+}
+
+// hash of the target's object list, so adding/removing a source forces a relink
+static uint64_t target_obj_hash(const Target *t) {
+    uint64_t h = HASH_SEED;
+    for (int i = 0; i < g_unit_count; i++)
+        if (g_units[i].t == t) h = hash_str(h, g_units[i].obj);
+    return h;
+}
+
+// assemble a double-clickable macOS .app bundle around a built app binary
+static void make_app_bundle(Target *t) {
+#ifdef __APPLE__
+    char *app = strf("%s/apps/%s.app", g_out, t->name);
+    char *macos = strf("%s/Contents/MacOS", app);
+    mkdir_p(macos);
+    mkdir_p(strf("%s/Contents/Resources", app));
+    Cmd cp = {0};
+    strl_push(&cp, "cp");
+    strl_push(&cp, t->out_path);
+    strl_push(&cp, strf("%s/%s", macos, t->name));
+    run_sync(&cp);
+    char *plist = strf(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" "
+        "\"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+        "<plist version=\"1.0\">\n<dict>\n"
+        "  <key>CFBundleName</key><string>%s</string>\n"
+        "  <key>CFBundleDisplayName</key><string>%s</string>\n"
+        "  <key>CFBundleIdentifier</key><string>dev.vexgraph.%s</string>\n"
+        "  <key>CFBundleExecutable</key><string>%s</string>\n"
+        "  <key>CFBundlePackageType</key><string>APPL</string>\n"
+        "  <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>\n"
+        "  <key>CFBundleShortVersionString</key><string>0.1.0</string>\n"
+        "  <key>CFBundleVersion</key><string>1</string>\n"
+        "  <key>LSMinimumSystemVersion</key><string>14.0</string>\n"
+        "  <key>NSHighResolutionCapable</key><true/>\n"
+        "  <key>NSPrincipalClass</key><string>NSApplication</string>\n"
+        "</dict>\n</plist>\n",
+        t->name, t->name, t->name, t->name);
+    write_file(strf("%s/Contents/Info.plist", app), plist);
+    Cmd cs = {0};
+    strl_push(&cs, "codesign");
+    strl_push(&cs, "--force");
+    strl_push(&cs, "--sign");
+    strl_push(&cs, "-");
+    strl_push(&cs, app);
+    run_sync(&cs);
+    printf("b: bundled %s\n", app);
+#else
+    (void)t;
+#endif
+}
+
+// transitive link libraries (a dep's dep must follow it on the link line)
+static void collect_link_libs(const Target *t, StrList *out, int depth) {
+    if (depth > 8) return;
+    for (int d = 0; d < t->deps.count; d++) {
+        Target *dt = find_target(&g_targets_ref, t->deps.items[d]);
+        if (!dt) continue;
+        strl_push_unique(out, dt->out_path);
+        collect_link_libs(dt, out, depth + 1);
+    }
+}
+
+static void link_target(Target *t) {
+    uint64_t listh = target_obj_hash(t);
+    bool need = target_objs_changed(t);
+    char *lmeta = strf("%s/%s.link", g_meta, t->name);
+    if (!need) {
+        size_t len = 0;
+        char *m = read_file(lmeta, &len);
+        if (!m || !path_exists(t->out_path)) {
+            need = true;
+        } else {
+            uint64_t stored = 0;
+            char *p = strstr(m, "list ");
+            if (p) stored = strtoull(p + 5, NULL, 16);
+            if (stored != listh) need = true;
+        }
+        free(m);
+    }
+    if (!need) return;
+
+    Cmd c = {0};
+    if (t->kind == T_LIB) {
+        strl_push(&c, "ar");
+        strl_push(&c, "rcs");
+        strl_push(&c, t->out_path);
+        for (int i = 0; i < g_unit_count; i++)
+            if (g_units[i].t == t) strl_push(&c, g_units[i].obj);
+    } else if (t->kind == T_MOD) {
+        strl_push(&c, "cc");
+        for (int i = 0; i < g_unit_count; i++)
+            if (g_units[i].t == t) strl_push(&c, g_units[i].obj);
+        // a loadable bundle: unresolved symbols bind at dlopen time
+        strl_push(&c, "-bundle");
+        strl_push(&c, "-Wl,-undefined,dynamic_lookup");
+        strl_push(&c, "-o");
+        strl_push(&c, t->out_path);
+    } else {
+        strl_push(&c, "cc");
+        StrList base = {0};
+        base_lflags(&base);
+        strl_extend(&c, &base);
+        for (int i = 0; i < g_unit_count; i++)
+            if (g_units[i].t == t) strl_push(&c, g_units[i].obj);
+        StrList libs = {0};
+        collect_link_libs(t, &libs, 0);
+        strl_extend(&c, &libs);
+        strl_extend(&c, &t->syslibs);
+        strl_push(&c, "-o");
+        strl_push(&c, t->out_path);
+    }
+    if (g_verbose) printf("  link %s\n", t->name);
+    mkdir_parent(t->out_path);
+    if (t->kind == T_LIB) unlink(t->out_path);  // ar is incremental: rebuild clean
+    run_sync(&c);
+    if (t->kind == T_APP) make_app_bundle(t);
+    write_file(lmeta, strf("list %016llx\n", (unsigned long long)listh));
+    free(lmeta);
+}
+
+static void build_all(void) {
+    compile_all();
+    for (int i = 0; i < g_targets_ref.count; i++) link_target(&g_targets_ref.items[i]);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// watch: rebuild on change (the hotload loop)
+// ─────────────────────────────────────────────────────────────────────────────
+
+static uint64_t watch_snapshot(void) {
+    uint64_t h = HASH_SEED;
+    StrList dirs = {0};
+    for (int i = 0; i < g_targets_ref.count; i++) {
+        Target *t = &g_targets_ref.items[i];
+        for (int d = 0; d < t->includes.count; d++) {
+            bool seen = false;
+            for (int k = 0; k < dirs.count; k++)
+                if (!strcmp(dirs.items[k], t->includes.items[d])) { seen = true; break; }
+            if (seen) continue;
+            strl_push(&dirs, t->includes.items[d]);
+            StrList all = {0};
+            glob_rec(t->includes.items[d], "", &all);
+            strl_sort(&all);
+            for (int k = 0; k < all.count; k++) {
+                Stamp st;
+                if (stamp_of(all.items[k], &st)) {
+                    h = hash_str(h, all.items[k]);
+                    h = fnv1a(h, &st, sizeof st);
+                }
+            }
+        }
+        for (int s = 0; s < t->srcs.count; s++) {
+            Stamp st;
+            if (stamp_of(t->srcs.items[s], &st)) {
+                h = hash_str(h, t->srcs.items[s]);
+                h = fnv1a(h, &st, sizeof st);
+            }
+        }
+    }
+    return h;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// b.json (clangd database)
+// ─────────────────────────────────────────────────────────────────────────────
+
+static void gen_compile_commands(void) {
+    StrList entries = {0};
+    for (int i = 0; i < g_unit_count; i++) {
+        Unit *u = &g_units[i];
+        char *cmd = cmd_join(&u->cmd);
+        strl_pushf(&entries, "  {\n    \"directory\": \"%s\",\n    \"file\": \"%s\",\n    \"command\": \"%s\"\n  }",
+                   g_root, u->src, cmd);
+        free(cmd);
+    }
+    size_t n = 32;
+    for (int i = 0; i < entries.count; i++) n += strlen(entries.items[i]) + 2;
+    char *buf = xmalloc(n);
+    strcpy(buf, "[\n");
+    for (int i = 0; i < entries.count; i++) {
+        strcat(buf, entries.items[i]);
+        strcat(buf, i + 1 < entries.count ? ",\n" : "\n");
+    }
+    strcat(buf, "]\n");
+    write_file(strf("%s/b.json", g_root), buf);
+    printf("b: wrote b.json (%d entries)\n", entries.count);
+    free(buf);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// self-rebuild + bootstrap
+// ─────────────────────────────────────────────────────────────────────────────
+
+static void rebuild_self(char **argv) {
+    const char *src = "tools/b.c";
+    if (!path_exists(src)) return;
+
+    char *bin = strf("%s/b", g_state);
+    char *hashf = strf("%s/b.hash", g_state);
+
+    uint64_t h = HASH_SEED;
+    hash_file(&h, src);
+    char hex[32];
+    snprintf(hex, sizeof hex, "%016llx", (unsigned long long)h);
+
+    size_t len = 0;
+    char *stored = read_file(hashf, &len);
+    bool same = stored && strncmp(stored, hex, 16) == 0;
+    free(stored);
+
+    if (same && path_exists(bin)) return;
+
+    printf("b: rebuilding itself…\n");
+    mkdir_p(g_state);
+    Cmd c = {0};
+    strl_push(&c, "cc");
+    strl_push(&c, "-std=gnu23");
+    strl_push(&c, "-O2");
+    strl_push(&c, "-Wall");
+    strl_push(&c, "-Wextra");
+    strl_push(&c, src);
+    strl_push(&c, "-o");
+    char *tmp = strf("%s/b.new", g_state);
+    strl_push(&c, tmp);
+    run_sync(&c);
+    rename(tmp, bin);
+    write_file(hashf, hex);
+
+    // re-exec with the same args
+    execv(bin, argv);
+    die("re-exec failed: %s", strerror(errno));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// main
+// ─────────────────────────────────────────────────────────────────────────────
+
+static void usage(void) {
+    printf("b — our build system\n"
+           "usage: b [--release] [-j N] [-v] <command> [args]\n"
+           "commands: build [target...] | run <target> [args...] | test [substr]\n"
+           "          watch | cc | clean | doctor | targets\n");
+}
+
+int main(int argc, char **argv) {
+    char cwd[4096];
+    if (!getcwd(cwd, sizeof cwd)) die("getcwd failed");
+    g_root = xstrdup(cwd);
+    const char *nh = getenv("B_HOME");
+    if (nh && *nh) {
+        g_state = xstrdup(nh);
+    } else {
+        const char *home = getenv("HOME");
+        g_state = strf("%s/Library/Application Support/vexgraph/b", home ? home : ".");
+    }
+
+    // parse globals until the first non-flag
+    int i = 1;
+    const char *command = NULL;
+    StrList rest = {0};
+    for (; i < argc; i++) {
+        const char *a = argv[i];
+        if (a[0] == '-' && a[1]) {
+            if (!strcmp(a, "--release")) g_release = true;
+            else if (!strcmp(a, "-v") || !strcmp(a, "--verbose")) g_verbose = true;
+            else if (!strcmp(a, "-j")) {
+                if (++i >= argc) die("-j needs a number");
+                g_max_jobs = atoi(argv[i]);
+            } else if (a[1] == 'j') {
+                g_max_jobs = atoi(a + 2);
+            } else if (!strcmp(a, "-h") || !strcmp(a, "--help")) {
+                usage();
+                return 0;
+            } else {
+                die("unknown flag: %s", a);
+            }
+        } else {
+            command = a;
+            i++;
+            break;
+        }
+    }
+    for (; i < argc; i++) strl_push(&rest, argv[i]);
+    if (g_max_jobs <= 0) g_max_jobs = 4;
+
+    rebuild_self(argv);
+
+    if (!command) {
+        usage();
+        return 1;
+    }
+
+    setup_paths();
+    setup_targets(&g_targets_ref);
+
+    if (!strcmp(command, "targets")) {
+        for (int k = 0; k < g_targets_ref.count; k++) {
+            const char *kindstr = g_targets_ref.items[k].kind == T_LIB ? "lib"
+                                : g_targets_ref.items[k].kind == T_MOD ? "mod"
+                                : g_targets_ref.items[k].kind == T_APP ? "app" : "exe";
+            printf("%-7s %s\n", kindstr, g_targets_ref.items[k].name);
+        }
+        return 0;
+    }
+    if (!strcmp(command, "doctor")) {
+        printf("root:     %s\nconfig:   %s\ncc:       %s\njobs:     %d\n",
+               g_root, g_release ? "release" : "debug", cc_version(), g_max_jobs);
+        StrList f = {0};
+        base_cflags(&f);
+        char *s = cmd_join(&f);
+        printf("cflags:   %s\n", s);
+        free(s);
+        for (int k = 0; k < g_targets_ref.count && k < 3; k++) {
+            Target *t = &g_targets_ref.items[k];
+            printf("target %-12s %d src(s) -> %s\n", t->name, t->srcs.count, t->out_path);
+        }
+        return 0;
+    }
+    if (!strcmp(command, "clean")) {
+        Cmd c = {0};
+        strl_push(&c, "rm");
+        strl_push(&c, "-rf");
+        strl_push(&c, strf("%s/out", g_state));
+        run_sync(&c);
+        printf("b: cleaned %s/out\n", g_state);
+        return 0;
+    }
+    if (!strcmp(command, "cc")) {
+        compile_all();
+        gen_compile_commands();
+        return 0;
+    }
+    if (!strcmp(command, "watch")) {
+        build_all();
+        uint64_t prev = watch_snapshot();
+        printf("b: watching for changes… (Ctrl-C to stop)\n");
+        fflush(stdout);
+        for (;;) {
+            usleep(300000);
+            uint64_t cur = watch_snapshot();
+            if (cur == prev) continue;
+            printf("\n=== change detected — rebuilding ===\n");
+            build_all();
+            prev = watch_snapshot();
+            fflush(stdout);
+        }
+    }
+    if (!strcmp(command, "build") || !strcmp(command, "run") || !strcmp(command, "test")) {
+        build_all();
+        if (!strcmp(command, "build")) {
+            gen_compile_commands();
+            return 0;
+        }
+        if (!strcmp(command, "run")) {
+            if (rest.count == 0) die("run needs a target");
+            Target *t = find_target(&g_targets_ref, rest.items[0]);
+            if (!t) die("no such target: %s", rest.items[0]);
+            if (t->kind == T_LIB) die("%s is a library, not a runnable app", t->name);
+            if (t->kind == T_MOD) die("%s is a loadable module, not a runnable app", t->name);
+            if (t->kind == T_APP) {
+                char *app = strf("%s/apps/%s.app", g_out, t->name);
+                Cmd o = {0};
+                strl_push(&o, "open");
+                strl_push(&o, app);
+                printf("b: launching %s\n", app);
+                fflush(stdout);
+                run_sync(&o);
+                return 0;
+            }
+            char **a = xmalloc(((size_t)rest.count + 1) * sizeof(char *));
+            a[0] = t->out_path;
+            int n = 1;
+            for (int k = 1; k < rest.count; k++) a[n++] = rest.items[k];
+            a[n] = NULL;
+            printf("b: launching %s\n", t->out_path);
+            fflush(stdout);
+            execv(t->out_path, a);
+            die("exec %s failed: %s", t->out_path, strerror(errno));
+        }
+        // test
+        StrList tests = {0};
+        for (int k = 0; k < g_targets_ref.count; k++) {
+            Target *t = &g_targets_ref.items[k];
+            if (!t->is_test) continue;
+            if (rest.count && !strstr(t->name, rest.items[0])) continue;
+            strl_push(&tests, t->out_path);
+        }
+        printf("b: running %d test(s)\n", tests.count);
+        int failed = 0;
+        for (int k = 0; k < tests.count; k++) {
+            Cmd c = {0};
+            strl_push(&c, tests.items[k]);
+            int st = run_capture(&c, NULL);
+            if (st == 0) {
+                printf("  PASS %s\n", tests.items[k]);
+            } else {
+                printf("  FAIL %s (exit %d)\n", tests.items[k], st);
+                failed++;
+            }
+        }
+        printf("b: %d passed, %d failed\n", tests.count - failed, failed);
+        return failed ? 1 : 0;
+    }
+
+    usage();
+    return 1;
+}
