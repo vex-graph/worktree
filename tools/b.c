@@ -37,6 +37,7 @@
 #include <errno.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -142,6 +143,20 @@ static bool write_file(const char *path, const char *data) {
     fwrite(data, 1, strlen(data), f);
     fclose(f);
     return true;
+}
+
+// escape a string for a JSON string literal (quotes/backslashes break b.json)
+static char *json_escape(const char *s) {
+    size_t n = 1;
+    for (const char *p = s; *p; p++) n += (*p == '"' || *p == '\\') ? 2 : 1;
+    char *out = xmalloc(n);
+    char *w = out;
+    for (const char *p = s; *p; p++) {
+        if (*p == '"' || *p == '\\') *w++ = '\\';
+        *w++ = *p;
+    }
+    *w = 0;
+    return out;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -499,6 +514,40 @@ static void setup_paths(void) {
     mkdir_p(strf("%s/logs", g_state));
 }
 
+// run one test: capture output to a log, enforce a wall-clock timeout, and
+// return the exit status (-1 on timeout, -2 on signal).
+static int run_test(const char *name, Cmd *cmd, int timeout_s) {
+    char *log = strf("%s/logs/test_%s.log", g_state, name);
+    mkdir_parent(log);
+    int fd = open(log, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd < 0) die("cannot open %s", log);
+    char **argv = cmd_argv(cmd);
+    pid_t pid = fork();
+    if (pid < 0) die("fork failed");
+    if (pid == 0) {
+        dup2(fd, 1);
+        dup2(fd, 2);
+        close(fd);
+        execvp(argv[0], argv);
+        _exit(127);
+    }
+    free(argv);
+    close(fd);
+    int st = 0;
+    bool done = false;
+    for (int i = 0; i < timeout_s * 20; i++) {
+        pid_t r = waitpid(pid, &st, WNOHANG);
+        if (r == pid) { done = true; break; }
+        usleep(50000);
+    }
+    if (!done) {
+        kill(pid, SIGKILL);
+        waitpid(pid, &st, 0);
+        return -1;
+    }
+    return WIFEXITED(st) ? WEXITSTATUS(st) : -2;
+}
+
 static char *cc_version(void) {
     if (g_cc_version) return g_cc_version;
     Cmd c = {0};
@@ -742,6 +791,7 @@ static void setup_hotcwap(TargetList *tl) {
     strl_push(&bad->includes, abspath(strf("%s/src", VEXSPOKE)));
     strl_push(&bad->defs, "HOT_BEHAVIOR_SCHEMA_MAGIC=0xBADC0DE5u");
     bad->out_path = strf("%s/modules_bad/hot_behavior.so", g_out);
+    char *badpath = xstrdup(bad->out_path);
 
     const char *needs_mod[] = {
         "manifest_hot_test", "two_dylib_swap_test", "wrong_binary_test",
@@ -773,6 +823,8 @@ static void setup_hotcwap(TargetList *tl) {
         for (size_t k = 0; k < sizeof needs_mod / sizeof needs_mod[0]; k++)
             if (!strcmp(name, needs_mod[k]))
                 strl_pushf(&t->defs, "HOT_BEHAVIOR_MODULE=\"%s\"", modpath);
+        if (!strcmp(name, "manifest_rollback_test"))
+            strl_pushf(&t->defs, "HOT_BEHAVIOR_BAD_MODULE=\"%s\"", badpath);
     }
 }
 
@@ -805,10 +857,8 @@ static void setup_apps(TargetList *tl) {
         strl_push(&t->srcs, apps.items[i]);
         for (int k = 0; k < shared.count; k++) strl_push(&t->srcs, shared.items[k]);
         strl_push(&t->includes, dir);
-        strl_push(&t->includes, abspath("ecosystem/hotcwap"));
         strl_push(&t->includes, abspath(strf("%s/src", VEXSPOKE)));
-        strl_push(&t->deps, "vexspoke");
-        strl_push(&t->deps, "hotcwap");
+        strl_push(&t->deps, "*");  // auto-link every library that exists
         add_exe_libs(t);
     }
 }
@@ -869,13 +919,21 @@ static void strl_push_unique(StrList *l, const char *s) {
     strl_push(l, s);
 }
 
-// gather a dep's PUBLIC include dirs + defs, transitively (CMake's PUBLIC propagation)
+// gather a dep's PUBLIC include dirs + defs, transitively (CMake's PUBLIC
+// propagation). The sentinel dep "*" expands to every library that exists.
 static void collect_pub(const Target *t, StrList *incs, StrList *defs, int depth) {
     if (depth > 8) return;
     for (int i = 0; i < t->includes.count; i++) strl_push_unique(incs, t->includes.items[i]);
     for (int i = 0; i < t->pub_defs.count; i++) strl_push_unique(defs, t->pub_defs.items[i]);
     for (int d = 0; d < t->deps.count; d++) {
-        Target *dt = find_target(&g_targets_ref, t->deps.items[d]);
+        const char *dn = t->deps.items[d];
+        if (!strcmp(dn, "*")) {
+            for (int i = 0; i < g_targets_ref.count; i++)
+                if (g_targets_ref.items[i].kind == T_LIB)
+                    collect_pub(&g_targets_ref.items[i], incs, defs, depth + 1);
+            continue;
+        }
+        Target *dt = find_target(&g_targets_ref, dn);
         if (dt) collect_pub(dt, incs, defs, depth + 1);
     }
 }
@@ -889,14 +947,10 @@ static void unit_build_cmd(Unit *u) {
     strl_extend(cmd, &u->t->cflags);
     for (int i = 0; i < u->t->defs.count; i++)
         strl_pushf(cmd, "-D%s", u->t->defs.items[i]);
-    // transitive PUBLIC defs + includes from deps
+    // transitive PUBLIC defs + includes (own + deps, "*" = all libs)
     StrList incs = {0};
-    for (int i = 0; i < u->t->includes.count; i++) strl_push_unique(&incs, u->t->includes.items[i]);
     StrList pubd = {0};
-    for (int d = 0; d < u->t->deps.count; d++) {
-        Target *dt = find_target(&g_targets_ref, u->t->deps.items[d]);
-        if (dt) collect_pub(dt, &incs, &pubd, 0);
-    }
+    collect_pub(u->t, &incs, &pubd, 0);
     for (int i = 0; i < pubd.count; i++) strl_pushf(cmd, "-D%s", pubd.items[i]);
     for (int i = 0; i < incs.count; i++) {
         strl_push(cmd, "-I");
@@ -1169,19 +1223,48 @@ static void make_app_bundle(Target *t) {
 #endif
 }
 
-// transitive link libraries (a dep's dep must follow it on the link line)
+// transitive link libraries (a dep's dep must follow it on the link line).
+// The sentinel dep "*" links every library that exists (dependents first, so
+// the dependency-free base lands last on the line).
 static void collect_link_libs(const Target *t, StrList *out, int depth) {
     if (depth > 8) return;
     for (int d = 0; d < t->deps.count; d++) {
-        Target *dt = find_target(&g_targets_ref, t->deps.items[d]);
+        const char *dn = t->deps.items[d];
+        if (!strcmp(dn, "*")) {
+            for (int i = g_targets_ref.count - 1; i >= 0; i--) {
+                Target *dt = &g_targets_ref.items[i];
+                if (dt == t || dt->kind != T_LIB) continue;
+                strl_push_unique(out, dt->out_path);
+                collect_link_libs(dt, out, depth + 1);
+            }
+            continue;
+        }
+        Target *dt = find_target(&g_targets_ref, dn);
         if (!dt) continue;
         strl_push_unique(out, dt->out_path);
         collect_link_libs(dt, out, depth + 1);
     }
 }
 
+// signature of a target's transitive libraries — a rebuilt dep must force a relink
+static uint64_t target_dep_sig(const Target *t) {
+    uint64_t h = HASH_SEED;
+    StrList libs = {0};
+    collect_link_libs(t, &libs, 0);
+    strl_sort(&libs);
+    for (int i = 0; i < libs.count; i++) {
+        Stamp st;
+        if (stamp_of(libs.items[i], &st)) {
+            h = hash_str(h, libs.items[i]);
+            h = fnv1a(h, &st, sizeof st);
+        }
+    }
+    return h;
+}
+
 static void link_target(Target *t) {
     uint64_t listh = target_obj_hash(t);
+    uint64_t depsig = target_dep_sig(t);
     bool need = target_objs_changed(t);
     char *lmeta = strf("%s/%s.link", g_meta, t->name);
     if (!need) {
@@ -1190,10 +1273,12 @@ static void link_target(Target *t) {
         if (!m || !path_exists(t->out_path)) {
             need = true;
         } else {
-            uint64_t stored = 0;
+            uint64_t sl = 0, sd = 0;
             char *p = strstr(m, "list ");
-            if (p) stored = strtoull(p + 5, NULL, 16);
-            if (stored != listh) need = true;
+            if (p) sl = strtoull(p + 5, NULL, 16);
+            p = strstr(m, "dep ");
+            if (p) sd = strtoull(p + 4, NULL, 16);
+            if (sl != listh || sd != depsig) need = true;
         }
         free(m);
     }
@@ -1234,7 +1319,8 @@ static void link_target(Target *t) {
     if (t->kind == T_LIB) unlink(t->out_path);  // ar is incremental: rebuild clean
     run_sync(&c);
     if (t->kind == T_APP) make_app_bundle(t);
-    write_file(lmeta, strf("list %016llx\n", (unsigned long long)listh));
+    write_file(lmeta, strf("list %016llx dep %016llx\n",
+                           (unsigned long long)listh, (unsigned long long)depsig));
     free(lmeta);
 }
 
@@ -1289,9 +1375,15 @@ static void gen_compile_commands(void) {
     for (int i = 0; i < g_unit_count; i++) {
         Unit *u = &g_units[i];
         char *cmd = cmd_join(&u->cmd);
+        char *ecmd = json_escape(cmd);
+        char *esrc = json_escape(u->src);
+        char *eroot = json_escape(g_root);
         strl_pushf(&entries, "  {\n    \"directory\": \"%s\",\n    \"file\": \"%s\",\n    \"command\": \"%s\"\n  }",
-                   g_root, u->src, cmd);
+                   eroot, esrc, ecmd);
         free(cmd);
+        free(ecmd);
+        free(esrc);
+        free(eroot);
     }
     size_t n = 32;
     for (int i = 0; i < entries.count; i++) n += strlen(entries.items[i]) + 2;
@@ -1506,20 +1598,38 @@ int main(int argc, char **argv) {
             strl_push(&tests, t->out_path);
         }
         printf("b: running %d test(s)\n", tests.count);
-        int failed = 0;
+        int failed = 0, timedout = 0;
         for (int k = 0; k < tests.count; k++) {
+            const char *nm = strrchr(tests.items[k], '/');
+            nm = nm ? nm + 1 : tests.items[k];
             Cmd c = {0};
             strl_push(&c, tests.items[k]);
-            int st = run_capture(&c, NULL);
+            int st = run_test(nm, &c, 30);
             if (st == 0) {
-                printf("  PASS %s\n", tests.items[k]);
+                printf("  PASS    %s\n", nm);
+            } else if (st == -1) {
+                printf("  TIMEOUT %s (>30s)\n", nm);
+                timedout++;
             } else {
-                printf("  FAIL %s (exit %d)\n", tests.items[k], st);
+                printf("  FAIL    %s (exit %d)\n", nm, st);
                 failed++;
+                char *lp = strf("%s/logs/test_%s.log", g_state, nm);
+                size_t len = 0;
+                char *txt = read_file(lp, &len);
+                if (txt && len) {
+                    char *p = txt + len;
+                    for (int lines = 0; p > txt && lines < 12;) {
+                        p--;
+                        if (*p == '\n') lines++;
+                    }
+                    fputs(p, stdout);
+                }
+                free(txt);
             }
         }
-        printf("b: %d passed, %d failed\n", tests.count - failed, failed);
-        return failed ? 1 : 0;
+        printf("b: %d passed, %d failed, %d timed out\n",
+               tests.count - failed - timedout, failed, timedout);
+        return (failed || timedout) ? 1 : 0;
     }
 
     usage();
