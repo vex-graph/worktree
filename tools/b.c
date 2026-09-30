@@ -145,6 +145,25 @@ static bool write_file(const char *path, const char *data) {
     return true;
 }
 
+// strip the workspace-root prefix from a path/command so generated files are
+// portable: "/root/eco/x.c" -> "eco/x.c" (resolved against the db dir).
+static char *relativize(const char *s, const char *root) {
+    size_t rl = strlen(root), n = strlen(s);
+    char *out = xmalloc(n + 1);
+    size_t w = 0;
+    for (size_t i = 0; i < n;) {
+        if (rl > 0 && i + rl <= n && strncmp(s + i, root, rl) == 0 &&
+            (s[i + rl] == '/' || s[i + rl] == '\0')) {
+            i += rl;
+            if (i < n && s[i] == '/') i++;   // drop the separator too
+        } else {
+            out[w++] = s[i++];
+        }
+    }
+    out[w] = '\0';
+    return out;
+}
+
 // escape a string for a JSON string literal (quotes/backslashes break b.json)
 static char *json_escape(const char *s) {
     size_t n = 1;
@@ -638,6 +657,33 @@ static void setup_vexspoke(TargetList *tl) {
     if (!g_release) strl_push(&v->pub_defs, "DEBUG_BORROW_CHECK=1");
 }
 
+// ── graphvex tests (tests/graphvex mirrors src/) ────────────────────────────
+static void setup_graphvex_tests(TargetList *tl) {
+    char *tdir = strf("%s/tests/graphvex", g_root);
+    StrList ts = {0};
+    glob_rec(tdir, "_test.c", &ts);
+    strl_sort(&ts);
+    for (int i = 0; i < ts.count; i++) {
+        const char *bn = strrchr(ts.items[i], '/');
+        bn = bn ? bn + 1 : ts.items[i];
+        char *name = xstrdup(bn);
+        name[strlen(name) - 2] = 0;
+        Target *t = target_new(tl, name, T_EXE);
+        t->is_test = true;
+        strl_push(&t->srcs, ts.items[i]);
+        strl_push(&t->includes, abspath("ecosystem/graphvex/src"));
+        strl_push(&t->defs, "UNDEBUG");
+        strl_push(&t->deps, "graphvex");
+        add_exe_libs(t);
+        // the renderer row references the Vulkan Device; its test links the loader
+        if (!strcmp(name, "vk_renderer_test") || !strcmp(name, "device_test")) {
+            strl_push(&t->syslibs, "-L/opt/homebrew/lib");
+            strl_push(&t->syslibs, "-lvulkan");
+            strl_push(&t->syslibs, "-Wl,-rpath,/opt/homebrew/lib");
+        }
+    }
+}
+
 static void setup_vexspoke_tests(TargetList *tl) {
     char *tests = strf("%s/tests/vexspoke", g_root);
     StrList srcs = {0};
@@ -863,13 +909,45 @@ static void setup_apps(TargetList *tl) {
     }
 }
 
+// ── ecosystem/graphvex (R3: GPU driver + graphics core) ─────────────────────
+static void add_gen(const char *src, const char *out, Cmd cmd);   // defined below
+
+static void setup_graphvex(TargetList *tl) {
+    char *base = abspath("ecosystem/graphvex");
+    Target *lib = target_new(tl, "graphvex", T_LIB);
+    StrList c = {0};
+    glob_rec(strf("%s/src", base), ".c", &c);
+    strl_sort(&c);
+    lib->srcs = c;
+    strl_push(&lib->includes, strf("%s/src", base));
+    strl_push(&lib->includes, abspath(strf("%s/src", VEXSPOKE)));   // R3 borrows R2
+    strl_push(&lib->cflags, "-I/opt/homebrew/include");             // Vulkan headers
+    strl_push(&lib->deps, "vexspoke");
+
+    // shaders -> SPIR-V (regenerated only when the .vert/.frag changes)
+    const char *names[] = {"quad.vert", "quad.frag"};
+    for (size_t i = 0; i < sizeof names / sizeof names[0]; i++) {
+        char *src = strf("%s/src/vulkan/shaders/%s", base, names[i]);
+        char *out = strf("%s/shader/%s.spv", g_out, names[i]);
+        Cmd g = {0};
+        strl_push(&g, "glslangValidator");
+        strl_push(&g, "-V");
+        strl_push(&g, src);
+        strl_push(&g, "-o");
+        strl_push(&g, out);
+        add_gen(src, out, g);
+    }
+}
+
 static void setup_targets(TargetList *tl) {
     setup_vexspoke(tl);        // libs first
     setup_hotcwap(tl);
+    setup_graphvex(tl);
     setup_sesh(tl);
     setup_impedance(tl);
     setup_apihaven(tl);
     setup_apps(tl);            // _main/*.c apps
+    setup_graphvex_tests(tl);  // tests/graphvex mirrors graphvex/src
     setup_vexspoke_tests(tl);  // executables last
 }
 
@@ -1324,7 +1402,42 @@ static void link_target(Target *t) {
     free(lmeta);
 }
 
+// ── generated sources (shaders -> SPIR-V, etc.) ─────────────────────────────
+typedef struct GenStep {
+    char *src;
+    char *out;
+    Cmd cmd;
+} GenStep;
+
+static GenStep *g_gens = NULL;
+static int g_genCount = 0;
+static int g_genCap = 0;
+
+static void add_gen(const char *src, const char *out, Cmd cmd) {
+    if (g_genCount == g_genCap) {
+        g_genCap = g_genCap ? g_genCap * 2 : 16;
+        g_gens = xrealloc(g_gens, (size_t)g_genCap * sizeof *g_gens);
+    }
+    g_gens[g_genCount].src = xstrdup(src);
+    g_gens[g_genCount].out = xstrdup(out);
+    g_gens[g_genCount].cmd = cmd;
+    g_genCount++;
+}
+
+static void run_gens(void) {
+    for (int i = 0; i < g_genCount; i++) {
+        Stamp s, o;
+        if (path_exists(g_gens[i].out) && stamp_of(g_gens[i].src, &s) &&
+            stamp_of(g_gens[i].out, &o) && s.sec <= o.sec && s.nsec <= o.nsec)
+            continue;
+        mkdir_parent(g_gens[i].out);
+        if (g_verbose) printf("  gen  %s\n", g_gens[i].out);
+        run_sync(&g_gens[i].cmd);
+    }
+}
+
 static void build_all(void) {
+    run_gens();
     compile_all();
     for (int i = 0; i < g_targets_ref.count; i++) link_target(&g_targets_ref.items[i]);
 }
@@ -1374,16 +1487,29 @@ static void gen_compile_commands(void) {
     StrList entries = {0};
     for (int i = 0; i < g_unit_count; i++) {
         Unit *u = &g_units[i];
-        char *cmd = cmd_join(&u->cmd);
-        char *ecmd = json_escape(cmd);
-        char *esrc = json_escape(u->src);
-        char *eroot = json_escape(g_root);
-        strl_pushf(&entries, "  {\n    \"directory\": \"%s\",\n    \"file\": \"%s\",\n    \"command\": \"%s\"\n  }",
-                   eroot, esrc, ecmd);
+        // the db command needs neither the object (-o) nor the depfile (-MF);
+        // dropping them keeps b.json free of machine-specific paths.
+        Cmd dbc = {0};
+        for (int k = 0; k < u->cmd.count; k++) {
+            const char *a = u->cmd.items[k];
+            if (!strcmp(a, "-o") || !strcmp(a, "-MF")) { k++; continue; }
+            strl_push(&dbc, a);
+        }
+        char *cmd = cmd_join(&dbc);
+        char *r1 = relativize(cmd, g_root);
+        char *rcmd = relativize(r1, g_state);   // strip the state dir too
+        char *rsrc = relativize(u->src, g_root);
+        free(r1);
+        char *ecmd = json_escape(rcmd);
+        char *esrc = json_escape(rsrc);
+        // portable: paths are relative to the db's own directory (the root)
+        strl_pushf(&entries, "  {\n    \"directory\": \".\",\n    \"file\": \"%s\",\n    \"command\": \"%s\"\n  }",
+                   esrc, ecmd);
         free(cmd);
+        free(rcmd);
+        free(rsrc);
         free(ecmd);
         free(esrc);
-        free(eroot);
     }
     size_t n = 32;
     for (int i = 0; i < entries.count; i++) n += strlen(entries.items[i]) + 2;
