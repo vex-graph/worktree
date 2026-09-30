@@ -490,7 +490,7 @@ static TargetList g_targets_ref;
 static void apple_frameworks(StrList *l) {
     const char *fw[] = {
         "Foundation", "LocalAuthentication", "Network", "Security", "AVFoundation",
-        "Cocoa", "AppKit", "CoreGraphics", "Metal", "IOKit", "CoreAudio",
+        "Cocoa", "AppKit", "CoreGraphics", "QuartzCore", "Metal", "IOKit", "CoreAudio",
         "AudioToolbox", "Contacts", "EventKit", "Photos", "CoreLocation",
         "UserNotifications", "CoreServices",
     };
@@ -657,6 +657,19 @@ static void setup_vexspoke(TargetList *tl) {
     if (!g_release) strl_push(&v->pub_defs, "DEBUG_BORROW_CHECK=1");
 }
 
+// ── projects/darling (R4: the UI toolkit — Frame, Containers, Elements) ────
+static void setup_darling(TargetList *tl) {
+    char *base = abspath("projects/darling");
+    Target *lib = target_new(tl, "darling", T_LIB);
+    StrList c = {0};
+    glob_rec(strf("%s/darling", base), ".c", &c);
+    strl_sort(&c);
+    lib->srcs = c;
+    strl_push(&lib->includes, base);
+    strl_push(&lib->deps, "hotcwap");   // R1: the OS window
+    strl_push(&lib->deps, "graphvex");  // R3: the renderer + Panel
+}
+
 // ── graphvex tests (tests/graphvex mirrors src/) ────────────────────────────
 static void setup_graphvex_tests(TargetList *tl) {
     char *tdir = strf("%s/tests/graphvex", g_root);
@@ -676,7 +689,8 @@ static void setup_graphvex_tests(TargetList *tl) {
         strl_push(&t->deps, "graphvex");
         add_exe_libs(t);
         // the renderer row references the Vulkan Device; its test links the loader
-        if (!strcmp(name, "vk_renderer_test") || !strcmp(name, "device_test")) {
+        if (!strcmp(name, "vk_renderer_test") || !strcmp(name, "device_test") ||
+            !strcmp(name, "gpu_render_test")) {
             strl_push(&t->syslibs, "-L/opt/homebrew/lib");
             strl_push(&t->syslibs, "-lvulkan");
             strl_push(&t->syslibs, "-Wl,-rpath,/opt/homebrew/lib");
@@ -906,6 +920,10 @@ static void setup_apps(TargetList *tl) {
         strl_push(&t->includes, abspath(strf("%s/src", VEXSPOKE)));
         strl_push(&t->deps, "*");  // auto-link every library that exists
         add_exe_libs(t);
+        // darling pulls in the Vulkan backend, so apps link the loader
+        strl_push(&t->syslibs, "-L/opt/homebrew/lib");
+        strl_push(&t->syslibs, "-lvulkan");
+        strl_push(&t->syslibs, "-Wl,-rpath,/opt/homebrew/lib");
     }
 }
 
@@ -922,6 +940,7 @@ static void setup_graphvex(TargetList *tl) {
     strl_push(&lib->includes, strf("%s/src", base));
     strl_push(&lib->includes, abspath(strf("%s/src", VEXSPOKE)));   // R3 borrows R2
     strl_push(&lib->cflags, "-I/opt/homebrew/include");             // Vulkan headers
+    strl_push(&lib->cflags, strf("-I%s/shader", g_out));           // embedded SPIR-V header
     strl_push(&lib->deps, "vexspoke");
 
     // shaders -> SPIR-V (regenerated only when the .vert/.frag changes)
@@ -937,6 +956,19 @@ static void setup_graphvex(TargetList *tl) {
         strl_push(&g, out);
         add_gen(src, out, g);
     }
+    // embed the SPIR-V into a header the renderer #includes (regen on EITHER
+    // shader change — one step keyed on the vert, one on the frag)
+    for (size_t i = 0; i < sizeof names / sizeof names[0]; i++) {
+        char *src = strf("%s/src/vulkan/shaders/%s", base, names[i]);
+        char *hdr = strf("%s/shader/quad_spv.h", g_out);
+        Cmd g = {0};
+        strl_push(&g, "python3");
+        strl_push(&g, strf("%s/tools/spv_header.py", g_root));
+        strl_push(&g, strf("%s/shader/quad.vert.spv", g_out));
+        strl_push(&g, strf("%s/shader/quad.frag.spv", g_out));
+        strl_push(&g, hdr);
+        add_gen(src, hdr, g);
+    }
 }
 
 static void setup_targets(TargetList *tl) {
@@ -946,6 +978,7 @@ static void setup_targets(TargetList *tl) {
     setup_sesh(tl);
     setup_impedance(tl);
     setup_apihaven(tl);
+    setup_darling(tl);
     setup_apps(tl);            // _main/*.c apps
     setup_graphvex_tests(tl);  // tests/graphvex mirrors graphvex/src
     setup_vexspoke_tests(tl);  // executables last
