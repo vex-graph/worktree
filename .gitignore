@@ -12,6 +12,8 @@ ecosystem/
 repos/
 projects/
 tests/
+_notes/
+_main/
 _trash/
 
 # Build output
