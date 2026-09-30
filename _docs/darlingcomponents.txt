@@ -1,0 +1,72 @@
+theres three types of darling objects:
+
+theres an element
+theres a container
+theres a component
+
+component properties:
+values:
+x, y, width, height
+anchor (9 anchors, top(left, middle, right), center(left, middle, right), bottom(left, middle, right))
+pivot (5 pivots, top(left, right), bottom(left, right), center)
+corner radius
+cornertype (arc, superellipse)
+margin (+location for its self element)
+padding (+location for its (other component and child elements))
+border
+minimum x, y, width, height
+maximum x, y, width, height
+parent (component)
+backgroundcolor
+backgroundrender()
+foregroundrender()
+
+this is for the buffers to pass it on so that every single values is the same:
+absolute width (including the anchors, pivots, width, height, margin and padding all in one)
+absolute height (including the anchors, pivots, width, height, margin and padding all in one)
+absolute x (same)
+absolute y (same)
+
+container:
+components[]
+
+
+Graphics {
+()()s
+}
+
+that includes
+
+VKGraphics
+MTLGraphics
+DGraphics
+
+like
+
+(fillRect)()
+(drawRect)()
+
+and many more...
+
+we need to have a bunch of ()()s inside a function and use those functions to create a single context and just... use it for the whole thing
+
+(bindless)()
+
+then use getters for Graphics_functionName() to do all the work
+
+for example:
+
+static void Graphics_fillRect(params) {
+    currentGraphics.fillRect(params);
+}
+
+thats how we do it
+
+we need to have src/ (for main graphics), vulkan/ directory, metal/ directory and direct/ directory too.. so yeah
+
+we need to have a unified graphic system because thats what makes to have a cleaner code before we even progress more
+
+panels:
+consists of:
+component
+container

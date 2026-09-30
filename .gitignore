@@ -1,0 +1,32 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# vex-graph/worktree — root superbuild + agent docs repository.
+#
+# This root repo tracks ONLY the workspace scaffolding and documentation.
+# Every directory below is an *independent* git checkout with its own remote.
+# They are ignored here on purpose so this repo never duplicates their content.
+# Commit and push inside each of those checkouts — never here.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Nested independent repositories
+ecosystem/
+repos/
+projects/
+tests/
+trash/
+
+# Build output
+cmake-build-*/
+build/
+*.o
+*.a
+*.dylib
+*.dSYM/
+
+# IDE / editor
+.idea/
+.vscode/
+
+# OS / misc
+.DS_Store
+__pycache__/
+*.pyc
