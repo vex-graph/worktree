@@ -492,7 +492,7 @@ static void apple_frameworks(StrList *l) {
         "Foundation", "LocalAuthentication", "Network", "Security", "AVFoundation",
         "Cocoa", "AppKit", "CoreGraphics", "QuartzCore", "Metal", "IOKit", "CoreAudio",
         "AudioToolbox", "Contacts", "EventKit", "Photos", "CoreLocation",
-        "UserNotifications", "CoreServices",
+        "UserNotifications", "CoreServices", "ImageIO",
     };
     for (size_t i = 0; i < sizeof fw / sizeof fw[0]; i++) {
         strl_push(l, "-framework");
@@ -690,7 +690,7 @@ static void setup_graphvex_tests(TargetList *tl) {
         add_exe_libs(t);
         // the renderer row references the Vulkan Device; its test links the loader
         if (!strcmp(name, "vk_renderer_test") || !strcmp(name, "device_test") ||
-            !strcmp(name, "gpu_render_test")) {
+            !strcmp(name, "gpu_render_test") || !strcmp(name, "resize_clip_test")) {
             strl_push(&t->syslibs, "-L/opt/homebrew/lib");
             strl_push(&t->syslibs, "-lvulkan");
             strl_push(&t->syslibs, "-Wl,-rpath,/opt/homebrew/lib");
@@ -1603,14 +1603,183 @@ static void rebuild_self(char **argv) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// runnable discovery — `b run` with no target lists what you can run, grouped
+// by the directory the target lives in (apps from _main/, tests from tests/…).
+// This is the answer to "what do I run?" without spelunking the tree.
+// ─────────────────────────────────────────────────────────────────────────────
+
+static bool target_runnable(const Target *t) {
+    return t->kind == T_APP || t->kind == T_EXE;
+}
+
+static const char *target_label(const Target *t) {
+    if (t->is_test) return "test";
+    if (t->kind == T_APP) return "app";
+    return "tool";
+}
+
+// the directory (relative to the repo root) a target's main source lives in
+static char *target_group(const Target *t) {
+    if (t->srcs.count == 0) return xstrdup(".");
+    const char *src = t->srcs.items[0];
+    size_t rl = strlen(g_root);
+    const char *rel = (strncmp(src, g_root, rl) == 0 && src[rl] == '/') ? src + rl + 1 : src;
+    const char *slash = strrchr(rel, '/');
+    if (!slash) return xstrdup(".");
+    size_t n = (size_t)(slash - rel);
+    char *g = xmalloc(n + 1);
+    memcpy(g, rel, n);
+    g[n] = 0;
+    return g;
+}
+
+typedef struct {
+    const char *group;
+    const char *name;
+    const char *label;
+} Runnable;
+
+static void list_runnables(TargetList *tl) {
+    Runnable *rs = xmalloc((size_t)(tl->count ? tl->count : 1) * sizeof *rs);
+    int n = 0;
+    for (int i = 0; i < tl->count; i++)
+        if (target_runnable(&tl->items[i]))
+            rs[n++] = (Runnable){target_group(&tl->items[i]), tl->items[i].name,
+                                 target_label(&tl->items[i])};
+
+    // sort by group, then name (insertion sort — n is small)
+    for (int i = 1; i < n; i++) {
+        Runnable key = rs[i];
+        int j = i - 1;
+        while (j >= 0 && (strcmp(rs[j].group, key.group) > 0 ||
+                          (!strcmp(rs[j].group, key.group) && strcmp(rs[j].name, key.name) > 0))) {
+            rs[j + 1] = rs[j];
+            j--;
+        }
+        rs[j + 1] = key;
+    }
+
+    printf("b: %d runnable target(s) — run one with `b run <name>`", n);
+    if (n) printf(", or `b test <name>` for a test");
+    printf("\n");
+    const char *cur = NULL;
+    for (int i = 0; i < n; i++) {
+        if (!cur || strcmp(cur, rs[i].group)) {
+            cur = rs[i].group;
+            printf("\n  %s/\n", cur);
+        }
+        printf("    %-30s %s\n", rs[i].name, rs[i].label);
+    }
+    if (n) printf("\n");
+    free(rs);
+}
+
+// names of runnable targets containing q
+static void match_targets(TargetList *tl, const char *q, StrList *out) {
+    for (int i = 0; i < tl->count; i++) {
+        Target *t = &tl->items[i];
+        if (target_runnable(t) && strstr(t->name, q)) strl_push(out, (char *)t->name);
+    }
+}
+
+// resolve a possibly-partial name to exactly one runnable target (silent on
+// miss/ambiguity — the caller may fall through to an on-demand source)
+static Target *resolve_runnable(TargetList *tl, const char *q) {
+    Target *exact = NULL, *match = NULL;
+    int hits = 0;
+    for (int i = 0; i < tl->count; i++) {
+        Target *t = &tl->items[i];
+        if (!target_runnable(t)) continue;
+        if (!strcmp(t->name, q)) exact = t;
+        if (strstr(t->name, q)) { match = t; hits++; }
+    }
+    if (exact) return exact;
+    if (hits == 1) return match;
+    return NULL;
+}
+
+// ── compile-on-demand: run any source by its stem ───────────────────────────
+// `b run <stem>` (or a path, with or without ".c") finds a .c with a main()
+// under tests/ then _main/ and, if it isn't already a target, builds a
+// throwaway one on the spot — so loose files run without wiring a target.
+
+static void match_sources(const char *root, const char *basename, StrList *out) {
+    StrList all = {0};
+    glob_rec(root, ".c", &all);
+    for (int i = 0; i < all.count; i++) {
+        const char *b = strrchr(all.items[i], '/');
+        b = b ? b + 1 : all.items[i];
+        if (!strcmp(b, basename)) strl_push(out, all.items[i]);
+    }
+}
+
+static char *find_source_for(const char *name) {
+    size_t nl = strlen(name);
+    bool ends_c = nl > 2 && !strcmp(name + nl - 2, ".c");
+
+    // an explicit path, or a bare name that exists as a file
+    char *direct = ends_c ? xstrdup(name) : strf("%s.c", name);
+    char *full = direct[0] == '/' ? xstrdup(direct) : strf("%s/%s", g_root, direct);
+    if (path_exists(full)) return full;
+
+    // a bare stem: search the runnable roots, tests/ first
+    const char *base = strrchr(direct, '/');
+    base = base ? base + 1 : direct;
+    const char *roots[] = {"tests", "_main", "projects", "ecosystem"};
+    for (size_t i = 0; i < sizeof roots / sizeof roots[0]; i++) {
+        StrList hits = {0};
+        match_sources(abspath(roots[i]), base, &hits);
+        if (hits.count == 1) return hits.items[0];
+        if (hits.count > 1) {
+            strl_sort(&hits);
+            fflush(stdout);
+            fprintf(stderr, "b: '%s' matches %d sources — be more specific:\n", name, hits.count);
+            for (int k = 0; k < hits.count; k++)
+                fprintf(stderr, "  %s\n", relativize(hits.items[k], g_root));
+            return NULL;
+        }
+    }
+    return NULL;
+}
+
+// wrap a lone .c into a throwaway exe target that links every library
+static Target *synth_target(TargetList *tl, const char *src) {
+    const char *b = strrchr(src, '/');
+    b = b ? b + 1 : src;
+    size_t bl = strlen(b);
+    char *name = xstrdup(b);
+    if (bl > 2 && !strcmp(name + bl - 2, ".c")) name[bl - 2] = 0;
+
+    Target *t = target_new(tl, name, T_EXE);
+    strl_push(&t->srcs, src);
+    char *dir = xstrdup(src);
+    char *slash = strrchr(dir, '/');
+    if (slash) *slash = 0; else { free(dir); dir = xstrdup(g_root); }
+    strl_push(&t->includes, dir);                                  // local headers
+    strl_push(&t->cflags, "-I/opt/homebrew/include");              // Vulkan headers
+    strl_push(&t->deps, "*");                                      // link + include everything
+    add_exe_libs(t);
+    strl_push(&t->syslibs, "-L/opt/homebrew/lib");
+    strl_push(&t->syslibs, "-lvulkan");
+    strl_push(&t->syslibs, "-Wl,-rpath,/opt/homebrew/lib");
+    return t;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // main
 // ─────────────────────────────────────────────────────────────────────────────
 
 static void usage(void) {
     printf("b — our build system\n"
            "usage: b [--release] [-j N] [-v] <command> [args]\n"
-           "commands: build [target...] | run <target> [args...] | test [substr]\n"
-           "          watch | cc | clean | doctor | targets\n");
+           "commands:\n"
+           "  build [target...]   compile (all, or the named target + deps)\n"
+           "  run [target] ...    run an app/tool/test; no target lists what's runnable\n"
+           "  test [substr]       run the test suite (or just tests matching substr)\n"
+           "  list                list every runnable target (alias: ls)\n"
+           "  targets             list every target, including libraries\n"
+           "  watch | cc | clean | doctor\n"
+           "  b run <name>        name may be partial (e.g. `b run gallery`)\n");
 }
 
 int main(int argc, char **argv) {
@@ -1656,13 +1825,15 @@ int main(int argc, char **argv) {
 
     rebuild_self(argv);
 
-    if (!command) {
-        usage();
-        return 1;
-    }
-
     setup_paths();
     setup_targets(&g_targets_ref);
+
+    if (!command) {
+        usage();
+        printf("\n");
+        list_runnables(&g_targets_ref);
+        return 0;
+    }
 
     if (!strcmp(command, "targets")) {
         for (int k = 0; k < g_targets_ref.count; k++) {
@@ -1671,6 +1842,10 @@ int main(int argc, char **argv) {
                                 : g_targets_ref.items[k].kind == T_APP ? "app" : "exe";
             printf("%-7s %s\n", kindstr, g_targets_ref.items[k].name);
         }
+        return 0;
+    }
+    if (!strcmp(command, "list") || !strcmp(command, "ls") || !strcmp(command, "apps")) {
+        list_runnables(&g_targets_ref);
         return 0;
     }
     if (!strcmp(command, "doctor")) {
@@ -1716,6 +1891,46 @@ int main(int argc, char **argv) {
             fflush(stdout);
         }
     }
+    if (!strcmp(command, "run") && rest.count == 0) {
+        list_runnables(&g_targets_ref);
+        return 0;
+    }
+
+    Target *run_target = NULL;
+    if (!strcmp(command, "run")) {
+        const char *q = rest.items[0];
+        run_target = resolve_runnable(&g_targets_ref, q);
+        if (!run_target) {
+            StrList tm = {0};
+            match_targets(&g_targets_ref, q, &tm);
+            if (tm.count > 1) {
+                fflush(stdout);
+                fprintf(stderr, "b: '%s' matches %d targets — be more specific:\n", q, tm.count);
+                for (int k = 0; k < tm.count; k++) fprintf(stderr, "  %s\n", tm.items[k]);
+                return 1;
+            }
+            // no target: try it as a loose .c (compile on demand)
+            char *src = find_source_for(q);
+            if (!src) {
+                fflush(stdout);
+                fprintf(stderr, "b: nothing runnable matches '%s'  (try `b run` to list)\n", q);
+                return 1;
+            }
+            const char *bs = strrchr(src, '/');
+            bs = bs ? bs + 1 : src;
+            char *stem = xstrdup(bs);
+            size_t sl = strlen(stem);
+            if (sl > 2 && !strcmp(stem + sl - 2, ".c")) stem[sl - 2] = 0;
+            Target *decl = find_target(&g_targets_ref, stem);
+            if (decl && target_runnable(decl)) {
+                run_target = decl;
+            } else {
+                printf("b: compiling %s on demand\n", relativize(src, g_root));
+                run_target = synth_target(&g_targets_ref, src);
+            }
+        }
+    }
+
     if (!strcmp(command, "build") || !strcmp(command, "run") || !strcmp(command, "test")) {
         build_all();
         if (!strcmp(command, "build")) {
@@ -1723,11 +1938,7 @@ int main(int argc, char **argv) {
             return 0;
         }
         if (!strcmp(command, "run")) {
-            if (rest.count == 0) die("run needs a target");
-            Target *t = find_target(&g_targets_ref, rest.items[0]);
-            if (!t) die("no such target: %s", rest.items[0]);
-            if (t->kind == T_LIB) die("%s is a library, not a runnable app", t->name);
-            if (t->kind == T_MOD) die("%s is a loadable module, not a runnable app", t->name);
+            Target *t = run_target;
             if (t->kind == T_APP) {
                 char *app = strf("%s/apps/%s.app", g_out, t->name);
                 Cmd o = {0};

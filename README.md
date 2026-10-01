@@ -43,8 +43,13 @@ assets.
 
 ## Rules
 
-The workspace is governed by a constitution: **`preferences.md`**
-(→ `ecosystem/vexspoke/preferences.md`) — read it in full; each repo adds its own
-`<repo>-preferences.md`. Cite every law by its canonical **Title**, never by
+The workspace is governed by a constitution: **`preferences.md`** — read it in
+full; each repo adds its own `<repo>-preferences.md`. Locally it is a symlink
+(`→ ecosystem/vexspoke/preferences.md`); **on the web** (the symlink won't render
+on GitHub) read it here:
+
+**https://github.com/vexgraph-ecosystem/vexspoke/blob/main/preferences.md**
+
+Cite every law by its canonical **Title**, never by
 number (the Law Identity Doctrine). **Never push without an explicit, one-off
 order** (the Git Workflow Law).
