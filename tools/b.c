@@ -492,7 +492,7 @@ static void apple_frameworks(StrList *l) {
         "Foundation", "LocalAuthentication", "Network", "Security", "AVFoundation",
         "Cocoa", "AppKit", "CoreGraphics", "QuartzCore", "Metal", "IOKit", "CoreAudio",
         "AudioToolbox", "Contacts", "EventKit", "Photos", "CoreLocation",
-        "UserNotifications", "CoreServices", "ImageIO",
+        "UserNotifications", "CoreServices", "ImageIO", "IOSurface", "CoreVideo",
     };
     for (size_t i = 0; i < sizeof fw / sizeof fw[0]; i++) {
         strl_push(l, "-framework");
