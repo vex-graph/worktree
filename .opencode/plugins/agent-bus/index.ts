@@ -1,6 +1,6 @@
 import { Plugin } from "@opencode/plugin"
-import { readFile } from "node:fs/promises"
-import { join } from "node:path"
+import { access, readFile } from "node:fs/promises"
+import { dirname, join } from "node:path"
 
 // vexgraph.agent-bus
 //
@@ -14,6 +14,23 @@ const ALLOWED_TOOLS = new Set(["read", "write", "edit", "bash", "websearch"])
 
 const BUS = join("_notes", "agents", "bus.md")
 
+// The workspace root is whichever ancestor owns tools/agents.sh. The server may
+// load this plugin from a different location than the session's directory, so
+// never assume ctx.location.directory is the workspace.
+async function workspaceRoot(start: string): Promise<string> {
+  let dir = start
+  for (;;) {
+    try {
+      await access(join(dir, "tools", "agents.sh"))
+      return dir
+    } catch {
+      const parent = dirname(dir)
+      if (parent === dir || parent === "") return start
+      dir = parent
+    }
+  }
+}
+
 const REMINDER =
   "Harness (minimal): use read/write/edit/bash/websearch only. Write source " +
   "with write/edit — never emit files by running a script. Before editing a " +
@@ -25,7 +42,7 @@ type AnyRecord = Record<string, unknown>
 export default Plugin.define({
   id: "vexgraph.agent-bus",
   async setup(ctx) {
-    const busPath = join(ctx.location.directory, BUS)
+    const busPath = join(await workspaceRoot(ctx.location.directory), BUS)
 
     await ctx.session.hook("context", async (event) => {
       const e = event as unknown as AnyRecord
