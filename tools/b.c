@@ -513,12 +513,15 @@ static char *g_meta;             // <state>/meta/<cfg>
 static char *g_cache;            // <state>/cache/objects
 static bool g_release = false;
 static bool g_verbose = false;
+static bool g_coverage = false;          // build + run with clang source coverage
+static const char *g_only = NULL;        // restrict the target graph to one subsystem
+static const char *g_profraw = NULL;     // LLVM_PROFILE_FILE for the next test run
 static char *g_cc_version = NULL;
 
 static const char *VEXSPOKE = "ecosystem/vexspoke";
 
 static void setup_paths(void) {
-    const char *cfg = g_release ? "release" : "debug";
+    const char *cfg = g_coverage ? "coverage" : (g_release ? "release" : "debug");
     g_out = strf("%s/out/%s", g_state, cfg);
     g_deps = strf("%s/deps/%s", g_state, cfg);
     g_meta = strf("%s/meta/%s", g_state, cfg);
@@ -547,6 +550,7 @@ static int run_test(const char *name, Cmd *cmd, int timeout_s) {
         dup2(fd, 1);
         dup2(fd, 2);
         close(fd);
+        if (g_profraw) setenv("LLVM_PROFILE_FILE", g_profraw, 1);
         execvp(argv[0], argv);
         _exit(127);
     }
@@ -591,6 +595,11 @@ static void base_cflags(StrList *out) {
     strl_push(out, "arm64");
     strl_push(out, "-mmacosx-version-min=14.0");
 #endif
+    if (g_coverage) {
+        // clang source-based coverage: every function/region gets counters.
+        strl_push(out, "-fprofile-instr-generate");
+        strl_push(out, "-fcoverage-mapping");
+    }
     if (g_release) {
         strl_push(out, "-O2");
 #ifdef __APPLE__
@@ -687,6 +696,7 @@ static void setup_graphvex_tests(TargetList *tl) {
         t->is_test = true;
         strl_push(&t->srcs, ts.items[i]);
         strl_push(&t->includes, abspath("ecosystem/drivers/graphvex/src"));
+        strl_push(&t->includes, abspath("tests"));   // test_support.h
         strl_push(&t->defs, "UNDEBUG");
         strl_push(&t->deps, "graphvex");
         add_exe_libs(t);
@@ -737,6 +747,7 @@ static void setup_vexspoke_tests(TargetList *tl) {
         t->is_test = is_test;
         strl_push(&t->srcs, s);
         strl_push(&t->includes, abspath(strf("%s/src", VEXSPOKE)));
+        strl_push(&t->includes, abspath("tests"));   // test_support.h
         strl_push(&t->defs, "UNDEBUG");
         strl_push(&t->deps, "vexspoke");
         add_exe_libs(t);
@@ -820,6 +831,7 @@ static void setup_apihaven(TargetList *tl) {
         strl_push(&t->srcs, ts.items[i]);
         strl_push(&t->includes, strf("%s/src", base));
         strl_push(&t->includes, abspath(strf("%s/src", VEXSPOKE)));
+        strl_push(&t->includes, abspath("tests"));   // test_support.h
         strl_push(&t->deps, "api_haven");
         strl_push(&t->deps, "vexspoke");
         add_exe_libs(t);
@@ -886,6 +898,7 @@ static void setup_hotcwap(TargetList *tl) {
         t->is_test = true;
         strl_push(&t->srcs, ts.items[i]);
         strl_push(&t->includes, base);
+        strl_push(&t->includes, abspath("tests"));   // test_support.h
         strl_push(&t->defs, "UNDEBUG");
         if (!strcmp(name, "spoke_test")) {
             strl_push(&t->srcs, strf("%s/spoke/lifetime.c", base));
@@ -1012,6 +1025,15 @@ static void setup_darling_tests(TargetList *tl) {
 }
 
 static void setup_targets(TargetList *tl) {
+    if (g_only) {
+        // a scoped build: only the named subsystem's lib + its tests. Used by
+        // `b coverage` so a broken sibling repo cannot block the proof.
+        if (!strcmp(g_only, "vexspoke")) {
+            setup_vexspoke(tl);
+            setup_vexspoke_tests(tl);
+        }
+        return;
+    }
     setup_vexspoke(tl);        // libs first
     setup_hotcwap(tl);
     setup_graphvex(tl);
@@ -1450,6 +1472,7 @@ static void link_target(Target *t) {
         // a loadable bundle: unresolved symbols bind at dlopen time
         strl_push(&c, "-bundle");
         strl_push(&c, "-Wl,-undefined,dynamic_lookup");
+        if (g_coverage) strl_push(&c, "-fprofile-instr-generate");
         strl_push(&c, "-o");
         strl_push(&c, t->out_path);
     } else {
@@ -1457,6 +1480,7 @@ static void link_target(Target *t) {
         StrList base = {0};
         base_lflags(&base);
         strl_extend(&c, &base);
+        if (g_coverage) strl_push(&c, "-fprofile-instr-generate");
         for (int i = 0; i < g_unit_count; i++)
             if (g_units[i].t == t) strl_push(&c, g_units[i].obj);
         StrList libs = {0};
@@ -1514,6 +1538,561 @@ static void build_all(void) {
     run_gens();
     compile_all();
     for (int i = 0; i < g_targets_ref.count; i++) link_target(&g_targets_ref.items[i]);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// the coverage ratchet — the Per-File Battle Test Law + the Public Surface
+// Proof Law, enforced in the C23 toolchain (not a script). Three shrink-only
+// baselines under tests/vexspoke/ record the known gaps:
+//   coverage_baseline.txt   units with no owner test
+//   surface_baseline.txt    public functions the owner never names
+//   function_baseline.txt   public functions the owner never executes
+// mirror_exceptions.txt lists deliberately non-mirrored owner tests.
+//   b check      static: owner + public-surface gates
+//   b coverage   dynamic: instrument, run, lcov, function-execution gate
+// ─────────────────────────────────────────────────────────────────────────────
+
+#define VEX_SRC_REL   "ecosystem/vexspoke"
+#define VEX_TESTS_REL "tests/vexspoke"
+
+static bool ident_char(char c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+           (c >= '0' && c <= '9') || c == '_';
+}
+
+static bool sl_has(const StrList *l, const char *s) {
+    for (int i = 0; i < l->count; i++)
+        if (!strcmp(l->items[i], s)) return true;
+    return false;
+}
+
+// one non-comment, trimmed line per entry (baselines)
+static void load_lines(const char *path, StrList *out) {
+    char *t = read_file(path, NULL);
+    if (!t) return;
+    char *save = NULL;
+    for (char *line = strtok_r(t, "\n", &save); line; line = strtok_r(NULL, "\n", &save)) {
+        while (*line == ' ' || *line == '\t' || *line == '\r') line++;
+        size_t n = strlen(line);
+        while (n && (line[n-1] == ' ' || line[n-1] == '\t' || line[n-1] == '\r')) line[--n] = 0;
+        if (*line && *line != '#') strl_push(out, xstrdup(line));
+    }
+    free(t);
+}
+
+// "key value" per entry (mirror exceptions)
+static void load_pairs(const char *path, StrList *keys, StrList *vals) {
+    char *t = read_file(path, NULL);
+    if (!t) return;
+    char *save = NULL;
+    for (char *line = strtok_r(t, "\n", &save); line; line = strtok_r(NULL, "\n", &save)) {
+        while (*line == ' ' || *line == '\t' || *line == '\r') line++;
+        if (!*line || *line == '#') continue;
+        char *sp = line;
+        while (*sp && *sp != ' ' && *sp != '\t' && *sp != '\r') sp++;
+        if (*sp) {
+            *sp++ = 0;
+            while (*sp == ' ' || *sp == '\t' || *sp == '\r') sp++;
+        }
+        size_t n = strlen(sp);
+        while (n && (sp[n-1] == ' ' || sp[n-1] == '\t' || sp[n-1] == '\r')) sp[--n] = 0;
+        if (*sp) {
+            strl_push(keys, xstrdup(line));
+            strl_push(vals, xstrdup(sp));
+        }
+    }
+    free(t);
+}
+
+static const char *TYPE_WORDS[] = {
+    "void", "int", "char", "short", "long", "float", "double", "signed",
+    "unsigned", "bool", "_Bool", "size_t", "ssize_t", "ptrdiff_t", "wchar_t",
+    "int8_t", "int16_t", "int32_t", "int64_t", "uint8_t", "uint16_t",
+    "uint32_t", "uint64_t", "intptr_t", "uintptr_t", "va_list",
+    "if", "for", "while", "switch", "return", "sizeof", "typeof", "defined",
+    "alignof", "_Alignof", "assert", "static_assert", "_Static_assert",
+};
+
+static bool is_type_word(const char *s) {
+    for (size_t i = 0; i < sizeof TYPE_WORDS / sizeof TYPE_WORDS[0]; i++)
+        if (!strcmp(s, TYPE_WORDS[i])) return true;
+    return false;
+}
+
+// strip comments, ;;ANNOTATION lines, preprocessor lines, and brace bodies, so
+// only top-level declarations remain. A function-pointer typedef such as
+// `void (*Fn)(void)` then yields no bogus name (the type word is filtered).
+static char *scrub_header(const char *raw) {
+    size_t n = strlen(raw), o = 0;
+    char *tmp = xmalloc(n + 1);
+    for (size_t i = 0; i < n;) {
+        if (raw[i] == '/' && i + 1 < n && raw[i+1] == '*') {
+            i += 2;
+            while (i + 1 < n && !(raw[i] == '*' && raw[i+1] == '/')) i++;
+            i = (i + 1 < n) ? i + 2 : n;
+            tmp[o++] = ' ';
+        } else if (raw[i] == '/' && i + 1 < n && raw[i+1] == '/') {
+            while (i < n && raw[i] != '\n') i++;
+        } else if (raw[i] == ';' && i + 1 < n && raw[i+1] == ';') {
+            // `;;ANNOTATION` — may span lines when it opens a parenthesis
+            // outside a string literal; consume through the matching close.
+            i += 2;
+            int depth = 0;
+            bool in_str = false;
+            for (; i < n; i++) {
+                char ch = raw[i];
+                if (in_str) {
+                    if (ch == '\\' && i + 1 < n) i++;
+                    else if (ch == '"') in_str = false;
+                    continue;
+                }
+                if (ch == '"') { in_str = true; continue; }
+                if (ch == '\n') { if (depth <= 0) break; }
+                else if (ch == '(') depth++;
+                else if (ch == ')') { depth--; if (depth <= 0) { i++; break; } }
+            }
+            tmp[o++] = ' ';
+        } else if (raw[i] == '{') {
+            int depth = 1;
+            i++;
+            while (i < n && depth) {
+                if (raw[i] == '{') depth++;
+                else if (raw[i] == '}') depth--;
+                i++;
+            }
+            tmp[o++] = ' ';
+        } else {
+            tmp[o++] = raw[i++];
+        }
+    }
+    tmp[o] = 0;
+
+    char *clean = xmalloc(o + 1);
+    size_t c = 0;
+    bool line_start = true, skip = false;
+    for (size_t i = 0; i < o; i++) {
+        char ch = tmp[i];
+        if (line_start) {
+            size_t j = i;
+            while (j < o && (tmp[j] == ' ' || tmp[j] == '\t')) j++;
+            if (j < o && tmp[j] == '#') skip = true;
+            line_start = false;
+        }
+        if (ch == '\n') {
+            line_start = true;
+            skip = false;
+            clean[c++] = ch;
+        } else if (!skip) {
+            clean[c++] = ch;
+        }
+    }
+    clean[c] = 0;
+    free(tmp);
+    return clean;
+}
+
+// public function names declared by a header, in declaration order
+static void header_functions(const char *header_path, StrList *out) {
+    char *raw = read_file(header_path, NULL);
+    if (!raw) return;
+    char *text = scrub_header(raw);
+    free(raw);
+    char *stmt = text;
+    for (char *p = text;; p++) {
+        if (*p == ';' || *p == 0) {
+            bool end = (*p == 0);
+            *p = 0;
+            const char *par = strchr(stmt, '(');
+            if (par) {
+                const char *q = par;
+                while (q > stmt && (q[-1] == ' ' || q[-1] == '\t' ||
+                                    q[-1] == '\n' || q[-1] == '\r')) q--;
+                const char *e = q;
+                while (q > stmt && ident_char(q[-1])) q--;
+                size_t len = (size_t)(e - q);
+                if (len > 0 && len < 128) {
+                    char name[128];
+                    memcpy(name, q, len);
+                    name[len] = 0;
+                    if (!is_type_word(name) && !sl_has(out, name))
+                        strl_push(out, xstrdup(name));
+                }
+            }
+            if (end) break;
+            stmt = p + 1;
+        }
+    }
+    free(text);
+}
+
+static bool word_in(const char *name, const char *text) {
+    size_t nl = strlen(name);
+    for (const char *p = text; (p = strstr(p, name)); p += nl) {
+        char before = (p == text) ? 0 : p[-1];
+        char after = p[nl];
+        if (!ident_char(before) && !ident_char(after)) return true;
+    }
+    return false;
+}
+
+// strip the workspace prefix and the repo prefix: /root/eco/vexspoke/src/x -> src/x
+static const char *unit_rel(const char *unit) {
+    const char *p = unit;
+    size_t rl = strlen(g_root);
+    if (!strncmp(p, g_root, rl)) {
+        p += rl;
+        while (*p == '/') p++;
+    }
+    const char *pre = VEX_SRC_REL "/";
+    if (!strncmp(p, pre, strlen(pre))) p += strlen(pre);
+    return p;
+}
+
+static char *own_header(const char *unit) {
+    size_t n = strlen(unit);
+    if (n < 3) return NULL;
+    if (strcmp(unit + n - 2, ".c") && strcmp(unit + n - 2, ".m")) return NULL;
+    char *stem = xstrdup(unit);
+    stem[n-2] = 0;
+    char *hdr = strf("%s.h", stem);
+    free(stem);
+    return path_exists(hdr) ? hdr : NULL;
+}
+
+static char *owner_test_for(const char *unit, const StrList *eu, const StrList *eo) {
+    const char *rel = unit_rel(unit);
+    for (int i = 0; i < eu->count; i++)
+        if (!strcmp(eu->items[i], rel)) return strf("%s/tests/%s", g_root, eo->items[i]);
+    if (strncmp(rel, "src/", 4)) return NULL;
+    char *tmp = xstrdup(rel + 4);
+    char *slash = strrchr(tmp, '/');
+    char *dir, *base;
+    if (slash) {
+        *slash = 0;
+        dir = tmp;
+        base = xstrdup(slash + 1);
+    } else {
+        dir = xstrdup("");
+        base = tmp;
+    }
+    char *dot = strrchr(base, '.');
+    if (dot) *dot = 0;
+    char *out = NULL;
+    char *tc = strf("%s/%s/%s%s%s_test.c", g_root, VEX_TESTS_REL, dir,
+                    dir[0] ? "/" : "", base);
+    if (path_exists(tc)) {
+        out = tc;
+    } else {
+        char *tm = strf("%s/%s/%s%s%s_test.mm", g_root, VEX_TESTS_REL, dir,
+                        dir[0] ? "/" : "", base);
+        if (path_exists(tm)) out = tm;
+    }
+    free(dir);
+    free(base);
+    return out;
+}
+
+static bool src_matches(const char *src, const char *unit) {
+    if (!strcmp(src, unit)) return true;
+    const char *rel = unit_rel(unit);
+    size_t sl = strlen(src), rl = strlen(rel);
+    return sl >= rl && !strcmp(src + sl - rl, rel);
+}
+
+typedef struct {
+    char *test;
+    char *src;
+    char *fn;
+} CovHit;
+
+static CovHit *g_cov;
+static int g_cov_n, g_cov_cap;
+
+static void cov_add(const char *test, const char *src, const char *fn) {
+    if (g_cov_n == g_cov_cap) {
+        g_cov_cap = g_cov_cap ? g_cov_cap * 2 : 256;
+        g_cov = xrealloc(g_cov, (size_t)g_cov_cap * sizeof *g_cov);
+    }
+    g_cov[g_cov_n].test = xstrdup(test);
+    g_cov[g_cov_n].src = xstrdup(src);
+    g_cov[g_cov_n].fn = xstrdup(fn);
+    g_cov_n++;
+}
+
+// executed by `test`? Functions defined in a header are compiled into each
+// including unit and recorded against the header's record, so accept evidence
+// from the unit's own source or its header.
+static bool cov_has(const char *test, const char *unit, const char *hdr, const char *fn) {
+    for (int i = 0; i < g_cov_n; i++) {
+        if (strcmp(g_cov[i].fn, fn) || strcmp(g_cov[i].test, test)) continue;
+        if (src_matches(g_cov[i].src, unit)) return true;
+        if (hdr && src_matches(g_cov[i].src, hdr)) return true;
+    }
+    return false;
+}
+
+// read every *.lcov in dir: record executed functions (count > 0) keyed by test
+static void load_lcov(const char *dir, StrList *stems) {
+    StrList files = {0};
+    glob_rec(dir, ".lcov", &files);
+    strl_sort(&files);
+    for (int i = 0; i < files.count; i++) {
+        const char *path = files.items[i];
+        const char *b = strrchr(path, '/');
+        b = b ? b + 1 : path;
+        char *stem = xstrdup(b);
+        size_t sl = strlen(stem);
+        if (sl > 5) stem[sl-5] = 0;                 // drop ".lcov"
+        strl_push_unique(stems, stem);
+        char *text = read_file(path, NULL);
+        if (!text) continue;
+        const char *cur_src = NULL;
+        char *save = NULL;
+        for (char *line = strtok_r(text, "\n", &save); line;
+             line = strtok_r(NULL, "\n", &save)) {
+            if (!strncmp(line, "SF:", 3)) {
+                cur_src = line + 3;
+            } else if (!strncmp(line, "FNDA:", 5) && cur_src) {
+                char *comma = strchr(line + 5, ',');
+                if (comma && atoi(line + 5) > 0) {
+                    // a header-defined function is recorded as "file.c:name"
+                    const char *fname = comma + 1;
+                    const char *colon = strrchr(fname, ':');
+                    if (colon) fname = colon + 1;
+                    cov_add(stem, cur_src, fname);
+                }
+            }
+        }
+        free(text);
+    }
+}
+
+static char *baseline_path(const char *name) {
+    return strf("%s/%s/%s", g_root, VEX_TESTS_REL, name);
+}
+
+static int ratchet(const char *covdir, bool strict, bool list,
+                   bool emit_units, bool emit_surface, bool emit_functions) {
+    StrList units = {0};
+    glob_rec(strf("%s/%s/src", g_root, VEX_SRC_REL), ".c", &units);
+#ifdef __APPLE__
+    glob_rec(strf("%s/%s/src", g_root, VEX_SRC_REL), ".m", &units);
+#endif
+    strl_sort(&units);
+
+    StrList unit_known = {0}, surface_known = {0}, func_known = {0};
+    load_lines(baseline_path("coverage_baseline.txt"), &unit_known);
+    load_lines(baseline_path("surface_baseline.txt"), &surface_known);
+    load_lines(baseline_path("function_baseline.txt"), &func_known);
+    StrList exc_u = {0}, exc_o = {0};
+    load_pairs(baseline_path("mirror_exceptions.txt"), &exc_u, &exc_o);
+
+    StrList uncovered = {0}, surface_gaps = {0}, func_gaps = {0};
+    int owned = 0, total_public = 0, checked = 0;
+
+    for (int i = 0; i < units.count; i++) {
+        const char *u = units.items[i];
+        char *owner = owner_test_for(u, &exc_u, &exc_o);
+        if (!owner) {
+            strl_push(&uncovered, xstrdup(unit_rel(u)));
+            continue;
+        }
+        owned++;
+        char *hdr = own_header(u);
+        if (!hdr) continue;
+        StrList fns = {0};
+        header_functions(hdr, &fns);
+        char *txt = read_file(owner, NULL);
+        if (txt) {
+            for (int k = 0; k < fns.count; k++) {
+                total_public++;
+                if (!word_in(fns.items[k], txt))
+                    strl_push(&surface_gaps, strf("%s %s", unit_rel(u), fns.items[k]));
+            }
+        }
+        free(txt);
+        free(hdr);
+        free(owner);
+    }
+
+    if (covdir) {
+        StrList stems = {0};
+        load_lcov(covdir, &stems);
+        for (int i = 0; i < units.count; i++) {
+            const char *u = units.items[i];
+            char *owner = owner_test_for(u, &exc_u, &exc_o);
+            if (!owner) continue;
+            char *hdr = own_header(u);
+            if (!hdr) continue;
+            const char *b = strrchr(owner, '/');
+            b = b ? b + 1 : owner;
+            char *stem = xstrdup(b);
+            char *dot = strrchr(stem, '.');
+            if (dot) *dot = 0;
+            if (sl_has(&stems, stem)) {
+                StrList fns = {0};
+                header_functions(hdr, &fns);
+                for (int k = 0; k < fns.count; k++) {
+                    checked++;
+                    if (!cov_has(stem, u, hdr, fns.items[k]))
+                        strl_push(&func_gaps, strf("%s %s", unit_rel(u), fns.items[k]));
+                }
+            }
+            free(stem);
+            free(hdr);
+            free(owner);
+        }
+    }
+
+    strl_sort(&uncovered);
+    strl_sort(&surface_gaps);
+    strl_sort(&func_gaps);
+
+    if (emit_units) {
+        for (int i = 0; i < uncovered.count; i++) printf("%s\n", uncovered.items[i]);
+        return 0;
+    }
+    if (emit_surface) {
+        for (int i = 0; i < surface_gaps.count; i++) printf("%s\n", surface_gaps.items[i]);
+        return 0;
+    }
+    if (emit_functions) {
+        if (!covdir) {
+            fprintf(stderr, "b check: --emit-functions needs `b coverage`\n");
+            return 2;
+        }
+        for (int i = 0; i < func_gaps.count; i++) printf("%s\n", func_gaps.items[i]);
+        return 0;
+    }
+
+    printf("vexspoke coverage ratchet\n");
+    printf("  compiled units   : %d\n", units.count);
+    printf("  owned            : %d\n", owned);
+    printf("  uncovered        : %d (baseline %d)\n", uncovered.count, unit_known.count);
+    printf("  public functions : %d\n", total_public);
+    printf("  uninvoked        : %d (baseline %d)\n", surface_gaps.count, surface_known.count);
+    if (covdir) {
+        printf("  executed (dyn)   : %d / %d\n", checked - func_gaps.count, checked);
+        printf("  unexecuted (dyn) : %d (baseline %d)\n", func_gaps.count, func_known.count);
+    }
+
+    if (list) {
+        for (int i = 0; i < surface_gaps.count; i++)
+            printf("  SURFACE %s\n", surface_gaps.items[i]);
+        for (int i = 0; i < func_gaps.count; i++)
+            printf("  EXEC    %s\n", func_gaps.items[i]);
+    }
+
+    int rc = 0;
+    for (int i = 0; i < uncovered.count; i++)
+        if (!sl_has(&unit_known, uncovered.items[i])) {
+            if (!rc) printf("\nREGRESSION — unit(s) shipped without an owner test:\n");
+            printf("  MISSING %s\n", uncovered.items[i]);
+            rc = 1;
+        }
+    for (int i = 0; i < surface_gaps.count; i++)
+        if (!sl_has(&surface_known, surface_gaps.items[i])) {
+            if (rc != 1) printf("\nREGRESSION — public function(s) never invoked by the owner test:\n");
+            printf("  UNINVOKED %s\n", surface_gaps.items[i]);
+            rc = 1;
+        }
+    for (int i = 0; i < func_gaps.count; i++)
+        if (!sl_has(&func_known, func_gaps.items[i])) {
+            printf("\nREGRESSION — public function(s) never executed under `b coverage`:\n");
+            printf("  UNEXECUTED %s\n", func_gaps.items[i]);
+            rc = 1;
+        }
+
+    if (strict && (uncovered.count || surface_gaps.count || func_gaps.count)) rc = 1;
+    if (rc == 0) printf("\nOK — no new coverage gaps\n");
+    return rc;
+}
+
+// `b coverage [substr]`: build with clang source coverage, run each selected
+// test exactly once, export lcov, then gate per-function execution natively.
+// A test that does not pass contributes no coverage; it is reported and skipped.
+static int run_coverage(StrList *rest) {
+    const char *sub = NULL;
+    bool strict = false, list = false, emit_functions = false;
+    for (int i = 0; i < rest->count; i++) {
+        const char *a = rest->items[i];
+        if (!strcmp(a, "--strict")) strict = true;
+        else if (!strcmp(a, "--list")) list = true;
+        else if (!strcmp(a, "--emit-functions")) emit_functions = true;
+        else if (a[0] != '-') sub = a;
+    }
+    build_all();
+    char *covdir = strf("%s/cov", g_state);
+    Cmd rm = {0};
+    strl_push(&rm, "rm");
+    strl_push(&rm, "-rf");
+    strl_push(&rm, covdir);
+    run_sync(&rm);
+    mkdir_p(covdir);
+
+    int ran = 0, failed = 0, skipped = 0;
+    for (int i = 0; i < g_targets_ref.count; i++) {
+        Target *t = &g_targets_ref.items[i];
+        if (!t->is_test) continue;
+        if (sub && !strstr(t->name, sub)) continue;
+
+        char *profraw = strf("%s/%s.profraw", covdir, t->name);
+        g_profraw = profraw;
+        Cmd c = {0};
+        strl_push(&c, t->out_path);
+        int st = run_test(t->name, &c, 60);
+        g_profraw = NULL;
+        if (st == 77) {
+            printf("  SKIP    %s (contract unproved) — coverage not counted\n", t->name);
+            skipped++;
+            continue;
+        }
+        if (st != 0) {
+            printf("  FAIL    %s (exit %d) — coverage skipped\n", t->name, st);
+            failed++;
+            continue;
+        }
+        char *profdata = strf("%s/%s.profdata", covdir, t->name);
+        Cmd mg = {0};
+        strl_push(&mg, "xcrun");
+        strl_push(&mg, "llvm-profdata");
+        strl_push(&mg, "merge");
+        strl_push(&mg, "-sparse");
+        strl_push(&mg, profraw);
+        strl_push(&mg, "-o");
+        strl_push(&mg, profdata);
+        char *junk = NULL;
+        if (run_capture(&mg, &junk) != 0) {
+            free(junk);
+            fprintf(stderr, "b: llvm-profdata merge failed for %s\n", t->name);
+            failed++;
+            continue;
+        }
+        free(junk);
+
+        Cmd ex = {0};
+        strl_push(&ex, "xcrun");
+        strl_push(&ex, "llvm-cov");
+        strl_push(&ex, "export");
+        strl_push(&ex, t->out_path);
+        strl_push(&ex, "-instr-profile");
+        strl_push(&ex, profdata);
+        strl_push(&ex, "-format");
+        strl_push(&ex, "lcov");
+        char *lcov = NULL;
+        if (run_capture(&ex, &lcov) != 0) {
+            free(lcov);
+            fprintf(stderr, "b: llvm-cov export failed for %s\n", t->name);
+            failed++;
+            continue;
+        }
+        write_file(strf("%s/%s.lcov", covdir, t->name), lcov);
+        free(lcov);
+        ran++;
+    }
+    printf("b: coverage from %d test(s), %d not passing, %d skipped\n",
+           ran, failed, skipped);
+    return ratchet(covdir, strict, list, false, false, emit_functions);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1817,6 +2396,8 @@ static void usage(void) {
            "  build [target...]   compile (all, or the named target + deps)\n"
            "  run [target] ...    run an app/tool/test; no target lists what's runnable\n"
            "  test [substr]       run the test suite (or just tests matching substr)\n"
+           "  check               per-file owner + public-surface coverage gates\n"
+           "  coverage [substr]   run tests instrumented; gate per-function execution\n"
            "  list                list every runnable target (alias: ls)\n"
            "  targets             list every target, including libraries\n"
            "  watch | cc | clean | doctor\n"
@@ -1863,6 +2444,10 @@ int main(int argc, char **argv) {
     }
     for (; i < argc; i++) strl_push(&rest, argv[i]);
     if (g_max_jobs <= 0) g_max_jobs = 4;
+    if (command && !strcmp(command, "coverage")) {
+        g_coverage = true;
+        g_only = "vexspoke";       // the ratchet is vexspoke-scoped
+    }
 
     rebuild_self(argv);
 
@@ -1916,6 +2501,18 @@ int main(int argc, char **argv) {
         compile_all();
         gen_compile_commands();
         return 0;
+    }
+    if (!strcmp(command, "coverage")) return run_coverage(&rest);
+    if (!strcmp(command, "check")) {
+        bool strict = false, list = false, eu = false, es = false;
+        for (int k = 0; k < rest.count; k++) {
+            const char *a = rest.items[k];
+            if (!strcmp(a, "--strict")) strict = true;
+            else if (!strcmp(a, "--list")) list = true;
+            else if (!strcmp(a, "--emit-units")) eu = true;
+            else if (!strcmp(a, "--emit-surface")) es = true;
+        }
+        return ratchet(NULL, strict, list, eu, es, false);
     }
     if (!strcmp(command, "watch")) {
         build_all();
@@ -1973,6 +2570,12 @@ int main(int argc, char **argv) {
     }
 
     if (!strcmp(command, "build") || !strcmp(command, "run") || !strcmp(command, "test")) {
+        if (!strcmp(command, "test")) {
+            // the static proof gate runs before the suite: no test run passes
+            // while a unit lacks an owner or a public function goes uninvoked.
+            int rc = ratchet(NULL, false, false, false, false, false);
+            if (rc) return rc;
+        }
         build_all();
         if (!strcmp(command, "build")) {
             gen_compile_commands();
@@ -2009,7 +2612,7 @@ int main(int argc, char **argv) {
             strl_push(&tests, t->out_path);
         }
         printf("b: running %d test(s)\n", tests.count);
-        int failed = 0, timedout = 0;
+        int failed = 0, timedout = 0, skipped = 0;
         for (int k = 0; k < tests.count; k++) {
             const char *nm = strrchr(tests.items[k], '/');
             nm = nm ? nm + 1 : tests.items[k];
@@ -2018,6 +2621,11 @@ int main(int argc, char **argv) {
             int st = run_test(nm, &c, 30);
             if (st == 0) {
                 printf("  PASS    %s\n", nm);
+            } else if (st == 77) {
+                // B_TEST_SKIP: the contract was not exercised on this host.
+                // Neither a pass nor a failure — but never silently green.
+                printf("  SKIP    %s (contract unproved on this host)\n", nm);
+                skipped++;
             } else if (st == -1) {
                 printf("  TIMEOUT %s (>30s)\n", nm);
                 timedout++;
@@ -2038,8 +2646,12 @@ int main(int argc, char **argv) {
                 free(txt);
             }
         }
-        printf("b: %d passed, %d failed, %d timed out\n",
-               tests.count - failed - timedout, failed, timedout);
+        printf("b: %d passed, %d failed, %d timed out, %d skipped\n",
+               tests.count - failed - timedout - skipped, failed, timedout, skipped);
+        if (skipped > 0 && g_verbose) {
+            printf("b: %d test(s) skipped a contract — see the SKIP lines above; "
+                   "a skip proves nothing\n", skipped);
+        }
         return (failed || timedout) ? 1 : 0;
     }
 

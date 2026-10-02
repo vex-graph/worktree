@@ -7,7 +7,7 @@
 #   tools/run.sh tests/darling/frame/liquid_glass_frame_test.c   (name derived)
 #
 # Or edit TARGET below and run with no argument.
-TARGET="${1:-liquid_glass_frame_test}"
+TARGET="${1:-panel_test}"
 
 set -e
 root="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
