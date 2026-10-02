@@ -923,21 +923,21 @@ static bool has_main(const char *path) {
     return found;
 }
 
-// auto-discover apps: every tests/darling/*.c with a main() becomes a
-// bundleable app, built together with any main-less sibling TU (shared scenes,
-// helpers). Only the top level is app territory — frame/ and panel/ are the
-// test suite, already wired as test targets.
+// auto-discover apps: every tests/darling main() that is not a *_test.c
+// becomes a bundleable app, built with any main-less sibling TU. The *_test.c
+// files are the test suite (wired separately).
 static void setup_apps(TargetList *tl) {
     char *dir = abspath("tests/darling");
     StrList all = {0};
     glob_rec(dir, ".c", &all);
     strl_sort(&all);
     StrList apps = {0}, shared = {0};
-    size_t dlen = strlen(dir);
     for (int i = 0; i < all.count; i++) {
-        if (strchr(all.items[i] + dlen + 1, '/')) continue;   // top level only
-        if (has_main(all.items[i])) strl_push(&apps, all.items[i]);
-        else strl_push(&shared, all.items[i]);
+        const char *p = all.items[i];
+        size_t plen = strlen(p);
+        if (plen > 7 && !strcmp(p + plen - 7, "_test.c")) continue;   // the suite
+        if (has_main(p)) strl_push(&apps, p);
+        else strl_push(&shared, p);
     }
     for (int i = 0; i < apps.count; i++) {
         const char *bn = strrchr(apps.items[i], '/');
