@@ -692,10 +692,22 @@ static void setup_graphvex_tests(TargetList *tl) {
         add_exe_libs(t);
         // the renderer row references the Vulkan Device; its test links the loader
         if (!strcmp(name, "vk_renderer_test") || !strcmp(name, "device_test") ||
-            !strcmp(name, "gpu_render_test") || !strcmp(name, "resize_clip_test")) {
+            !strcmp(name, "gpu_render_test") || !strcmp(name, "resize_clip_test") ||
+            !strcmp(name, "surface_gpu_test")) {
             strl_push(&t->syslibs, "-L/opt/homebrew/lib");
             strl_push(&t->syslibs, "-lvulkan");
             strl_push(&t->syslibs, "-Wl,-rpath,/opt/homebrew/lib");
+        }
+        if (!strcmp(name, "surface_gpu_test")) {
+            // the zero-copy seam test creates a real IOSurface (Foundation).
+            // The host helper is its own TU so the Apple headers never meet
+            // graphvex's Rect in one translation unit.
+            strl_push(&t->srcs, strf("%s/vulkan/iosurface_host.c", tdir));
+            strl_push(&t->includes, strf("%s/vulkan", tdir));
+            strl_push(&t->syslibs, "-framework");
+            strl_push(&t->syslibs, "IOSurface");
+            strl_push(&t->syslibs, "-framework");
+            strl_push(&t->syslibs, "CoreFoundation");
         }
     }
 }
