@@ -31,10 +31,11 @@ async function workspaceRoot(start: string): Promise<string> {
 }
 
 const REMINDER =
-  "Harness (minimal): use read/write/edit/bash/websearch only. Write source " +
-  "with write/edit — never emit files by running a script. Before editing a " +
-  "path a sibling may own, check `tools/agents.sh peers` and `tools/agents.sh " +
-  'bus`; announce scope with `tools/agents.sh tell "…"`.'
+  "Harness: if this session exposes write/edit, author source with them. If it " +
+  "does not (some routes expose only read/shell/websearch), the command tool " +
+  "(python/sed) is the fallback — you are not blocked, just say so. Announce " +
+  "scope with `tools/agents.sh tell \"…\"` and check `tools/agents.sh bus`/`peers` " +
+  "before editing a path a sibling may own."
 
 type AnyRecord = Record<string, unknown>
 

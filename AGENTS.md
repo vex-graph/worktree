@@ -5,9 +5,14 @@ Minimal core, opt-in everything else. Six capabilities, nothing more by default:
 
 ## Authoring
 
-- Write and change source with `write` / `edit`. Do **not** generate code by
-  running a script (no `python`, `sed`, heredocs, or template loops that emit
-  source). Scripts are for tooling and inspection, never for authoring files.
+- **If your session exposes `write` / `edit`, use them** for every source
+  change — never generate files by running a script. That is the preferred
+  path, and the one this workspace is built around.
+- **If it does not** (some model routes expose only `read` / `shell` /
+  `websearch`), the command tool is your fallback: use `python`, `sed`, or
+  heredocs to read and, when you must, to write files. You are not blocked —
+  just note it in your report/commit, because the session lacked the direct
+  tools.
 - Use `bash` for build/test/git and read-only inspection. Prefer the umbrella
   build (`./tools/b`) over inventing commands.
 - Keep changes small and cohesive; cite laws by Title, never number
