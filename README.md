@@ -29,10 +29,10 @@ bundles and launches it as an ad-hoc-codesigned `.app`. All build state lives
 |---|---|---|
 | `ecosystem/hotcwap` | R1 kernel host · windows | `vexgraph-ecosystem/hotcwap` |
 | `ecosystem/vexspoke` | R2 behavior core (**the constitution**) | `vexgraph-ecosystem/vexspoke` |
-| `ecosystem/graphvex` | R3 GPU driver (rect-first, no swapchain) | `vexgraph-ecosystem/graphvex` |
-| `ecosystem/api-haven` | R3 API / connectors | `vexgraph-ecosystem/api-haven` |
-| `ecosystem/language`, `ecosystem/darkbase` | R3 *(scaffolds)* | `vexgraph-ecosystem/*` |
-| `ecosystem/sesh`, `ecosystem/samplerate` | R4 | `vexgraph-ecosystem/*` |
+| `ecosystem/drivers/graphvex` | R3 GPU driver (rect-first, no swapchain) | `vexgraph-ecosystem/graphvex` |
+| `ecosystem/drivers/api-haven` | R3 API / connectors | `vexgraph-ecosystem/api-haven` |
+| `ecosystem/drivers/language`, `ecosystem/drivers/darkbase` | R3 *(scaffolds)* | `vexgraph-ecosystem/*` |
+| `ecosystem/interface/sesh`, `ecosystem/drivers/samplerate` | R4 | `vexgraph-ecosystem/*` |
 | `projects/{anti,drawling,semicolon,darling,impedance}` | R5 | `vexgraph-ecosystem/*` |
 | `tests` | the shared test suite | `vexgraph-ecosystem/tests` |
 | `repos/.ecosystem`, `repos/.github`, `repos/.vexgraph-dev` | meta | `vexgraph-*/*` |

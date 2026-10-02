@@ -657,17 +657,19 @@ static void setup_vexspoke(TargetList *tl) {
     if (!g_release) strl_push(&v->pub_defs, "DEBUG_BORROW_CHECK=1");
 }
 
-// ── projects/darling (R4: the UI toolkit — Frame, Containers, Elements) ────
+// ── ecosystem/interface/darling-framework (R4: the UI framework — Frame, Panel) ───────
 static void setup_darling(TargetList *tl) {
-    char *base = abspath("projects/darling");
+    char *base = abspath("ecosystem/interface/darling-framework");
     Target *lib = target_new(tl, "darling", T_LIB);
     StrList c = {0};
-    glob_rec(strf("%s/darling", base), ".c", &c);
+    // R4 is split by concern: src/ (Frame, Panel), src/input (accessibility),
+    // src/event (coordinate resolution).
+    glob_rec(strf("%s/src", base), ".c", &c);
     strl_sort(&c);
     lib->srcs = c;
-    strl_push(&lib->includes, base);
+    strl_push(&lib->includes, strf("%s/src", base));
     strl_push(&lib->deps, "hotcwap");   // R1: the OS window
-    strl_push(&lib->deps, "graphvex");  // R3: the renderer + Panel
+    strl_push(&lib->deps, "graphvex");  // R3: Element + the renderer
 }
 
 // ── graphvex tests (tests/graphvex mirrors src/) ────────────────────────────
@@ -684,7 +686,7 @@ static void setup_graphvex_tests(TargetList *tl) {
         Target *t = target_new(tl, name, T_EXE);
         t->is_test = true;
         strl_push(&t->srcs, ts.items[i]);
-        strl_push(&t->includes, abspath("ecosystem/graphvex/src"));
+        strl_push(&t->includes, abspath("ecosystem/drivers/graphvex/src"));
         strl_push(&t->defs, "UNDEBUG");
         strl_push(&t->deps, "graphvex");
         add_exe_libs(t);
@@ -729,9 +731,9 @@ static void setup_vexspoke_tests(TargetList *tl) {
     }
 }
 
-// ── ecosystem/sesh (header-only until sources land) ─────────────────────────
+// ── ecosystem/interface/sesh (header-only until sources land) ─────────────────────────
 static void setup_sesh(TargetList *tl) {
-    char *src = abspath("ecosystem/sesh/src");
+    char *src = abspath("ecosystem/interface/sesh/src");
     StrList c = {0};
     glob_rec(src, ".c", &c);
     if (c.count == 0) return;
@@ -739,7 +741,7 @@ static void setup_sesh(TargetList *tl) {
     Target *t = target_new(tl, "sesh", T_LIB);
     t->srcs = c;
     strl_push(&t->includes, src);
-    strl_push(&t->includes, abspath("ecosystem/sesh"));
+    strl_push(&t->includes, abspath("ecosystem/interface/sesh"));
     strl_push(&t->deps, "vexspoke");
 }
 
@@ -764,9 +766,9 @@ static void setup_impedance(TargetList *tl) {
     }
 }
 
-// ── ecosystem/api-haven ─────────────────────────────────────────────────────
+// ── ecosystem/drivers/api-haven ─────────────────────────────────────────────────────
 static void setup_apihaven(TargetList *tl) {
-    char *base = abspath("ecosystem/api-haven");
+    char *base = abspath("ecosystem/drivers/api-haven");
     const char *libs[] = {
         "src/api/client.c", "src/api/auth.c", "src/api/rest.c",
         "src/api/haven_ws_fanout.c", "src/com/discord/discord.c",
@@ -927,11 +929,11 @@ static void setup_apps(TargetList *tl) {
     }
 }
 
-// ── ecosystem/graphvex (R3: GPU driver + graphics core) ─────────────────────
+// ── ecosystem/drivers/graphvex (R3: GPU driver + graphics core) ─────────────────────
 static void add_gen(const char *src, const char *out, Cmd cmd);   // defined below
 
 static void setup_graphvex(TargetList *tl) {
-    char *base = abspath("ecosystem/graphvex");
+    char *base = abspath("ecosystem/drivers/graphvex");
     Target *lib = target_new(tl, "graphvex", T_LIB);
     StrList c = {0};
     glob_rec(strf("%s/src", base), ".c", &c);
@@ -945,8 +947,9 @@ static void setup_graphvex(TargetList *tl) {
 
     // shaders -> SPIR-V (regenerated only when the .vert/.frag changes)
     const char *names[] = {"quad.vert", "quad.frag"};
+    const char *dirs[]  = {"vert", "frag"};
     for (size_t i = 0; i < sizeof names / sizeof names[0]; i++) {
-        char *src = strf("%s/src/vulkan/shaders/%s", base, names[i]);
+        char *src = strf("%s/src/shaders/%s/%s", base, dirs[i], names[i]);
         char *out = strf("%s/shader/%s.spv", g_out, names[i]);
         Cmd g = {0};
         strl_push(&g, "glslangValidator");
@@ -959,7 +962,7 @@ static void setup_graphvex(TargetList *tl) {
     // embed the SPIR-V into a header the renderer #includes (regen on EITHER
     // shader change — one step keyed on the vert, one on the frag)
     for (size_t i = 0; i < sizeof names / sizeof names[0]; i++) {
-        char *src = strf("%s/src/vulkan/shaders/%s", base, names[i]);
+        char *src = strf("%s/src/shaders/%s/%s", base, dirs[i], names[i]);
         char *hdr = strf("%s/shader/quad_spv.h", g_out);
         Cmd g = {0};
         strl_push(&g, "python3");
@@ -968,6 +971,31 @@ static void setup_graphvex(TargetList *tl) {
         strl_push(&g, strf("%s/shader/quad.frag.spv", g_out));
         strl_push(&g, hdr);
         add_gen(src, hdr, g);
+    }
+}
+
+// ── darling tests (tests/darling — the battle suite lives in tests/, never in
+//    an ecosystem repo) ──────────────────────────────────────────────────────
+static void setup_darling_tests(TargetList *tl) {
+    char *tdir = strf("%s/tests/darling", g_root);
+    StrList ts = {0};
+    glob_rec(tdir, "_test.c", &ts);
+    strl_sort(&ts);
+    for (int i = 0; i < ts.count; i++) {
+        const char *bn = strrchr(ts.items[i], '/');
+        bn = bn ? bn + 1 : ts.items[i];
+        char *name = xstrdup(bn);
+        name[strlen(name) - 2] = 0;
+        Target *t = target_new(tl, name, T_EXE);
+        t->is_test = true;
+        strl_push(&t->srcs, ts.items[i]);
+        strl_push(&t->includes, abspath("ecosystem/interface/darling-framework/src"));
+        strl_push(&t->defs, "UNDEBUG");
+        strl_push(&t->deps, "darling");
+        add_exe_libs(t);
+        strl_push(&t->syslibs, "-L/opt/homebrew/lib");
+        strl_push(&t->syslibs, "-lvulkan");
+        strl_push(&t->syslibs, "-Wl,-rpath,/opt/homebrew/lib");
     }
 }
 
@@ -981,6 +1009,7 @@ static void setup_targets(TargetList *tl) {
     setup_darling(tl);
     setup_apps(tl);            // _main/*.c apps
     setup_graphvex_tests(tl);  // tests/graphvex mirrors graphvex/src
+    setup_darling_tests(tl);   // tests/darling mirrors darling-framework/src
     setup_vexspoke_tests(tl);  // executables last
 }
 

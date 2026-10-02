@@ -36,6 +36,8 @@ __pycache__/
 # b build state + generated artefacts
 .b/
 b.json
+compile_commands.json
+run/hello
 
 # Private assets — never published
 resources/
