@@ -1,4 +1,3 @@
-import { Plugin } from "@opencode/plugin"
 import { access, readFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
@@ -41,9 +40,21 @@ const REMINDER =
 
 type AnyRecord = Record<string, unknown>
 
-export default Plugin.define({
+// The slice of the plugin context this uses. The published helper's define() is
+// an identity wrapper (return plugin), so a dependency-free default export of
+// { id, setup } is accepted directly — no node_modules to resolve.
+type Ctx = {
+  location: { directory: string }
+  session: { hook: (name: string, fn: (event: unknown) => unknown) => Promise<unknown> }
+  storage: {
+    get: (key: string) => Promise<unknown>
+    set: (key: string, value: unknown) => Promise<void>
+  }
+}
+
+export default {
   id: "vexgraph.agent-bus",
-  async setup(ctx) {
+  async setup(ctx: Ctx) {
     const busPath = join(await workspaceRoot(ctx.location.directory), BUS)
 
     await ctx.session.hook("context", async (event) => {
@@ -80,4 +91,4 @@ export default Plugin.define({
       }
     })
   },
-})
+}
