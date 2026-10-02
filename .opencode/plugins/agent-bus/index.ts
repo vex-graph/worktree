@@ -9,8 +9,10 @@ import { dirname, join } from "node:path"
 //   2. Keep every session aware of its siblings by delivering unread bus notes
 //      (tools/agents.sh writes them) into the system prompt exactly once.
 //
-// The bus itself needs no tool: it rides on `bash` running tools/agents.sh.
-const ALLOWED_TOOLS = new Set(["read", "write", "edit", "bash", "websearch"])
+// The bus itself needs no tool: it rides on the command tool running
+// tools/agents.sh. OpenCode registers the command tool as `shell`, and Code
+// Mode's `execute` must survive or nothing can be invoked at all.
+const ALLOWED_TOOLS = new Set(["read", "write", "edit", "shell", "bash", "websearch", "execute"])
 
 const BUS = join("_notes", "agents", "bus.md")
 

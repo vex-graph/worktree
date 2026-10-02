@@ -41,3 +41,9 @@ run/hello
 
 # Private assets — never published
 resources/
+
+# OpenCode plugin dependencies (the plugin source + package.json are tracked)
+.opencode/node_modules/
+.opencode/bun.lock
+.opencode/plugins/*/node_modules/
+.opencode/plugins/*/bun.lock
