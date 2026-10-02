@@ -703,7 +703,7 @@ static void setup_graphvex_tests(TargetList *tl) {
         // the renderer row references the Vulkan Device; its test links the loader
         if (!strcmp(name, "vk_renderer_test") || !strcmp(name, "device_test") ||
             !strcmp(name, "gpu_render_test") || !strcmp(name, "resize_clip_test") ||
-            !strcmp(name, "surface_gpu_test")) {
+            !strcmp(name, "surface_gpu_test") || !strcmp(name, "clip_rounded_test")) {
             strl_push(&t->syslibs, "-L/opt/homebrew/lib");
             strl_push(&t->syslibs, "-lvulkan");
             strl_push(&t->syslibs, "-Wl,-rpath,/opt/homebrew/lib");
