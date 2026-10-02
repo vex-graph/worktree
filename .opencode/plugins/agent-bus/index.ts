@@ -3,15 +3,13 @@ import { dirname, join } from "node:path"
 
 // vexgraph.agent-bus
 //
-// Two jobs, both invisible when they work:
-//   1. Hold the model to the minimal tool surface for every request.
-//   2. Keep every session aware of its siblings by delivering unread bus notes
-//      (tools/agents.sh writes them) into the system prompt exactly once.
+// One job: deliver unread bus notes (tools/agents.sh writes them) into every
+// session's system prompt, once.
 //
-// The bus itself needs no tool: it rides on the command tool running
-// tools/agents.sh. OpenCode registers the command tool as `shell`, and Code
-// Mode's `execute` must survive or nothing can be invoked at all.
-const ALLOWED_TOOLS = new Set(["read", "write", "edit", "shell", "bash", "websearch", "execute"])
+// It deliberately does NOT touch the tool set. Filtering tools by name broke
+// sibling sessions whose provider names them differently — a session could lose
+// write/edit because "write" wasn't the name this list used. The minimal
+// surface is a convention (AGENTS.md), not a deletion.
 
 const BUS = join("_notes", "agents", "bus.md")
 
@@ -60,15 +58,7 @@ export default {
     await ctx.session.hook("context", async (event) => {
       const e = event as unknown as AnyRecord
 
-      // 1. Enforce the minimal tool surface for this model call.
-      const tools = e.tools as AnyRecord | undefined
-      if (tools && typeof tools === "object") {
-        for (const name of Object.keys(tools)) {
-          if (!ALLOWED_TOOLS.has(name)) delete tools[name]
-        }
-      }
-
-      // 2. Deliver unread bus notes to this session, once.
+      // Deliver unread bus notes to this session, once.
       let unread = ""
       try {
         const raw = await readFile(busPath, "utf8")
@@ -81,7 +71,6 @@ export default {
         // no bus yet — nothing to deliver
       }
 
-      // 3. Keep the reminder (and any fresh notes) in front of the model.
       const system = e.system as Array<{ type: string; text: string }> | undefined
       if (Array.isArray(system)) {
         system.push({
