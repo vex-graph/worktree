@@ -923,15 +923,19 @@ static bool has_main(const char *path) {
     return found;
 }
 
-// auto-discover apps: every _main/<name>.c with a main() becomes a bundleable
-// app, built together with any main-less sibling TU (shared scenes, helpers).
+// auto-discover apps: every tests/darling/*.c with a main() becomes a
+// bundleable app, built together with any main-less sibling TU (shared scenes,
+// helpers). Only the top level is app territory — frame/ and panel/ are the
+// test suite, already wired as test targets.
 static void setup_apps(TargetList *tl) {
-    char *dir = abspath("_main");
+    char *dir = abspath("tests/darling");
     StrList all = {0};
     glob_rec(dir, ".c", &all);
     strl_sort(&all);
     StrList apps = {0}, shared = {0};
+    size_t dlen = strlen(dir);
     for (int i = 0; i < all.count; i++) {
+        if (strchr(all.items[i] + dlen + 1, '/')) continue;   // top level only
         if (has_main(all.items[i])) strl_push(&apps, all.items[i]);
         else strl_push(&shared, all.items[i]);
     }
@@ -1041,7 +1045,7 @@ static void setup_targets(TargetList *tl) {
     setup_impedance(tl);
     setup_apihaven(tl);
     setup_darling(tl);
-    setup_apps(tl);            // _main/*.c apps
+    setup_apps(tl);            // tests/darling/*.c apps
     setup_graphvex_tests(tl);  // tests/graphvex mirrors graphvex/src
     setup_darling_tests(tl);   // tests/darling mirrors darling-framework/src
     setup_vexspoke_tests(tl);  // executables last
@@ -2224,7 +2228,7 @@ static void rebuild_self(char **argv) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // runnable discovery — `b run` with no target lists what you can run, grouped
-// by the directory the target lives in (apps from _main/, tests from tests/…).
+// by the directory the target lives in (apps from tests/darling/, tests from tests/…).
 // This is the answer to "what do I run?" without spelunking the tree.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -2320,7 +2324,7 @@ static Target *resolve_runnable(TargetList *tl, const char *q) {
 
 // ── compile-on-demand: run any source by its stem ───────────────────────────
 // `b run <stem>` (or a path, with or without ".c") finds a .c with a main()
-// under tests/ then _main/ and, if it isn't already a target, builds a
+// under tests/ and, if it isn't already a target, builds a
 // throwaway one on the spot — so loose files run without wiring a target.
 
 static void match_sources(const char *root, const char *basename, StrList *out) {
@@ -2345,7 +2349,7 @@ static char *find_source_for(const char *name) {
     // a bare stem: search the runnable roots, tests/ first
     const char *base = strrchr(direct, '/');
     base = base ? base + 1 : direct;
-    const char *roots[] = {"tests", "_main", "projects", "ecosystem"};
+    const char *roots[] = {"tests", "projects", "ecosystem"};
     for (size_t i = 0; i < sizeof roots / sizeof roots[0]; i++) {
         StrList hits = {0};
         match_sources(abspath(roots[i]), base, &hits);
