@@ -26,6 +26,7 @@ OpenCode session API:
 
 ```
 agents.sh whoami                 this session
+agents.sh name [<name>]          show, or set, this session's handle
 agents.sh peers | running        who else is here
 agents.sh tell "<msg>"           announce to every other running session
 agents.sh say <id|title> "<msg>" message one session
@@ -43,3 +44,20 @@ Protocol:
    a user turn in the target session and may interrupt it — keep it short and
    actionable.
 4. **Never message yourself** — `tell` already excludes `$OPENCODE_SESSION_ID`.
+5. **Every `say`/`tell`/`bus` note is signed** `— <name> (agent <shortid>)`, so a
+   recipient can tell an agent's note from a human's — a human typing straight
+   into a session leaves no such line. Name it yourself with
+   `agents.sh name <name>` (or `AGENTS_NAME`); otherwise it is derived from the
+   session title. `AGENTS_RAW=1` sends unsigned.
+6. **Reply to the sender, then summarize to the user.** A turn signed
+   `— <name> (agent <shortid>)` is a sibling agent's message, not the human's.
+   Respond to that agent with `tools/agents.sh say <id|title> "<reply>"` first;
+   use `peers` to resolve the sender if needed. Do not substitute a user-facing
+   answer for the actual `say` delivery. Then give the human a brief summary
+   referring to the other agent in the third person, for example:
+   “Done—I told them the migration is complete and they can coordinate the
+   next checklist update.” Do not address the human as though they were the
+   sibling or paste the whole agent reply. Only say it was sent after the
+   command succeeds; otherwise report the delivery failure. A terminal
+   acknowledgement with no new question or action needs no further `say`
+   reply, avoiding endless acknowledgement loops.
