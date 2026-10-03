@@ -948,6 +948,7 @@ static void setup_apps(TargetList *tl) {
         strl_push(&t->srcs, apps.items[i]);
         for (int k = 0; k < shared.count; k++) strl_push(&t->srcs, shared.items[k]);
         strl_push(&t->includes, dir);
+        strl_push(&t->includes, abspath("tests")); // shared Application test starter
         strl_push(&t->includes, abspath(strf("%s/src", VEXSPOKE)));
         strl_push(&t->deps, "*");  // auto-link every library that exists
         add_exe_libs(t);
@@ -1019,6 +1020,7 @@ static void setup_darling_tests(TargetList *tl) {
         t->is_test = true;
         strl_push(&t->srcs, ts.items[i]);
         strl_push(&t->includes, abspath("ecosystem/interface/darling-framework/src"));
+        strl_push(&t->includes, abspath("tests"));
         strl_push(&t->defs, "UNDEBUG");
         strl_push(&t->deps, "darling");
         add_exe_libs(t);
@@ -2186,6 +2188,60 @@ static void gen_compile_commands(void) {
 // self-rebuild + bootstrap
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Machine-readable IDE seam. CMake consumes this graph instead of inventing
+// a second set of include roots, public definitions, or archive link ordering.
+static void ide_strings(const StrList *items) {
+    printf("[");
+    for (int i = 0; i < items->count; i++) {
+        char *escaped = json_escape(items->items[i]);
+        printf("%s\"%s\"", i ? "," : "", escaped);
+        free(escaped);
+    }
+    printf("]");
+}
+
+static void export_ide_graph(void) {
+    printf("{\"byproducts\":[");
+    int count = 0;
+    for (int i = 0; i < g_targets_ref.count; i++) {
+        Target *t = &g_targets_ref.items[i];
+        if (t->kind != T_LIB && t->kind != T_MOD) continue;
+        char *path = json_escape(t->out_path);
+        printf("%s\"%s\"", count++ ? "," : "", path);
+        free(path);
+    }
+    printf("],\"tests\":[");
+    count = 0;
+    for (int i = 0; i < g_targets_ref.count; i++) {
+        Target *t = &g_targets_ref.items[i];
+        if (!t->is_test) continue;
+        StrList includes = {0}, definitions = {0}, options = {0}, libraries = {0};
+        collect_pub(t, &includes, &definitions, 0);
+        strl_extend(&definitions, &t->defs);
+        base_cflags(&options);
+        strl_extend(&options, &t->cflags);
+        collect_link_libs(t, &libraries, 0);
+        // CMake treats each framework pair as one link item, not -lFoundation.
+        for (int k = 0; k < t->syslibs.count; k++) {
+            if (!strcmp(t->syslibs.items[k], "-framework") && k + 1 < t->syslibs.count) {
+                strl_pushf(&libraries, "-framework %s", t->syslibs.items[++k]);
+            } else {
+                strl_push(&libraries, t->syslibs.items[k]);
+            }
+        }
+        char *name = json_escape(t->name);
+        printf("%s{\"name\":\"%s\",\"sources\":", count++ ? "," : "", name);
+        free(name);
+        ide_strings(&t->srcs);
+        printf(",\"includes\":"); ide_strings(&includes);
+        printf(",\"definitions\":"); ide_strings(&definitions);
+        printf(",\"options\":"); ide_strings(&options);
+        printf(",\"libraries\":"); ide_strings(&libraries);
+        printf("}");
+    }
+    printf("]}\n");
+}
+
 static void rebuild_self(char **argv) {
     const char *src = "tools/b.c";
     if (!path_exists(src)) return;
@@ -2404,6 +2460,7 @@ static void usage(void) {
            "  coverage [substr]   run tests instrumented; gate per-function execution\n"
            "  list                list every runnable target (alias: ls)\n"
            "  targets             list every target, including libraries\n"
+           "  ide                 export test build metadata as JSON for CLion/CMake\n"
            "  watch | cc | clean | doctor\n"
            "  b run <name>        name may be partial (e.g. `b run gallery`)\n");
 }
@@ -2472,6 +2529,10 @@ int main(int argc, char **argv) {
                                 : g_targets_ref.items[k].kind == T_APP ? "app" : "exe";
             printf("%-7s %s\n", kindstr, g_targets_ref.items[k].name);
         }
+        return 0;
+    }
+    if (!strcmp(command, "ide")) {
+        export_ide_graph();
         return 0;
     }
     if (!strcmp(command, "list") || !strcmp(command, "ls") || !strcmp(command, "apps")) {
