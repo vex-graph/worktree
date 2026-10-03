@@ -19,6 +19,16 @@ Minimal core, opt-in everything else. Six capabilities, nothing more by default:
   (`preferences.md` is the constitution). Never push without an explicit,
   one-off order (the Git Workflow Law).
 
+## Test evidence
+
+Before changing any part, consult `tests/test-checklist.md` and
+`tests/test-preferences.md` (the Timestamped Test Checklist Law). Update affected
+rows with actual automated lab evidence, descriptions, and Unix timestamps in
+the same work cycle. Do not record author identities or session IDs. Visual
+checks and appearance approval belong to the user, not the checklist;
+run `python3 tools/test_checklist.py check` before calling work verified. This
+applies to every framework, directory, test, document, and workspace tool.
+
 ## Talking to other agents
 
 `tools/agents.sh` is the bus — sibling sessions in this workspace, over the
