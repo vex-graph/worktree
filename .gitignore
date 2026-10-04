@@ -8,6 +8,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Nested independent repositories
+b/
 ecosystem/
 repos/
 projects/
@@ -35,9 +36,15 @@ __pycache__/
 
 # b build state + generated artefacts
 .b/
-b.json
-compile_commands.json
+b/b.json
+b/compile_commands.json
 run/hello
 
 # Private assets — never published
 resources/
+
+# harnesses (i only use oc as of rn)
+.opencode/
+.claude/
+.codex/
+.antigravity/
