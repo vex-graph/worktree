@@ -56,7 +56,7 @@ Do not hand-edit generated tables; add files/tests and use `sync` or `run`.
 
 def inventory(root):
     """Include tracked and non-ignored untracked files in every local repo."""
-    repos = {root, root / "tests"}
+    repos = {root, root / "tests", root / "b"}
     # Scan independently of the umbrella repo's ignores: nested repositories
     # own their inventory and their own ignore rules. .git may be a worktree file.
     for directory in ("ecosystem", "repos", "projects"):
