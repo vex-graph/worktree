@@ -62,7 +62,8 @@ workspace entry point.
 | `ecosystem/drivers/graphvex` | R3 GPU driver (rect-first, no swapchain) | `vexgraph-ecosystem/graphvex` |
 | `ecosystem/drivers/api-haven` | R3 API / connectors | `vexgraph-ecosystem/api-haven` |
 | `ecosystem/drivers/language`, `ecosystem/drivers/darkbase` | R3 *(scaffolds)* | `vexgraph-ecosystem/*` |
-| `ecosystem/interface/sesh`, `ecosystem/drivers/samplerate` | R4 | `vexgraph-ecosystem/*` |
+| `ecosystem/interface/sesh` | R4 interface · session relay | `vexgraph-ecosystem/sesh` |
+| `ecosystem/drivers/samplerate` | R5 interactable · audio engine | `vexgraph-ecosystem/samplerate` |
 | `projects/{anti,drawling,semicolon,darling,impedance}` | R5 | `vexgraph-ecosystem/*` |
 | `tests` | the shared test suite | `vexgraph-ecosystem/tests` |
 | `repos/.ecosystem`, `repos/.github`, `repos/.vexgraph-dev` | meta | `vexgraph-*/*` |
