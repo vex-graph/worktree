@@ -9,9 +9,12 @@ harness, assets) is git-ignored, so this repo stays tiny.
 ## Build: `b`
 
 The build system lives in the independent [`vex-graph/b`](https://github.com/vex-graph/b)
-checkout at `b/`. Its C23 language CLI owns `run`, `build` and the planned `export`
-surface. `b/workspace.c` preserves the existing framework graph, shaders, cache
-and tests. `tools/b` is only a forwarding compatibility launcher.
+checkout at `b/`. `b.c` is a language-agnostic CLI — a small suite (`b.h` +
+`util.c` + pluggable `languages/*` adapters) that owns `run`, `build` and the
+planned `export` surface. The adapter set is open-ended and grows over time;
+`b/README.md` lists the languages wired today. `b/workspace.c` remains the
+workspace engine that builds the whole ecosystem graph (libs, shaders, tests,
+apps); `tools/b` is a thin forwarding launcher for it.
 
 ```sh
 ./tools/b build            # build everything (libs, tests, apps)
@@ -30,9 +33,18 @@ For standalone projects, add the `b/` checkout to `PATH`, or invoke `./b/b`:
 ```sh
 ./b/b run exec ./hello.c
 ./b/b java ./Hello.java
+./b/b build python ./pkg
 ./b/b build c ./native-project
-./b/b build java ./java-project
 ```
+
+### Run the file you are looking at (CLion)
+
+The CLion external tool **b Runner → Run current file** runs
+`tools/b run "$FilePath$"`, so invoking it from an open source file builds and
+launches that file (its stem resolves to a declared target or a `tests/` app).
+The project run configuration named **b** triggers the same tool. This is the
+"open a file, press Run, it runs" path while `b/workspace.c` is still the
+builder.
 
 See `b/README.md` for the implemented command contract and packaging roadmap.
 `run instance` runs directly through a runtime or an existing executable;
