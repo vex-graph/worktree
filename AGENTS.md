@@ -7,6 +7,9 @@ complete current `preferences.md`. It is the universal constitution, not optiona
 background. Read the relevant implementation before making claims about it;
 distinguish existing behavior from proposals. Every primary agent and subagent
 must follow this order, then consult the owning repo preferences and test laws.
+Follow the repository reading map in `preferences.md`'s Rule Taxonomy: read the
+complete owning repo-local preferences before work in that repo. For cross-repo
+changes, read every affected owner's rules; report missing lawbooks explicitly.
 The OpenCode preferences plugin injects the full constitution first among its
 project context blocks on every model request. If it is unavailable, explicitly
 read `preferences.md` before proceeding; the config reference alone is not enough.
