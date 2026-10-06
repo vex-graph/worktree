@@ -25,3 +25,9 @@ an exit-code-5 report is not a compiler or launcher failure. That file is untouc
 Automated proof uses `tests/tools/run_current_test.py` and
 `tests/b/workspace_test.py`, without opening windows. Saved XML wiring is proved;
 CLion UI operation and appearance still need user confirmation after reopening.
+
+The workspace-root `CMakeLists.txt` is an IDE adapter. Open the root as a CMake
+project and reload it in CLion to index production C/Objective-C with the flags
+exported by `b ide`. Excluded `vexgraph_index_*` object targets supply the code
+model only; runtime builds still delegate to b. Native test Run/Debug targets
+retain assertions, and window/GPU/UI CTest execution is disabled by default.
