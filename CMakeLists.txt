@@ -78,7 +78,8 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${VEXGRAPH_SOURCE_ROOT}/tools/workspace.c" "${VEXGRAPH_SOURCE_ROOT}/tools/build_annotation.h"
     "${VEXGRAPH_SOURCE_ROOT}/tools/b")
 
-# Real, excluded object targets give CLion a code model for production files.
+# Real, excluded object targets give libraries, modules, apps and helper sources
+# their owning code model. Application indexing never admits galleries to CTest.
 # They do not replace b's runtime archives or participate in the default build.
 string(JSON index_count LENGTH "${graph}" index)
 if(index_count GREATER 0)
@@ -134,5 +135,5 @@ if(test_count GREATER 0)
         endif()
     endforeach()
 endif()
-message(STATUS "CLion: ${index_count} production indexing targets, ${test_count} native test targets from b")
+message(STATUS "CLion: ${index_count} non-test indexing targets, ${test_count} native test targets from b")
 message(STATUS "b remains build truth; window/GPU/UI CTest execution is opt-in")
