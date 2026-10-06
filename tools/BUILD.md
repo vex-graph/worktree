@@ -31,3 +31,10 @@ project and reload it in CLion to index production C/Objective-C with the flags
 exported by `b ide`. Excluded `vexgraph_index_*` object targets supply the code
 model only; runtime builds still delegate to b. Native test Run/Debug targets
 retain assertions, and window/GPU/UI CTest execution is disabled by default.
+
+The adapter also indexes every registered application/tool and its shared helper
+sources, including `tests/darling/compositor/filter_gallery.c` and
+`tests/darling/darling_tests.c`. Each keeps its own transitive include context;
+gallery indexing does not register or launch it as a test. The tests-only
+`tests/CMakeLists.txt` reuses this same complete graph. After changing the graph,
+reload the active CMake project so CLion replaces its old source contexts.
