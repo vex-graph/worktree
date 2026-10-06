@@ -101,6 +101,10 @@
  * setup_graphvex registers six compositor shader entrypoints; color.frag also
  * watches filter/filter_type.h so its shared operation IDs invalidate SPIR-V.
  * Compositor GLSL resolves canonical includes from Graphvex's src root.
+ * export_ide_graph covers every source-bearing target: tests as native test
+ * records and all other libraries/modules/apps/tools as excluded index records.
+ * Application mains and shared gallery helpers retain their own transitive
+ * include/definition context without being admitted to CTest or launched.
  * setup_graphvex_tests gives explicit Vulkan tests, including color_pass_test
  * gpu_scope_test and filter_gallery_fixture_test, the Homebrew headers and
  * loader link/rpath. Darling gallery apps already link that loader.
@@ -159,7 +163,7 @@ static char *strf(const char *fmt, ...) {
     va_start(ap, fmt);
     va_list ap2;
     va_copy(ap2, ap);
-    int n = vsnprintf(NULL, 0, fmt, ap);
+    int n = vsnprintf(nullptr, 0, fmt, ap);
     va_end(ap);
     char *s = xmalloc((size_t)n + 1);
     vsnprintf(s, (size_t)n + 1, fmt, ap2);
@@ -202,7 +206,7 @@ static void mkdir_parent(const char *path) {
 
 static char *read_file(const char *path, size_t *len_out) {
     FILE *f = fopen(path, "rb");
-    if (!f) return NULL;
+    if (!f) return nullptr;
     fseek(f, 0, SEEK_END);
     long n = ftell(f);
     fseek(f, 0, SEEK_SET);
@@ -278,7 +282,7 @@ static void strl_pushf(StrList *l, const char *fmt, ...) {
     va_start(ap, fmt);
     va_list ap2;
     va_copy(ap2, ap);
-    int n = vsnprintf(NULL, 0, fmt, ap);
+    int n = vsnprintf(nullptr, 0, fmt, ap);
     va_end(ap);
     char *s = xmalloc((size_t)n + 1);
     vsnprintf(s, (size_t)n + 1, fmt, ap2);
@@ -305,7 +309,7 @@ typedef StrList Cmd;
 static char **cmd_argv(const Cmd *c) {
     char **argv = xmalloc(((size_t) (*c).count + 1) * sizeof(char *));
     for (int i = 0; i < (*c).count; i++) argv[i] = (*c).items[i];
-    argv[(*c).count] = NULL;
+    argv[(*c).count] = nullptr;
     return argv;
 }
 
@@ -560,7 +564,7 @@ static Target *find_target(TargetList *tl, const char *name) {
         Target *target = &(*tl).items[i];
         if (!strcmp((*target).name, name)) return target;
     }
-    return NULL;
+    return nullptr;
 }
 
 // the global target list (declared here so unit_build_cmd can resolve deps)
@@ -594,9 +598,9 @@ static char *g_cache;            // <state>/cache/objects
 static bool g_release = false;
 static bool g_verbose = false;
 static bool g_coverage = false;          // build + run with clang source coverage
-static const char *g_only = NULL;        // restrict the target graph to one subsystem
-static const char *g_profraw = NULL;     // LLVM_PROFILE_FILE for the next test run
-static char *g_cc_version = NULL;
+static const char *g_only = nullptr;        // restrict the target graph to one subsystem
+static const char *g_profraw = nullptr;     // LLVM_PROFILE_FILE for the next test run
+static char *g_cc_version = nullptr;
 
 static const char *VEXSPOKE = "ecosystem/repos/vexspoke";
 
@@ -656,7 +660,7 @@ static char *cc_version(void) {
     Cmd c = {0};
     strl_push(&c, "cc");
     strl_push(&c, "--version");
-    char *out = NULL;
+    char *out = nullptr;
     if (run_capture(&c, &out) != 0) out = xstrdup("unknown");
     char *nl = strchr(out, '\n');
     if (nl) *nl = 0;
@@ -999,9 +1003,9 @@ static void setup_hotcwap(TargetList *tl) {
 }
 
 static bool has_main(const char *path) {
-    char *s = read_file(path, NULL);
+    char *s = read_file(path, nullptr);
     if (!s) return false;
-    bool found = strstr(s, "int main") != NULL;
+    bool found = strstr(s, "int main") != nullptr;
     free(s);
     return found;
 }
@@ -1313,10 +1317,10 @@ static bool unit_up_to_date(Unit *u) {
         return false;
     }
     bool ok = true;
-    char *save = NULL;
-    for (char *line = strtok_r(meta, "\n", &save); line; line = strtok_r(NULL, "\n", &save)) {
+    char *save = nullptr;
+    for (char *line = strtok_r(meta, "\n", &save); line; line = strtok_r(nullptr, "\n", &save)) {
         if (!strncmp(line, "cmd ", 4)) {
-            stored = strtoull(line + 4, NULL, 16);
+            stored = strtoull(line + 4, nullptr, 16);
         } else if (!strncmp(line, "in ", 3)) {
             long long sec, nsec, size;
             char path[4096];
@@ -1385,7 +1389,7 @@ static char *cache_path(uint64_t h) {
 // build driver
 // ─────────────────────────────────────────────────────────────────────────────
 
-static Unit *g_units = NULL;
+static Unit *g_units = nullptr;
 static int g_unit_count = 0;
 
 static void compile_all(void) {
@@ -1566,9 +1570,9 @@ static void link_target(Target *t) {
         } else {
             uint64_t sl = 0, sd = 0;
             char *p = strstr(m, "list ");
-            if (p) sl = strtoull(p + 5, NULL, 16);
+            if (p) sl = strtoull(p + 5, nullptr, 16);
             p = strstr(m, "dep ");
-            if (p) sd = strtoull(p + 4, NULL, 16);
+            if (p) sd = strtoull(p + 4, nullptr, 16);
             if (sl != listh || sd != depsig) need = true;
         }
         free(m);
@@ -1624,7 +1628,7 @@ typedef struct GenStep {
     Cmd cmd;
 } GenStep;
 
-static GenStep *g_gens = NULL;
+static GenStep *g_gens = nullptr;
 static int g_genCount = 0;
 static int g_genCap = 0;
 
@@ -1685,10 +1689,10 @@ static bool sl_has(const StrList *l, const char *s) {
 
 // one non-comment, trimmed line per entry (baselines)
 static void load_lines(const char *path, StrList *out) {
-    char *t = read_file(path, NULL);
+    char *t = read_file(path, nullptr);
     if (!t) return;
-    char *save = NULL;
-    for (char *line = strtok_r(t, "\n", &save); line; line = strtok_r(NULL, "\n", &save)) {
+    char *save = nullptr;
+    for (char *line = strtok_r(t, "\n", &save); line; line = strtok_r(nullptr, "\n", &save)) {
         while (*line == ' ' || *line == '\t' || *line == '\r') line++;
         size_t n = strlen(line);
         while (n && (line[n-1] == ' ' || line[n-1] == '\t' || line[n-1] == '\r')) line[--n] = 0;
@@ -1699,10 +1703,10 @@ static void load_lines(const char *path, StrList *out) {
 
 // "key value" per entry (mirror exceptions)
 static void load_pairs(const char *path, StrList *keys, StrList *vals) {
-    char *t = read_file(path, NULL);
+    char *t = read_file(path, nullptr);
     if (!t) return;
-    char *save = NULL;
-    for (char *line = strtok_r(t, "\n", &save); line; line = strtok_r(NULL, "\n", &save)) {
+    char *save = nullptr;
+    for (char *line = strtok_r(t, "\n", &save); line; line = strtok_r(nullptr, "\n", &save)) {
         while (*line == ' ' || *line == '\t' || *line == '\r') line++;
         if (!*line || *line == '#') continue;
         char *sp = line;
@@ -1810,7 +1814,7 @@ static char *scrub_header(const char *raw) {
 
 // public function names declared by a header, in declaration order
 static void header_functions(const char *header_path, StrList *out) {
-    char *raw = read_file(header_path, NULL);
+    char *raw = read_file(header_path, nullptr);
     if (!raw) return;
     char *text = scrub_header(raw);
     free(raw);
@@ -1867,20 +1871,20 @@ static const char *unit_rel(const char *unit) {
 
 static char *own_header(const char *unit) {
     size_t n = strlen(unit);
-    if (n < 3) return NULL;
-    if (strcmp(unit + n - 2, ".c") && strcmp(unit + n - 2, ".m")) return NULL;
+    if (n < 3) return nullptr;
+    if (strcmp(unit + n - 2, ".c") && strcmp(unit + n - 2, ".m")) return nullptr;
     char *stem = xstrdup(unit);
     stem[n-2] = 0;
     char *hdr = strf("%s.h", stem);
     free(stem);
-    return path_exists(hdr) ? hdr : NULL;
+    return path_exists(hdr) ? hdr : nullptr;
 }
 
 static char *owner_test_for(const char *unit, const StrList *eu, const StrList *eo) {
     const char *rel = unit_rel(unit);
     for (int i = 0; i < (*eu).count; i++)
         if (!strcmp((*eu).items[i], rel)) return strf("%s/tests/%s", g_root, (*eo).items[i]);
-    if (strncmp(rel, "src/", 4)) return NULL;
+    if (strncmp(rel, "src/", 4)) return nullptr;
     char *tmp = xstrdup(rel + 4);
     char *slash = strrchr(tmp, '/');
     char *dir, *base;
@@ -1894,7 +1898,7 @@ static char *owner_test_for(const char *unit, const StrList *eu, const StrList *
     }
     char *dot = strrchr(base, '.');
     if (dot) *dot = 0;
-    char *out = NULL;
+    char *out = nullptr;
     char *tc = strf("%s/%s/%s%s%s_test.c", g_root, VEX_TESTS_REL, dir,
                     dir[0] ? "/" : "", base);
     if (path_exists(tc)) {
@@ -1961,12 +1965,12 @@ static void load_lcov(const char *dir, StrList *stems) {
         size_t sl = strlen(stem);
         if (sl > 5) stem[sl-5] = 0;                 // drop ".lcov"
         strl_push_unique(stems, stem);
-        char *text = read_file(path, NULL);
+        char *text = read_file(path, nullptr);
         if (!text) continue;
-        const char *cur_src = NULL;
-        char *save = NULL;
+        const char *cur_src = nullptr;
+        char *save = nullptr;
         for (char *line = strtok_r(text, "\n", &save); line;
-             line = strtok_r(NULL, "\n", &save)) {
+             line = strtok_r(nullptr, "\n", &save)) {
             if (!strncmp(line, "SF:", 3)) {
                 cur_src = line + 3;
             } else if (!strncmp(line, "FNDA:", 5) && cur_src) {
@@ -2019,7 +2023,7 @@ static int ratchet(const char *covdir, bool strict, bool list,
         if (!hdr) continue;
         StrList fns = {0};
         header_functions(hdr, &fns);
-        char *txt = read_file(owner, NULL);
+        char *txt = read_file(owner, nullptr);
         if (txt) {
             for (int k = 0; k < fns.count; k++) {
                 total_public++;
@@ -2129,7 +2133,7 @@ static int ratchet(const char *covdir, bool strict, bool list,
 // test exactly once, export lcov, then gate per-function execution natively.
 // A test that does not pass contributes no coverage; it is reported and skipped.
 static int run_coverage(StrList *rest) {
-    const char *sub = NULL;
+    const char *sub = nullptr;
     bool strict = false, list = false, emit_functions = false;
     for (int i = 0; i < (*rest).count; i++) {
         const char *a = (*rest).items[i];
@@ -2158,7 +2162,7 @@ static int run_coverage(StrList *rest) {
         Cmd c = {0};
         strl_push(&c, (*t).out_path);
         int st = run_test((*t).name, &c, 60);
-        g_profraw = NULL;
+        g_profraw = nullptr;
         if (st == 77) {
             printf("  SKIP    %s (contract unproved) — coverage not counted\n", (*t).name);
             skipped++;
@@ -2178,7 +2182,7 @@ static int run_coverage(StrList *rest) {
         strl_push(&mg, profraw);
         strl_push(&mg, "-o");
         strl_push(&mg, profdata);
-        char *junk = NULL;
+        char *junk = nullptr;
         if (run_capture(&mg, &junk) != 0) {
             free(junk);
             fprintf(stderr, "b: llvm-profdata merge failed for %s\n", (*t).name);
@@ -2196,7 +2200,7 @@ static int run_coverage(StrList *rest) {
         strl_push(&ex, profdata);
         strl_push(&ex, "-format");
         strl_push(&ex, "lcov");
-        char *lcov = NULL;
+        char *lcov = nullptr;
         if (run_capture(&ex, &lcov) != 0) {
             free(lcov);
             fprintf(stderr, "b: llvm-cov export failed for %s\n", (*t).name);
@@ -2302,7 +2306,7 @@ static void gen_compile_commands(void) {
 // self-rebuild + bootstrap
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Machine-readable IDE seam. CMake consumes test and production-index records
+// Machine-readable IDE seam. CMake consumes test and all non-test index records
 // instead of inventing include roots, definitions or archive link ordering.
 static void ide_strings(const StrList *items) {
     printf("[");
@@ -2358,7 +2362,7 @@ static void export_ide_graph(void) {
     count = 0;
     for (int i = 0; i < g_targets_ref.count; i++) {
         Target *t = &g_targets_ref.items[i];
-        if ((*t).kind != T_LIB && (*t).kind != T_MOD) continue;
+        if ((*t).is_test) continue;
         if ((*t).srcs.count == 0) continue;
         StrList includes = {0}, definitions = {0}, options = {0};
         collect_pub(t, &includes, &definitions, 0);
@@ -2485,7 +2489,7 @@ static void list_runnables(TargetList *tl) {
     printf("b: %d runnable target(s) — run one with `b run <name>`", n);
     if (n) printf(", or `b test <name>` for a test");
     printf("\n");
-    const char *cur = NULL;
+    const char *cur = nullptr;
     for (int i = 0; i < n; i++) {
         if (!cur || strcmp(cur, rs[i].group)) {
             cur = rs[i].group;
@@ -2508,7 +2512,7 @@ static void match_targets(TargetList *tl, const char *q, StrList *out) {
 // resolve a possibly-partial name to exactly one runnable target (silent on
 // miss/ambiguity — the caller may fall through to an on-demand source)
 static Target *resolve_runnable(TargetList *tl, const char *q) {
-    Target *exact = NULL, *match = NULL;
+    Target *exact = nullptr, *match = nullptr;
     int hits = 0;
     for (int i = 0; i < (*tl).count; i++) {
         Target *t = &(*tl).items[i];
@@ -2518,7 +2522,7 @@ static Target *resolve_runnable(TargetList *tl, const char *q) {
     }
     if (exact) return exact;
     if (hits == 1) return match;
-    return NULL;
+    return nullptr;
 }
 
 // ── compile-on-demand: run any source by its stem ───────────────────────────
@@ -2559,10 +2563,10 @@ static char *find_source_for(const char *name) {
             fprintf(stderr, "b: '%s' matches %d sources — be more specific:\n", name, hits.count);
             for (int k = 0; k < hits.count; k++)
                 fprintf(stderr, "  %s\n", relativize(hits.items[k], g_root));
-            return NULL;
+            return nullptr;
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 // wrap a lone .c into a throwaway exe target that links every library
@@ -2622,7 +2626,7 @@ int main(int argc, char **argv) {
 
     // parse globals until the first non-flag
     int i = 1;
-    const char *command = NULL;
+    const char *command = nullptr;
     StrList rest = {0};
     for (; i < argc; i++) {
         const char *a = argv[i];
@@ -2721,7 +2725,7 @@ int main(int argc, char **argv) {
             else if (!strcmp(a, "--emit-units")) eu = true;
             else if (!strcmp(a, "--emit-surface")) es = true;
         }
-        return ratchet(NULL, strict, list, eu, es, false);
+        return ratchet(nullptr, strict, list, eu, es, false);
     }
     if (!strcmp(command, "watch")) {
         build_all();
@@ -2743,7 +2747,7 @@ int main(int argc, char **argv) {
         return 0;
     }
 
-    Target *run_target = NULL;
+    Target *run_target = nullptr;
     if (!strcmp(command, "run")) {
         const char *q = rest.items[0];
         run_target = resolve_runnable(&g_targets_ref, q);
@@ -2782,7 +2786,7 @@ int main(int argc, char **argv) {
         if (!strcmp(command, "test")) {
             // the static proof gate runs before the suite: no test run passes
             // while a unit lacks an owner or a public function goes uninvoked.
-            int rc = ratchet(NULL, false, false, false, false, false);
+            int rc = ratchet(nullptr, false, false, false, false, false);
             if (rc) return rc;
         }
         build_all();
@@ -2806,7 +2810,7 @@ int main(int argc, char **argv) {
             a[0] = (*t).out_path;
             int n = 1;
             for (int k = 1; k < rest.count; k++) a[n++] = rest.items[k];
-            a[n] = NULL;
+            a[n] = nullptr;
             printf("b: launching %s\n", (*t).out_path);
             fflush(stdout);
             execv((*t).out_path, a);
