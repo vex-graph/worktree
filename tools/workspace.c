@@ -2302,8 +2302,8 @@ static void gen_compile_commands(void) {
 // self-rebuild + bootstrap
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Machine-readable IDE seam. CMake consumes this graph instead of inventing
-// a second set of include roots, public definitions, or archive link ordering.
+// Machine-readable IDE seam. CMake consumes test and production-index records
+// instead of inventing include roots, definitions or archive link ordering.
 static void ide_strings(const StrList *items) {
     printf("[");
     for (int i = 0; i < (*items).count; i++) {
@@ -2352,6 +2352,26 @@ static void export_ide_graph(void) {
         printf(",\"definitions\":"); ide_strings(&definitions);
         printf(",\"options\":"); ide_strings(&options);
         printf(",\"libraries\":"); ide_strings(&libraries);
+        printf("}");
+    }
+    printf("],\"index\":[");
+    count = 0;
+    for (int i = 0; i < g_targets_ref.count; i++) {
+        Target *t = &g_targets_ref.items[i];
+        if ((*t).kind != T_LIB && (*t).kind != T_MOD) continue;
+        if ((*t).srcs.count == 0) continue;
+        StrList includes = {0}, definitions = {0}, options = {0};
+        collect_pub(t, &includes, &definitions, 0);
+        strl_extend(&definitions, &(*t).defs);
+        base_cflags(&options);
+        strl_extend(&options, &(*t).cflags);
+        char *name = json_escape((*t).name);
+        printf("%s{\"name\":\"%s\",\"sources\":", count++ ? "," : "", name);
+        free(name);
+        ide_strings(&(*t).srcs);
+        printf(",\"includes\":"); ide_strings(&includes);
+        printf(",\"definitions\":"); ide_strings(&definitions);
+        printf(",\"options\":"); ide_strings(&options);
         printf("}");
     }
     printf("]}\n");
