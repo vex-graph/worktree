@@ -48,3 +48,6 @@ resources/
 .claude/
 .codex/
 .antigravity/
+
+# Local constitution; published separately as a GitHub Gist.
+/preferences.md
