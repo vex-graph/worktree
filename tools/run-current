@@ -1,0 +1,28 @@
+#!/bin/sh
+# CLion entry point: project C clients need graph linking; other files use b.
+set -eu
+here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+root=$(CDPATH= cd -- "$here/.." && pwd)
+# Finder-launched CLion may lack shell startup paths. Keep caller precedence,
+# then expose this Apple Silicon host's installed Homebrew/rustup toolchains.
+export PATH="${PATH:-/usr/bin:/bin}:/opt/homebrew/bin:$HOME/.cargo/bin"
+if [ "$#" -lt 1 ]; then
+    echo 'b: usage: run-current <active-file> [arguments...]' >&2
+    exit 2
+fi
+file=$1
+shift
+if [ ! -f "$file" ]; then
+    echo "b: active file does not exist: $file" >&2
+    exit 2
+fi
+directory=$(CDPATH= cd -- "$(dirname -- "$file")" && pwd)
+file="$directory/$(basename -- "$file")"
+case "$file" in
+    "$root"/tests/*.c|"$root"/ecosystem/projects/*.c)
+        exec "$root/tools/b" run "$file" "$@"
+        ;;
+    *)
+        exec "$root/personal/b/b" run exec "$file" -- "$@"
+        ;;
+esac
