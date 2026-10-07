@@ -796,7 +796,7 @@ static void setup_graphvex_tests(TargetList *tl) {
             strl_pushf(&(*t).defs, "FILTER_GALLERY_SOURCE_RESOURCE=\"%s\"",
                 abspath("tests/resources/other-sunflower.png"));
         }
-        if (!strcmp(name, "vk_renderer_test") || !strcmp(name, "device_test") ||
+        if (!strcmp(name, "vk_renderer_test") || !strcmp(name, "sampled_image_test") || !strcmp(name, "device_test") ||
             !strcmp(name, "gpu_render_test") || !strcmp(name, "resize_clip_test") ||
             !strcmp(name, "surface_gpu_test") || !strcmp(name, "clip_rounded_test") ||
             !strcmp(name, "color_pass_test") || !strcmp(name, "gpu_scope_test") ||
