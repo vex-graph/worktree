@@ -85,7 +85,9 @@
  * StrList srcs — source files; StrList includes — include directories;
  * StrList defs — own definitions; StrList pub_defs — propagated definitions;
  * StrList cflags — compile options; StrList deps — dependency target names;
- * StrList syslibs — platform link arguments; StrList objc_arc — ARC source files;
+ * StrList syslibs — platform link arguments;
+ * StrList resources — source assets copied into app bundle Resources;
+ * StrList objc_arc — ARC source files;
  * char *out_path — output; bool is_test — test admission; bool selected — build set.
  * TargetList: Target *items — target rows; int count — used; int cap — capacity.
  * Unit: Target *t — owner; const char *src — source; char *obj — object path;
@@ -108,6 +110,9 @@
  * setup_graphvex_tests gives explicit Vulkan tests, including color_pass_test
  * gpu_scope_test and filter_gallery_fixture_test, the Homebrew headers and
  * loader link/rpath. Darling gallery apps already link that loader.
+ * filter_gallery bundles the tracked sunflower PNG; its owner test resolves
+ * the source fixture explicitly. Resource-bearing apps refresh their bundle
+ * even when compiled code is unchanged; asset copy failures stop the build.
  */
 
 #include <stdarg.h>
@@ -540,6 +545,7 @@ typedef struct {
     StrList cflags;      // extra compile flags
     StrList deps;        // names of target-level libs this links
     StrList syslibs;     // raw link args (-lpthread, "-framework Cocoa", ...)
+    StrList resources;   // owned build inputs, copied into Contents/Resources
     StrList objc_arc;    // sources needing -fobjc-arc
     char *out_path;      // resolved archive/binary path
     bool is_test;        // runnable by `b test`
@@ -785,6 +791,11 @@ static void setup_graphvex_tests(TargetList *tl) {
         strl_push(&(*t).deps, "graphvex");
         add_exe_libs(t);
         // Explicit Vulkan clients require both SDK headers and the loader.
+        if (!strcmp(name, "filter_gallery_fixture_test")) {
+            strl_push(&(*t).srcs, abspath("tests/darling/compositor/gallery_photo.c"));
+            strl_pushf(&(*t).defs, "FILTER_GALLERY_SOURCE_RESOURCE=\"%s\"",
+                abspath("tests/resources/other-sunflower.png"));
+        }
         if (!strcmp(name, "vk_renderer_test") || !strcmp(name, "device_test") ||
             !strcmp(name, "gpu_render_test") || !strcmp(name, "resize_clip_test") ||
             !strcmp(name, "surface_gpu_test") || !strcmp(name, "clip_rounded_test") ||
@@ -1021,6 +1032,10 @@ static void setup_apps(TargetList *tl) {
     StrList apps = {0}, shared = {0};
     for (int i = 0; i < all.count; i++) {
         const char *p = all.items[i];
+        // Native photo decoding is a gallery fixture, not a shared app utility.
+        const char *leaf = strrchr(p, '/');
+        if (leaf && !strcmp(leaf + 1, "gallery_photo.c"))
+            continue;
         size_t plen = strlen(p);
         if (plen > 7 && !strcmp(p + plen - 7, "_test.c")) continue;   // the suite
         if (has_main(p)) strl_push(&apps, p);
@@ -1032,6 +1047,10 @@ static void setup_apps(TargetList *tl) {
         char *name = xstrdup(bn);
         name[strlen(name) - 2] = 0;
         Target *t = target_new(tl, name, T_APP);
+        if (!strcmp(name, "filter_gallery")) {
+            strl_push(&(*t).resources, abspath("tests/resources/other-sunflower.png"));
+            strl_push(&(*t).srcs, abspath("tests/darling/compositor/gallery_photo.c"));
+        }
         strl_push(&(*t).srcs, apps.items[i]);
         for (int k = 0; k < shared.count; k++) strl_push(&(*t).srcs, shared.items[k]);
         strl_push(&(*t).includes, dir);
@@ -1127,6 +1146,11 @@ static void setup_darling_tests(TargetList *tl) {
         (*t).is_test = true;
         strl_push(&(*t).srcs, ts.items[i]);
         strl_push(&(*t).includes, abspath("ecosystem/repos/darling-framework/src"));
+        if (!strcmp(name, "gallery_photo_test")) {
+            strl_push(&(*t).srcs, abspath("tests/darling/compositor/gallery_photo.c"));
+            strl_pushf(&(*t).defs, "FILTER_GALLERY_SOURCE_RESOURCE=\"%s\"",
+                abspath("tests/resources/other-sunflower.png"));
+        }
         strl_push(&(*t).includes, abspath("tests"));
         strl_push(&(*t).defs, "UNDEBUG");
         strl_push(&(*t).deps, "darling");
@@ -1485,6 +1509,14 @@ static void make_app_bundle(Target *t) {
     strl_push(&cp, (*t).out_path);
     strl_push(&cp, strf("%s/%s", macos, (*t).name));
     run_sync(&cp);
+    const StrList *resources = &(*t).resources;
+    for (int i = 0; i < (*resources).count; ++i) {
+        Cmd asset = {0};
+        strl_push(&asset, "cp");
+        strl_push(&asset, (*resources).items[i]);
+        strl_push(&asset, strf("%s/Contents/Resources", app));
+        run_sync(&asset);
+    }
     char *plist = strf(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
         "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" "
@@ -1577,7 +1609,12 @@ static void link_target(Target *t) {
         }
         free(m);
     }
-    if (!need) return;
+    if (!need) {
+        const StrList *resources = &(*t).resources;
+        if ((*t).kind == T_APP && (*resources).count)
+            make_app_bundle(t);
+        return;
+    }
 
     Cmd c = {0};
     if ((*t).kind == T_LIB) {
