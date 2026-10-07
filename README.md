@@ -8,6 +8,20 @@ harness, assets) is git-ignored, so this repo stays tiny.
 
 ## Build: `b`
 
+### CLion: CMake is IDE metadata only
+
+Each code repository has its own `CMakeLists.txt` and README guidance for
+navigation, diagnostics and inlay hints. Per-repo source targets are excluded
+from default builds: no dependency downloads, release linking or application
+runner is wired into them. Supply local dependency header paths where required;
+missing headers remain real errors, never fake declarations. Source-free
+blueprints explicitly have no source targets. IDE appearance is user-verified.
+
+Use [b](https://github.com/vex-graph/b) for actual builds. The workspace-root and
+`tests/` CMake entries retain their existing b-metadata/native-test integration;
+they are separate from the per-repo indexing-only entries. See each repository's
+README for its current build command and stated standalone/runtime gaps.
+
 The build system lives in the independent [`vex-graph/b`](https://github.com/vex-graph/b)
 checkout at `b/`. `b.c` is a language-agnostic CLI — a small suite (`b.h` +
 `util.c` + pluggable `languages/*` adapters) that owns `run`, `build` and the
