@@ -769,15 +769,17 @@ static void setup_vexspoke(TargetList *tl) {
 }
 
 // ── ecosystem/repos/relational-engine (R2 storage/memory owner) ──────────────
-// Production native C Memory/MemoryArena/Transient and File/Cache/VexHome/
-// log/transport, promoted from Vexspoke. Only src/nio + src/io are production;
-// src/relational, src/reflection and src/search stay reference-only and must
-// never shadow Vexspoke's canonical headers (consumers put Vexspoke src first).
+// Production native C Memory/MemoryArena/Transient, File/Cache/VexHome/
+// log/transport, and the type-id algebra, promoted from Vexspoke. Only
+// src/nio + src/io + src/type are production; src/relational, src/reflection
+// and src/search stay reference-only and must never shadow Vexspoke's
+// canonical headers (consumers put Vexspoke src first).
 static void setup_relational_engine(TargetList *tl) {
     Target *e = target_new(tl, "relational_engine", T_LIB);
     StrList c = {0};
     glob_rec(abspath(strf("%s/src/nio", REL_ENGINE)), ".c", &c);
     glob_rec(abspath(strf("%s/src/io", REL_ENGINE)), ".c", &c);
+    glob_rec(abspath(strf("%s/src/type", REL_ENGINE)), ".c", &c);  // type algebra
 #ifdef __APPLE__
     glob_rec(abspath(strf("%s/src/io", REL_ENGINE)), ".m", &c);  // clipboard_mac.m (ARC)
 #endif
@@ -795,7 +797,7 @@ static void setup_relational_engine(TargetList *tl) {
 // handshake (relational_memory_test.c) needs rust/include + the Rust static
 // library, so it stays owned by tests/relational-engine/rust/run.py, not here.
 static void setup_relational_engine_tests(TargetList *tl) {
-    const char *dirs[] = { "tests/relational-engine/nio", "tests/relational-engine/io" };
+    const char *dirs[] = { "tests/relational-engine/nio", "tests/relational-engine/io", "tests/relational-engine/type" };
     StrList srcs = {0};
     for (size_t d = 0; d < sizeof dirs / sizeof dirs[0]; d++)
         glob_rec(abspath(dirs[d]), ".c", &srcs);
