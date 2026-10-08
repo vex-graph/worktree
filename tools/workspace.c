@@ -926,7 +926,7 @@ static void setup_vexspoke_tests(TargetList *tl) {
     }
 }
 
-// ── ecosystem/repos/sesh (header-only until sources land) ────────────────────
+// ── ecosystem/repos/sesh (caller-buffer snapshot core) ───────────────────────
 static void setup_sesh(TargetList *tl) {
     char *src = abspath("ecosystem/repos/sesh/src");
     StrList c = {0};
@@ -937,6 +937,8 @@ static void setup_sesh(TargetList *tl) {
     (*t).srcs = c;
     strl_push(&(*t).includes, src);
     strl_push(&(*t).includes, abspath("ecosystem/repos/sesh"));
+    strl_push(&(*t).includes, abspath(strf("%s/src", VEXSPOKE)));
+    strl_push(&(*t).includes, abspath("ecosystem/repos/api-haven/src"));
     strl_push(&(*t).deps, "vexspoke");
 }
 
