@@ -18,7 +18,7 @@ that same tool action. Reopen CLion to load the corrected saved settings.
 - A standalone Rust file must have a `main`; Cargo library modules are not standalone
   programs. Use `personal/b/b build cargo <crate-directory>` for the crate.
 
-For example, select `personal/relational-engine/rust/src/helloworld.rs` and use
+For example, select `../ecosystem/repos/relational-engine/rust/src/helloworld.rs` and use
 the b action. Its current code prints its arguments and deliberately exits 5;
 an exit-code-5 report is not a compiler or launcher failure. That file is untouched.
 
