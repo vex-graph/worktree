@@ -833,6 +833,11 @@ static void setup_vexspoke_tests(TargetList *tl) {
         size_t bl = strlen(base);
         bool is_test = bl > 7 && !strcmp(base + bl - 7, "_test.c");
         if (!is_test && strcmp(base, "touchid_demo.c")) continue;
+        // Opt-in engine extern boundary: registered explicitly by
+        // setup_vexspoke_engine_seam when VEX_ENGINE_SEAM=1, because the ordinary
+        // closure links neither the Rust include dir nor its static library.
+        // The registered owner proof is tests/relational-engine/rust/run.py.
+        if (!strcmp(base, "relational_memory_test.c")) continue;
         char *name = xstrdup(base);
         name[strlen(name) - 2] = 0;
         bool dup = false;
@@ -850,6 +855,52 @@ static void setup_vexspoke_tests(TargetList *tl) {
         strl_push(&(*t).deps, "vexspoke");
         add_exe_libs(t);
     }
+}
+
+// ── optional Vexspoke -> Relational Engine extern seam (opt-in only) ─────────
+// nio/relational_memory.h needs the engine Rust include dir and its resident
+// static library. This boundary is NOT part of the ordinary vexspoke/Darling
+// closure; it is registered explicitly, and only when enabled:
+//
+//     VEX_ENGINE_SEAM=1 ./tools/b build relational_memory_test
+//
+// VEX_ENGINE_LIB overrides the archive path (default:
+// ecosystem/repos/relational-engine/rust/target/debug/librelational_engine_scratchpad.a).
+// If the archive is absent, cargo builds it offline/locked first. The registered
+// owner proof for this boundary is tests/relational-engine/rust/run.py.
+static void setup_vexspoke_engine_seam(TargetList *tl) {
+    const char *enable = getenv("VEX_ENGINE_SEAM");
+    if (enable == nullptr || *enable == '\0' || !strcmp(enable, "0"))
+        return;
+    const char *engine = "ecosystem/repos/relational-engine";
+    char *manifest = abspath(strf("%s/rust/Cargo.toml", engine));
+    const char *lib = getenv("VEX_ENGINE_LIB");
+    if (lib == nullptr || *lib == '\0')
+        lib = abspath(strf("%s/rust/target/debug/librelational_engine_scratchpad.a", engine));
+    if (!path_exists(lib)) {
+        Cmd c = {0};
+        strl_push(&c, "cargo");
+        strl_push(&c, "build");
+        strl_push(&c, "--offline");
+        strl_push(&c, "--locked");
+        strl_push(&c, "--manifest-path");
+        strl_push(&c, manifest);
+        run_sync(&c);
+    }
+    if (!path_exists(lib)) {
+        printf("b: VEX_ENGINE_SEAM set but engine archive missing at %s\n", lib);
+        return;
+    }
+    Target *t = target_new(tl, "relational_memory_test", T_EXE);
+    (*t).is_test = true;
+    strl_push(&(*t).srcs, abspath("tests/vexspoke/nio/relational_memory_test.c"));
+    strl_push(&(*t).includes, abspath(strf("%s/rust/include", engine)));
+    strl_push(&(*t).includes, abspath(strf("%s/src", VEXSPOKE)));
+    strl_push(&(*t).includes, abspath("tests"));
+    strl_push(&(*t).defs, "UNDEBUG");
+    strl_push(&(*t).deps, "vexspoke");
+    strl_push(&(*t).syslibs, lib);
+    add_exe_libs(t);
 }
 
 // ── ecosystem/repos/sesh (header-only until sources land) ────────────────────
@@ -1168,6 +1219,7 @@ static void setup_targets(TargetList *tl) {
         if (!strcmp(g_only, "vexspoke")) {
             setup_vexspoke(tl);
             setup_vexspoke_tests(tl);
+            setup_vexspoke_engine_seam(tl);   // opt-in (VEX_ENGINE_SEAM)
         }
         return;
     }
@@ -1182,6 +1234,7 @@ static void setup_targets(TargetList *tl) {
     setup_graphvex_tests(tl);  // tests/graphvex mirrors graphvex/src
     setup_darling_tests(tl);   // tests/darling mirrors darling-framework/src
     setup_vexspoke_tests(tl);  // executables last
+    setup_vexspoke_engine_seam(tl);  // opt-in engine extern boundary (VEX_ENGINE_SEAM)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
