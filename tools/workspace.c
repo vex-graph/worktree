@@ -78,7 +78,7 @@
  * StrList: char **items — string rows; int count — used rows; int cap — storage.
  * Cmd: alias of StrList — child argument collection, same fields.
  * Stamp: long long sec — file modification seconds; long long nsec — fraction;
- * long long size — file bytes.
+ * long long size — file Bytes.
  * Job: Cmd cmd — arguments; char *log_path — captured output; pid_t pid — child;
  * int status — completion; bool started — admitted; const char *label — job name.
  * Target: const char *name — identity; TKind kind — lib/module/exe/app;
@@ -609,6 +609,7 @@ static const char *g_profraw = nullptr;     // LLVM_PROFILE_FILE for the next te
 static char *g_cc_version = nullptr;
 
 static const char *VEXSPOKE = "ecosystem/repos/vexspoke";
+static const char *REL_ENGINE = "ecosystem/repos/relational-engine";
 
 static void setup_paths(void) {
     const char *cfg = g_coverage ? "coverage" : (g_release ? "release" : "debug");
@@ -737,7 +738,7 @@ static void add_exe_libs(Target *t) {
 #endif
 }
 
-// ── ecosystem/repos/vexspoke ────────────────────────────────────────────────
+// ── ecosystem/repos/vexspoke (R2 CPU computation/behavior) ──────────────────
 static void setup_vexspoke(TargetList *tl) {
     Target *v = target_new(tl, "vexspoke", T_LIB);
     StrList c = {0};
@@ -746,14 +747,87 @@ static void setup_vexspoke(TargetList *tl) {
     glob_rec(abspath(strf("%s/src", VEXSPOKE)), ".m", &c);
 #endif
     strl_sort(&c);
+    // Provenance guard: storage/memory now lives in relational_engine. A leftover
+    // Vexspoke copy (including an empty-to-nonempty dir) would link duplicate
+    // Memory_*/File_* symbols, so reject it loudly instead.
+    for (int i = 0; i < c.count; i++) {
+        const char *s = c.items[i];
+        if (strstr(s, "/src/nio/") || strstr(s, "/src/io/"))
+            die("duplicate storage source left in Vexspoke: %s", s);
+    }
     (*v).srcs = c;
     strl_push(&(*v).includes, abspath(strf("%s/src", VEXSPOKE)));
+    // Engine-owned storage headers/lib; the engine lib has no Vexspoke dep, so
+    // this edge is acyclic (Vexspoke CPU -> engine storage, never the reverse).
+    strl_push(&(*v).deps, "relational_engine");
 #ifdef __APPLE__
     strl_push(&(*v).cflags, "-mcpu=apple-m1");
     apple_frameworks(&(*v).syslibs);
 #endif
     strl_push(&(*v).syslibs, "-lpthread");
     if (!g_release) strl_push(&(*v).pub_defs, "DEBUG_BORROW_CHECK=1");
+}
+
+// ── ecosystem/repos/relational-engine (R2 storage/memory owner) ──────────────
+// Production native C Memory/MemoryArena/Transient and File/Cache/VexHome/
+// log/transport, promoted from Vexspoke. Only src/nio + src/io are production;
+// src/relational, src/reflection and src/search stay reference-only and must
+// never shadow Vexspoke's canonical headers (consumers put Vexspoke src first).
+static void setup_relational_engine(TargetList *tl) {
+    Target *e = target_new(tl, "relational_engine", T_LIB);
+    StrList c = {0};
+    glob_rec(abspath(strf("%s/src/nio", REL_ENGINE)), ".c", &c);
+    glob_rec(abspath(strf("%s/src/io", REL_ENGINE)), ".c", &c);
+#ifdef __APPLE__
+    glob_rec(abspath(strf("%s/src/io", REL_ENGINE)), ".m", &c);  // clipboard_mac.m (ARC)
+#endif
+    strl_sort(&c);
+    (*e).srcs = c;
+    strl_push(&(*e).includes, abspath(strf("%s/src", REL_ENGINE)));
+    strl_push(&(*e).includes, abspath(strf("%s/src", VEXSPOKE)));  // CPU leaf headers
+#ifdef __APPLE__
+    strl_push(&(*e).cflags, "-mcpu=apple-m1");
+#endif
+    if (!g_release) strl_push(&(*e).pub_defs, "DEBUG_BORROW_CHECK=1");
+}
+
+// Native storage owner tests: tests/relational-engine/{nio,io}. The Rust ABI
+// handshake (relational_memory_test.c) needs rust/include + the Rust static
+// library, so it stays owned by tests/relational-engine/rust/run.py, not here.
+static void setup_relational_engine_tests(TargetList *tl) {
+    const char *dirs[] = { "tests/relational-engine/nio", "tests/relational-engine/io" };
+    StrList srcs = {0};
+    for (size_t d = 0; d < sizeof dirs / sizeof dirs[0]; d++)
+        glob_rec(abspath(dirs[d]), ".c", &srcs);
+    strl_sort(&srcs);
+    StrList seen = {0};
+    for (int i = 0; i < srcs.count; i++) {
+        const char *s = srcs.items[i];
+        const char *base = strrchr(s, '/');
+        base = base ? base + 1 : s;
+        size_t bl = strlen(base);
+        if (!(bl > 7 && !strcmp(base + bl - 7, "_test.c"))) continue;
+        if (!strcmp(base, "relational_memory_test.c")) continue;  // Rust ABI runner
+        char *name = xstrdup(base);
+        name[strlen(name) - 2] = 0;
+        bool dup = false;
+        for (int k = 0; k < seen.count; k++)
+            if (!strcmp(seen.items[k], name)) { dup = true; break; }
+        if (dup) { free(name); continue; }
+        strl_push(&seen, name);
+
+        Target *t = target_new(tl, name, T_EXE);
+        (*t).is_test = true;
+        strl_push(&(*t).srcs, s);
+        strl_push(&(*t).includes, abspath(strf("%s/src", VEXSPOKE)));
+        strl_push(&(*t).includes, abspath("tests"));   // test_support.h
+        strl_push(&(*t).defs, "UNDEBUG");
+        // Engine storage calls Vexspoke CPU leaves (SpinLock_*, Crypto_sha256Hex),
+        // so an engine-linked test lists both archives; no recursive target dep.
+        strl_push(&(*t).deps, "relational_engine");
+        strl_push(&(*t).deps, "vexspoke");
+        add_exe_libs(t);
+    }
 }
 
 // ── ecosystem/repos/darling-framework (R4: Frame, Panel) ──────────────────────
@@ -833,11 +907,6 @@ static void setup_vexspoke_tests(TargetList *tl) {
         size_t bl = strlen(base);
         bool is_test = bl > 7 && !strcmp(base + bl - 7, "_test.c");
         if (!is_test && strcmp(base, "touchid_demo.c")) continue;
-        // Opt-in engine extern boundary: registered explicitly by
-        // setup_vexspoke_engine_seam when VEX_ENGINE_SEAM=1, because the ordinary
-        // closure links neither the Rust include dir nor its static library.
-        // The registered owner proof is tests/relational-engine/rust/run.py.
-        if (!strcmp(base, "relational_memory_test.c")) continue;
         char *name = xstrdup(base);
         name[strlen(name) - 2] = 0;
         bool dup = false;
@@ -855,52 +924,6 @@ static void setup_vexspoke_tests(TargetList *tl) {
         strl_push(&(*t).deps, "vexspoke");
         add_exe_libs(t);
     }
-}
-
-// ── optional Vexspoke -> Relational Engine extern seam (opt-in only) ─────────
-// nio/relational_memory.h needs the engine Rust include dir and its resident
-// static library. This boundary is NOT part of the ordinary vexspoke/Darling
-// closure; it is registered explicitly, and only when enabled:
-//
-//     VEX_ENGINE_SEAM=1 ./tools/b build relational_memory_test
-//
-// VEX_ENGINE_LIB overrides the archive path (default:
-// ecosystem/repos/relational-engine/rust/target/debug/librelational_engine_scratchpad.a).
-// If the archive is absent, cargo builds it offline/locked first. The registered
-// owner proof for this boundary is tests/relational-engine/rust/run.py.
-static void setup_vexspoke_engine_seam(TargetList *tl) {
-    const char *enable = getenv("VEX_ENGINE_SEAM");
-    if (enable == nullptr || *enable == '\0' || !strcmp(enable, "0"))
-        return;
-    const char *engine = "ecosystem/repos/relational-engine";
-    char *manifest = abspath(strf("%s/rust/Cargo.toml", engine));
-    const char *lib = getenv("VEX_ENGINE_LIB");
-    if (lib == nullptr || *lib == '\0')
-        lib = abspath(strf("%s/rust/target/debug/librelational_engine_scratchpad.a", engine));
-    if (!path_exists(lib)) {
-        Cmd c = {0};
-        strl_push(&c, "cargo");
-        strl_push(&c, "build");
-        strl_push(&c, "--offline");
-        strl_push(&c, "--locked");
-        strl_push(&c, "--manifest-path");
-        strl_push(&c, manifest);
-        run_sync(&c);
-    }
-    if (!path_exists(lib)) {
-        printf("b: VEX_ENGINE_SEAM set but engine archive missing at %s\n", lib);
-        return;
-    }
-    Target *t = target_new(tl, "relational_memory_test", T_EXE);
-    (*t).is_test = true;
-    strl_push(&(*t).srcs, abspath("tests/vexspoke/nio/relational_memory_test.c"));
-    strl_push(&(*t).includes, abspath(strf("%s/rust/include", engine)));
-    strl_push(&(*t).includes, abspath(strf("%s/src", VEXSPOKE)));
-    strl_push(&(*t).includes, abspath("tests"));
-    strl_push(&(*t).defs, "UNDEBUG");
-    strl_push(&(*t).deps, "vexspoke");
-    strl_push(&(*t).syslibs, lib);
-    add_exe_libs(t);
 }
 
 // ── ecosystem/repos/sesh (header-only until sources land) ────────────────────
@@ -1217,12 +1240,13 @@ static void setup_targets(TargetList *tl) {
         // a scoped build: only the named subsystem's lib + its tests. Used by
         // `b coverage` so a broken sibling repo cannot block the proof.
         if (!strcmp(g_only, "vexspoke")) {
+            setup_relational_engine(tl);   // storage owner the CPU tests link
             setup_vexspoke(tl);
             setup_vexspoke_tests(tl);
-            setup_vexspoke_engine_seam(tl);   // opt-in (VEX_ENGINE_SEAM)
         }
         return;
     }
+    setup_relational_engine(tl);  // R2 storage/memory first (Vexspoke depends on it)
     setup_vexspoke(tl);        // libs first
     setup_hotcwap(tl);
     setup_graphvex(tl);
@@ -1234,7 +1258,7 @@ static void setup_targets(TargetList *tl) {
     setup_graphvex_tests(tl);  // tests/graphvex mirrors graphvex/src
     setup_darling_tests(tl);   // tests/darling mirrors darling-framework/src
     setup_vexspoke_tests(tl);  // executables last
-    setup_vexspoke_engine_seam(tl);  // opt-in engine extern boundary (VEX_ENGINE_SEAM)
+    setup_relational_engine_tests(tl);  // migrated io/nio owner tests
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
