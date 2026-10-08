@@ -1237,6 +1237,46 @@ static void setup_darling_tests(TargetList *tl) {
     }
 }
 
+// ── ecosystem/repos/darkbase (R3: Database interface + native vex store) ─────
+// Sources land per class; until then the source glob is empty and this is a
+// no-op, so the blueprint stays buildable without inventing targets.
+static void setup_darkbase(TargetList *tl) {
+    char *base = abspath("ecosystem/repos/darkbase");
+    char *src = strf("%s/src", base);
+    StrList c = {0};
+    glob_rec(src, ".c", &c);
+    if (c.count == 0) return;              // blueprint until the first class lands
+    strl_sort(&c);
+    Target *lib = target_new(tl, "darkbase", T_LIB);
+    (*lib).srcs = c;
+    strl_push(&(*lib).includes, src);
+    strl_push(&(*lib).includes, abspath(strf("%s/src", VEXSPOKE)));
+    strl_push(&(*lib).includes, abspath(strf("%s/src", REL_ENGINE)));
+    strl_push(&(*lib).deps, "relational_engine");   // Memory_* / File / VexHome
+    strl_push(&(*lib).deps, "vexspoke");            // oop/type.h, reflection
+
+    char *tdir = strf("%s/tests/darkbase", g_root);
+    StrList ts = {0};
+    glob_rec(tdir, "_test.c", &ts);
+    strl_sort(&ts);
+    for (int i = 0; i < ts.count; i++) {
+        const char *bn = strrchr(ts.items[i], '/');
+        bn = bn ? bn + 1 : ts.items[i];
+        char *name = xstrdup(bn);
+        name[strlen(name) - 2] = 0;
+        Target *t = target_new(tl, name, T_EXE);
+        (*t).is_test = true;
+        strl_push(&(*t).srcs, ts.items[i]);
+        strl_push(&(*t).includes, src);
+        strl_push(&(*t).includes, abspath(strf("%s/src", VEXSPOKE)));
+        strl_push(&(*t).includes, abspath(strf("%s/src", REL_ENGINE)));
+        strl_push(&(*t).includes, abspath("tests"));   // test_support.h
+        strl_push(&(*t).defs, "UNDEBUG");
+        strl_push(&(*t).deps, "darkbase");
+        add_exe_libs(t);
+    }
+}
+
 static void setup_targets(TargetList *tl) {
     if (g_only) {
         // a scoped build: only the named subsystem's lib + its tests. Used by
@@ -1255,6 +1295,7 @@ static void setup_targets(TargetList *tl) {
     setup_sesh(tl);
     setup_impedance(tl);
     setup_apihaven(tl);
+    setup_darkbase(tl);        // R3 database switchboard + native vex store
     setup_darling(tl);
     setup_apps(tl);            // tests/darling/*.c apps
     setup_graphvex_tests(tl);  // tests/graphvex mirrors graphvex/src
