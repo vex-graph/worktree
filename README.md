@@ -71,8 +71,9 @@ workspace entry point.
 R2 has two cooperating repositories: **Vexspoke** owns CPU computation, math,
 algorithms, synchronization and behavior; **Relational Engine** owns memory
 allocation/storage, stable row chunks, variable bindings and native C search over
-Rust-owned spans. Migration is staged: the existing Vexspoke memory/container ABI
-and default allocator remain until explicit migration and owner proof. R1 owns
+Rust-owned spans. Native IO/NIO has migrated to RE and default production builds
+link that implementation; Vexspoke contains no copies. Native C allocation semantics
+are preserved, not rewritten into Rust; broader collection migration is staged. R1 owns
 storage residency/lifetimes; GPU shaders and dispatch remain Graphvex R3.
 
 **This ecosystem is unfinished.** The layer map describes intended ownership,
