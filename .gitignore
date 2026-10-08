@@ -8,9 +8,9 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Nested independent repositories
-b/
+personal/b/
 ecosystem/
-repos/
+personal/
 projects/
 tests/
 _notes/
@@ -36,8 +36,8 @@ __pycache__/
 
 # b build state + generated artefacts
 .b/
-b/b.json
-b/compile_commands.json
+personal/b/b.json
+personal/b/compile_commands.json
 run/hello
 
 # Private assets — never published
