@@ -94,7 +94,7 @@ scaffolds or designs—not finished IDE, DAW, studio or game products. See the
 | `ecosystem/repos/language`, `ecosystem/repos/darkbase` | R3 *(scaffolds)* | `vexgraph-ecosystem/*` |
 | `ecosystem/repos/darling-framework` | R4 widget interfaces · partial implementation | `vexgraph-ecosystem/darling-framework` |
 | `ecosystem/repos/sesh` | R4 interface · session relay blueprint | `vexgraph-ecosystem/sesh` |
-| `ecosystem/repos/samplerate` | R5 interactable · audio engine | `vexgraph-ecosystem/samplerate` |
+| `ecosystem/repos/samplerate` | R3 driver · native audio engine (CoreAudio/WASAPI/ALSA) | `vexgraph-ecosystem/samplerate` |
 | `ecosystem/projects/{anti,drawling,semicolon,impedance}` | R5 · unfinished apps | `vexgraph-ecosystem/*` |
 | `tests` | the shared test suite | `vexgraph-ecosystem/tests` |
 | `ecosystem/ecosystem`, `ecosystem/.github`, `personal/vex-graph` | meta | `vexgraph-*/*` |
