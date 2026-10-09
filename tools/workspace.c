@@ -134,6 +134,7 @@
 // small utilities
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Print a formatted build error to stderr and terminate the coordinator.
 static void die(const char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
@@ -144,18 +145,21 @@ static void die(const char *fmt, ...) {
     exit(1);
 }
 
+// Allocate at least one byte and terminate the build if allocation fails.
 static void *xmalloc(size_t n) {
     void *p = malloc(n ? n : 1);
     if (!p) die("out of memory");
     return p;
 }
 
+// Resize storage to at least one byte and terminate the build on failure.
 static void *xrealloc(void *p, size_t n) {
     void *q = realloc(p, n ? n : 1);
     if (!q) die("out of memory");
     return q;
 }
 
+// Return a heap-owned copy of a NUL-terminated string.
 static char *xstrdup(const char *s) {
     size_t n = strlen(s) + 1;
     char *p = xmalloc(n);
@@ -163,6 +167,7 @@ static char *xstrdup(const char *s) {
     return p;
 }
 
+// Format a heap-owned string using a printf-style format and arguments.
 static char *strf(const char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
@@ -176,16 +181,19 @@ static char *strf(const char *fmt, ...) {
     return s;
 }
 
+// Return whether the path resolves to an existing filesystem entry.
 static bool path_exists(const char *p) {
     struct stat st;
     return stat(p, &st) == 0;
 }
 
+// Return whether stat identifies the path as a directory.
 static bool is_dir(const char *p) {
     struct stat st;
     return stat(p, &st) == 0 && S_ISDIR(st.st_mode);
 }
 
+// Create each missing directory component with user-readable permissions.
 static void mkdir_p(const char *path) {
     char *tmp = xstrdup(path);
     for (char *p = tmp + 1; *p; p++) {
@@ -199,6 +207,7 @@ static void mkdir_p(const char *path) {
     free(tmp);
 }
 
+// Ensure the parent directory of a file path exists.
 static void mkdir_parent(const char *path) {
     char *tmp = xstrdup(path);
     char *slash = strrchr(tmp, '/');
@@ -209,6 +218,7 @@ static void mkdir_parent(const char *path) {
     free(tmp);
 }
 
+// Read a whole file into a NUL-terminated allocation, or return nullptr if open fails.
 static char *read_file(const char *path, size_t *len_out) {
     FILE *f = fopen(path, "rb");
     if (!f) return nullptr;
@@ -223,6 +233,7 @@ static char *read_file(const char *path, size_t *len_out) {
     return buf;
 }
 
+// Create parent directories and replace a file with the supplied text.
 static bool write_file(const char *path, const char *data) {
     mkdir_parent(path);
     FILE *f = fopen(path, "wb");
@@ -274,6 +285,7 @@ typedef struct {
     int count, cap;
 } StrList;
 
+// Append an owned copy of a string, growing the list when full.
 static void strl_push(StrList *l, const char *s) {
     if ((*l).count == (*l).cap) {
         (*l).cap = (*l).cap ? (*l).cap * 2 : 8;
@@ -282,6 +294,7 @@ static void strl_push(StrList *l, const char *s) {
     (*l).items[(*l).count++] = xstrdup(s);
 }
 
+// Format a temporary string and append its owned copy to the list.
 static void strl_pushf(StrList *l, const char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
@@ -296,14 +309,17 @@ static void strl_pushf(StrList *l, const char *fmt, ...) {
     free(s);
 }
 
+// Append owned copies of every source entry to the destination list.
 static void strl_extend(StrList *dst, const StrList *src) {
     for (int i = 0; i < (*src).count; i++) strl_push(dst, (*src).items[i]);
 }
 
+// Compare two string pointers for lexical sorting.
 static int cmp_str(const void *a, const void *b) {
     return strcmp(*(const char *const *)a, *(const char *const *)b);
 }
 
+// Sort the populated list entries in lexical order.
 static void strl_sort(StrList *l) {
     if ((*l).count) qsort((*l).items, (size_t) (*l).count, sizeof(char *), cmp_str);
 }
@@ -318,6 +334,7 @@ static char **cmd_argv(const Cmd *c) {
     return argv;
 }
 
+// Join command arguments with spaces for human-readable failure diagnostics.
 static char *cmd_join(const Cmd *c) {
     size_t n = 1;
     for (int i = 0; i < (*c).count; i++) n += strlen((*c).items[i]) + 1;
@@ -334,6 +351,7 @@ static char *cmd_join(const Cmd *c) {
 // hashing (FNV-1a 64)
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Extend an FNV-1a hash state with an arbitrary byte span.
 static uint64_t fnv1a(uint64_t h, const void *data, size_t n) {
     const unsigned char *p = data;
     for (size_t i = 0; i < n; i++) {
@@ -343,6 +361,7 @@ static uint64_t fnv1a(uint64_t h, const void *data, size_t n) {
     return h;
 }
 
+// Extend an FNV-1a state with the bytes of a NUL-terminated string.
 static uint64_t hash_str(uint64_t h, const char *s) {
     return fnv1a(h, s, strlen(s));
 }
@@ -368,6 +387,7 @@ typedef struct {
     long long sec, nsec, size;
 } Stamp;
 
+// Capture modification time and size for an input freshness check.
 static bool stamp_of(const char *path, Stamp *out) {
     struct stat st;
     if (stat(path, &st) != 0) return false;
@@ -392,6 +412,7 @@ typedef struct {
 
 static int g_max_jobs = 0;
 
+// Run a command synchronously and terminate the build on failure.
 static void run_sync(const Cmd *cmd) {
     char **argv = cmd_argv(cmd);
     pid_t pid = fork();
@@ -408,6 +429,7 @@ static void run_sync(const Cmd *cmd) {
         die("command failed: %s", cmd_join(cmd));
 }
 
+// Run a command, capture stdout, and return its process exit status.
 static int run_capture(const Cmd *cmd, char **out_stdout) {
     int pipefd[2];
     if (pipe(pipefd) != 0) die("pipe failed");
@@ -443,6 +465,7 @@ static int run_capture(const Cmd *cmd, char **out_stdout) {
     return WEXITSTATUS(st);
 }
 
+// Start one compiler job with both output streams directed to its log.
 static void job_start(Job *j) {
     mkdir_parent((*j).log_path);
     int fd = open((*j).log_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
@@ -505,6 +528,7 @@ static int run_jobs(Job *jobs, int n, int max_par, bool verbose) {
 // recursive source glob
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Recursively append files ending in suffix, silently skipping unreadable directories.
 static void glob_rec(const char *dir, const char *suffix, StrList *out) {
     DIR *d = opendir(dir);
     if (!d) return;
@@ -557,6 +581,7 @@ typedef struct {
     int count, cap;
 } TargetList;
 
+// Append a target record to the growable target graph.
 static void tl_push(TargetList *tl, Target t) {
     if ((*tl).count == (*tl).cap) {
         (*tl).cap = (*tl).cap ? (*tl).cap * 2 : 8;
@@ -565,6 +590,7 @@ static void tl_push(TargetList *tl, Target t) {
     (*tl).items[(*tl).count++] = t;
 }
 
+// Return the registered target with an exact name match, or nullptr when absent.
 static Target *find_target(TargetList *tl, const char *name) {
     for (int i = 0; i < (*tl).count; i++) {
         Target *target = &(*tl).items[i];
@@ -577,6 +603,7 @@ static Target *find_target(TargetList *tl, const char *name) {
 static TargetList g_targets_ref;
 
 #ifdef __APPLE__
+// Append the Apple frameworks used by workspace native targets.
 static void apple_frameworks(StrList *l) {
     const char *fw[] = {
         "Foundation", "LocalAuthentication", "Network", "Security", "AVFoundation",
@@ -611,6 +638,7 @@ static char *g_cc_version = nullptr;
 static const char *VEXSPOKE = "ecosystem/repos/vexspoke";
 static const char *REL_ENGINE = "ecosystem/repos/relational-engine";
 
+// Resolve configuration-specific output paths and create build-state folders.
 static void setup_paths(void) {
     const char *cfg = g_coverage ? "coverage" : (g_release ? "release" : "debug");
     g_out = strf("%s/out/%s", g_state, cfg);
@@ -662,6 +690,7 @@ static int run_test(const char *name, Cmd *cmd, int timeout_s) {
     return WIFEXITED(st) ? WEXITSTATUS(st) : -2;
 }
 
+// Cache and return the first output line from `cc --version`, or "unknown" on failure.
 static char *cc_version(void) {
     if (g_cc_version) return g_cc_version;
     Cmd c = {0};
@@ -703,6 +732,7 @@ static void base_cflags(StrList *out) {
     }
 }
 
+// Append linker options shared by workspace targets in the active configuration.
 static void base_lflags(StrList *out) {
     if (g_release) {
 #ifdef __APPLE__
@@ -715,10 +745,12 @@ static void base_lflags(StrList *out) {
 // the vexspoke module (v0.1 proof; later this becomes per-repo declarations)
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Resolve a workspace-relative path by prefixing the absolute workspace root.
 static char *abspath(const char *rel) {
     return strf("%s/%s", g_root, rel);
 }
 
+// Register a selected target and initialize its configuration-specific output path.
 static Target *target_new(TargetList *tl, const char *name, TKind kind) {
     Target t = {0};
     t.name = name;
@@ -731,6 +763,7 @@ static Target *target_new(TargetList *tl, const char *name, TKind kind) {
     return &(*tl).items[(*tl).count - 1];
 }
 
+// Add platform system libraries required by executable targets.
 static void add_exe_libs(Target *t) {
     strl_push(&(*t).syslibs, "-lpthread");
 #ifdef __APPLE__
@@ -896,6 +929,7 @@ static void setup_graphvex_tests(TargetList *tl) {
     }
 }
 
+// Register Vexspoke owner tests and the standalone touch-ID probe.
 static void setup_vexspoke_tests(TargetList *tl) {
     char *tests = strf("%s/tests/vexspoke", g_root);
     StrList srcs = {0};
@@ -1091,6 +1125,7 @@ static void setup_hotcwap(TargetList *tl) {
     }
 }
 
+// Detect whether a C source contains the application's main entrypoint.
 static bool has_main(const char *path) {
     char *s = read_file(path, nullptr);
     if (!s) return false;
@@ -1146,6 +1181,7 @@ static void setup_apps(TargetList *tl) {
 // ── ecosystem/repos/graphvex (R3: GPU driver + graphics core) ──────────────────
 static void add_gen(const char *src, const char *out, Cmd cmd);   // defined below
 
+// Register Graphvex sources and shader generation dependencies.
 static void setup_graphvex(TargetList *tl) {
     char *base = abspath("ecosystem/repos/graphvex");
     Target *lib = target_new(tl, "graphvex", T_LIB);
@@ -1279,6 +1315,7 @@ static void setup_darkbase(TargetList *tl) {
     }
 }
 
+// Declare the workspace target graph in dependency-aware registration order.
 static void setup_targets(TargetList *tl) {
     if (g_only) {
         // a scoped build: only the named subsystem's lib + its tests. Used by
@@ -1323,6 +1360,7 @@ typedef struct {
     Job job;
 } Unit;
 
+// Produce a filesystem-friendly source stem by replacing slashes and removing its extension.
 static char *mangle(const char *src) {
     char *s = xstrdup(src);
     for (char *p = s; *p; p++) {
@@ -1333,6 +1371,7 @@ static char *mangle(const char *src) {
     return s;
 }
 
+// Derive stable object, depfile, metadata, and hash paths for one source unit.
 static void unit_paths(Unit *u) {
     // make obj/dep names stable & unique to the target
     Target *target = (*u).t;
@@ -1347,6 +1386,7 @@ static void unit_paths(Unit *u) {
     free(m);
 }
 
+// Append a string only when no equal entry is already present.
 static void strl_push_unique(StrList *l, const char *s) {
     for (int i = 0; i < (*l).count; i++)
         if (!strcmp((*l).items[i], s)) return;
@@ -1375,6 +1415,7 @@ static void collect_pub(const Target *t, StrList *incs, StrList *defs, int depth
     }
 }
 
+// Assemble a compile command and hash its effective compiler configuration.
 static void unit_build_cmd(Unit *u) {
     Cmd *cmd = &(*u).cmd;
     Target *target = (*u).t;
@@ -1416,6 +1457,7 @@ static void unit_build_cmd(Unit *u) {
 // depfile parsing (compiler-emitted truth)
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Parse compiler depfile prerequisites into headers, skipping the initial object target.
 static void parse_depfile(const char *path, StrList *headers) {
     size_t len = 0;
     char *buf = read_file(path, &len);
@@ -1488,6 +1530,7 @@ static bool unit_up_to_date(Unit *u) {
     return true;
 }
 
+// Persist compiler inputs and the resulting object hash for cache validation.
 static void write_meta(Unit *u, uint64_t obj_hash) {
     StrList hdrs = {0};
     parse_depfile((*u).dep, &hdrs);
@@ -1527,6 +1570,7 @@ static uint64_t unit_content_hash(Unit *u) {
     return h;
 }
 
+// Map a content hash to its shared cached object-file path.
 static char *cache_path(uint64_t h) {
     return strf("%s/%016llx.o", g_cache, (unsigned long long)h);
 }
@@ -1538,6 +1582,7 @@ static char *cache_path(uint64_t h) {
 static Unit *g_units = nullptr;
 static int g_unit_count = 0;
 
+// Compile stale source units concurrently and update their content-cache metadata.
 static void compile_all(void) {
     // build the unit list for every target
     int total = 0;
@@ -1604,6 +1649,7 @@ static void compile_all(void) {
     free(jobs);
 }
 
+// Report whether any object belonging to this target was rebuilt this pass.
 static bool target_objs_changed(const Target *t) {
     for (int i = 0; i < g_unit_count; i++) {
         if (g_units[i].t == t && g_units[i].need_build) return true;
@@ -1711,6 +1757,7 @@ static uint64_t target_dep_sig(const Target *t) {
     return h;
 }
 
+// Rebuild a target when its objects or transitive dependency signature changed.
 static void link_target(Target *t) {
     uint64_t listh = target_obj_hash(t);
     uint64_t depsig = target_dep_sig(t);
@@ -1791,6 +1838,7 @@ static GenStep *g_gens = nullptr;
 static int g_genCount = 0;
 static int g_genCap = 0;
 
+// Register a generated output and the command that produces it.
 static void add_gen(const char *src, const char *out, Cmd cmd) {
     if (g_genCount == g_genCap) {
         g_genCap = g_genCap ? g_genCap * 2 : 16;
@@ -1802,6 +1850,7 @@ static void add_gen(const char *src, const char *out, Cmd cmd) {
     g_genCount++;
 }
 
+// Run registered generators whose input is newer than their output.
 static void run_gens(void) {
     for (int i = 0; i < g_genCount; i++) {
         Stamp s, o;
@@ -1814,6 +1863,7 @@ static void run_gens(void) {
     }
 }
 
+// Generate inputs, compile stale units, then link every declared target.
 static void build_all(void) {
     run_gens();
     compile_all();
@@ -1835,11 +1885,13 @@ static void build_all(void) {
 #define VEX_SRC_REL   "ecosystem/repos/vexspoke"
 #define VEX_TESTS_REL "tests/vexspoke"
 
+// Identify characters that may occur inside a C identifier.
 static bool ident_char(char c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
            (c >= '0' && c <= '9') || c == '_';
 }
 
+// Test whether a string list contains an exact matching entry.
 static bool sl_has(const StrList *l, const char *s) {
     for (int i = 0; i < (*l).count; i++)
         if (!strcmp((*l).items[i], s)) return true;
@@ -1893,6 +1945,7 @@ static const char *TYPE_WORDS[] = {
     "alignof", "_Alignof", "assert", "static_assert", "_Static_assert",
 };
 
+// Recognize C type/control keywords excluded from function-name parsing.
 static bool is_type_word(const char *s) {
     for (size_t i = 0; i < sizeof TYPE_WORDS / sizeof TYPE_WORDS[0]; i++)
         if (!strcmp(s, TYPE_WORDS[i])) return true;
@@ -2005,6 +2058,7 @@ static void header_functions(const char *header_path, StrList *out) {
     free(text);
 }
 
+// Find an identifier as a complete word rather than a substring.
 static bool word_in(const char *name, const char *text) {
     size_t nl = strlen(name);
     for (const char *p = text; (p = strstr(p, name)); p += nl) {
@@ -2072,6 +2126,7 @@ static char *owner_test_for(const char *unit, const StrList *eu, const StrList *
     return out;
 }
 
+// Match a coverage source path against an absolute or repository-relative unit.
 static bool src_matches(const char *src, const char *unit) {
     if (!strcmp(src, unit)) return true;
     const char *rel = unit_rel(unit);
@@ -2088,6 +2143,7 @@ typedef struct {
 static CovHit *g_cov;
 static int g_cov_n, g_cov_cap;
 
+// Record one function execution attributed to its test and source file.
 static void cov_add(const char *test, const char *src, const char *fn) {
     if (g_cov_n == g_cov_cap) {
         g_cov_cap = g_cov_cap ? g_cov_cap * 2 : 256;
@@ -2477,6 +2533,7 @@ static void ide_strings(const StrList *items) {
     printf("]");
 }
 
+// Emit build-derived target, test, and source-index metadata as JSON.
 static void export_ide_graph(void) {
     printf("{\"byproducts\":[");
     int count = 0;
@@ -2540,6 +2597,7 @@ static void export_ide_graph(void) {
     printf("]}\n");
 }
 
+// Recompile this CLI when its source hash changes, then re-exec it.
 static void rebuild_self(char **argv) {
     const char *src = "tools/workspace.c";
     if (!path_exists(src)) return;
@@ -2623,6 +2681,7 @@ typedef struct {
     const char *label;
 } Runnable;
 
+// Print runnable targets grouped by source directory and sorted by name.
 static void list_runnables(TargetList *tl) {
     Runnable *rs = xmalloc((size_t)((*tl).count ? (*tl).count : 1) * sizeof *rs);
     int n = 0;
@@ -2771,6 +2830,7 @@ static void usage(void) {
            "  b run <name>        name may be partial (e.g. `b run gallery`)\n");
 }
 
+// Parse b options and dispatch workspace build, run, test, and inspection commands.
 int main(int argc, char **argv) {
     char cwd[4096];
     if (!getcwd(cwd, sizeof cwd)) die("getcwd failed");
