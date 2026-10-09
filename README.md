@@ -6,6 +6,24 @@ Each nested directory is its own checkout with its own remote: commit and push
 *inside each of those*, never here. Everything private (notes, the local app
 harness, assets) is git-ignored, so this repo stays tiny.
 
+## Current State
+
+**Implemented:** the wrapper structure, the `b`-driven build entry (`tools/b` →
+`personal/b/b run exec tools/workspace.c`), the workspace build graph, the shared
+`tests/` suite and this documentation. **Proven:** macOS builds and the scoped
+test suites recorded in `tests/test-checklist.md`; the nested repositories range
+from implemented slices to source-free blueprints. **The R5 applications are
+unfinished** — shells, scaffolds or designs, not shipped products.
+
+## Scope and Limitations
+
+**Scope:** a thin wrapper that nests the independent repositories and builds them
+together through `b`; it owns no product code. **Deliberately not covered:**
+feature implementation (each repo owns its own) and visual acceptance (the
+user's). **Known limits and gaps:** no monorepo semantics — each nested repo is
+committed and pushed independently; nothing here proves any application runtime,
+and the readiness Gist plus `tests/test-checklist.md` are the evidence of record.
+
 ## Build: `b`
 
 ### CLion: CMake is IDE metadata only
@@ -26,7 +44,7 @@ The build system lives in the independent [`vex-graph/b`](https://github.com/vex
 checkout at `personal/b/`. `b.c` is a language-agnostic CLI — a small suite (`b.h` +
 `util.c` + pluggable `languages/*` adapters) that owns `run`, `build` and the
 planned `export` surface. The adapter set is open-ended and grows over time;
-`personal/b/README.md` lists the languages wired today. `personal/b/workspace.c` remains the
+`personal/b/README.md` lists the languages wired today. `tools/workspace.c` remains the
 workspace engine that builds the whole ecosystem graph (libs, shaders, tests,
 apps); `tools/b` is a thin forwarding launcher for it.
 
@@ -57,7 +75,7 @@ The CLion external tool **b Runner → Run current file** runs
 `tools/b run "$FilePath$"`, so invoking it from an open source file builds and
 launches that file (its stem resolves to a declared target or a `tests/` app).
 The project run configuration named **b** triggers the same tool. This is the
-"open a file, press Run, it runs" path while `personal/b/workspace.c` is still the
+"open a file, press Run, it runs" path while `tools/workspace.c` is still the
 builder.
 
 See `personal/b/README.md` for the implemented command contract and packaging roadmap.
