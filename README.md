@@ -86,6 +86,7 @@ scaffolds or designs—not finished IDE, DAW, studio or game products. See the
 | Path | Layer | Remote |
 |---|---|---|
 | `personal/b` | standalone build-system CLI + workspace engine | `vex-graph/b` |
+| `personal/func` | standalone compile-time opcode orchestrator | `vex-graph/func` |
 | `ecosystem/repos/hotcwap` | R1 kernel host · windows | `vexgraph-ecosystem/hotcwap` |
 | `ecosystem/repos/relational-engine` | R2 memory/storage · native C search | `vexgraph-ecosystem/relational-engine` |
 | `ecosystem/repos/vexspoke` | R2 CPU computation · behavior; legacy storage ABI retained | `vexgraph-ecosystem/vexspoke` |
@@ -94,6 +95,7 @@ scaffolds or designs—not finished IDE, DAW, studio or game products. See the
 | `ecosystem/repos/language`, `ecosystem/repos/darkbase` | R3 *(scaffolds)* | `vexgraph-ecosystem/*` |
 | `ecosystem/repos/darling-framework` | R4 widget interfaces · partial implementation | `vexgraph-ecosystem/darling-framework` |
 | `ecosystem/repos/sesh` | R4 interface · session relay blueprint | `vexgraph-ecosystem/sesh` |
+| `ecosystem/repos/harness` | R4 interface · the user's own agent (integrates projects/tools/R5 apps) | `vexgraph-ecosystem/harness` |
 | `ecosystem/repos/samplerate` | R3 driver · native audio engine (CoreAudio/WASAPI/ALSA) | `vexgraph-ecosystem/samplerate` |
 | `ecosystem/projects/{anti,drawling,semicolon,impedance}` | R5 · unfinished apps | `vexgraph-ecosystem/*` |
 | `tests` | the shared test suite | `vexgraph-ecosystem/tests` |
