@@ -51,3 +51,6 @@ resources/
 
 # Local constitution; published separately as a GitHub Gist.
 /preferences.md
+
+# Local backlog notes (not tracked)
+/blockers.md
