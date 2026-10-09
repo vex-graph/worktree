@@ -79,7 +79,7 @@ storage residency/lifetimes; GPU shaders and dispatch remain Graphvex R3.
 **This ecosystem is unfinished.** The layer map describes intended ownership,
 not a completion claim. In particular the R5 applications are unfinished shells,
 scaffolds or designs—not finished IDE, DAW, studio or game products. See the
-[readiness wiki](ecosystem/ecosystem/Home.md) and file-specific test evidence.
+[readiness Gist](https://gist.github.com/vex-graph/6943f92acb931b25dad1073c46da6ce7) and file-specific test evidence.
 
 ## The repositories
 
