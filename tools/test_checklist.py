@@ -22,9 +22,13 @@ Governed by the **Timestamped Test Checklist Law** in `preferences.md`.
   `—` means never checked. Estimates must never be recorded as executed evidence.
 - The hash identifies the tested content. A file change invalidates a previous ✅;
   the old timestamp/evidence remains visible until the next executed check.
-- All non-ignored files are inventoried, including headers, shaders, documentation,
-  build/configuration files, test files, and tools. This report alone is excluded
-  to avoid a self-referential hash. Empty/blueprint frameworks remain visible.
+- The ledger tracks **executable tests only**: compilable/runnable test sources
+  (`*_test.c/.m/.rs/.py`), registered runner scripts (`run.py`, `*_run.py`) and
+  the shared test harness (`test_support.h`). Markdown, documentation, images,
+  configuration and production source are deliberately excluded — a row exists
+  to record a test that can actually run, not a file that never executes.
+  This report alone is excluded to avoid a self-referential hash. A subsystem
+  with no inventoried test is untested, not exempt.
 - An integration pass only applies to explicitly named subjects and scope.
   Neither test-file presence nor a passing build proves every framework file.
 - Platform gaps and omitted cases must be stated in the evidence/scope column.
@@ -37,11 +41,14 @@ Governed by the **Timestamped Test Checklist Law** in `preferences.md`.
 ## Commands
 
 ```sh
-python3 tools/test_checklist.py sync   # inventory files; invalidate stale greens
+python3 tools/test_checklist.py sync   # inventory executable tests; invalidate stale greens
 python3 tools/test_checklist.py check  # reject missing rows or stale results
-# Execute first, then record only the explicitly named subjects:
-python3 tools/test_checklist.py run --file tools/agents.sh -- bash -n tools/agents.sh
+# Execute the test first, then record its executed test file:
+python3 tools/test_checklist.py run --file tests/tools/test_checklist_test.py -- python3 -B tests/tools/test_checklist_test.py
 ```
+
+`run` records only inventoried executable test files; naming a documented or
+production file is rejected because those are not runnable tests.
 
 `run` propagates failures; exit 77 is recorded as skipped, never green.
 Add repeated `--file` arguments only for files actually exercised by the command.
@@ -55,7 +62,11 @@ Do not hand-edit generated tables; add files/tests and use `sync` or `run`.
 
 
 def inventory(root):
-    """Include tracked and non-ignored untracked files in every local repo."""
+    """List executable test units (compilable/runnable tests, runners, harness).
+
+    Documentation, configuration, images and production source are excluded by
+    design: the ledger is a test-execution record, not a whole-tree inventory.
+    """
     repos = {root, root / "tests", root / "b"}
     # Scan independently of the umbrella repo's ignores: nested repositories
     # own their inventory and their own ignore rules. .git may be a worktree file.
@@ -73,6 +84,8 @@ def inventory(root):
              "--exclude-standard", "-z"]
         ).decode().split("\0")
         for name in sorted(set(names) - {""}):
+            if not is_executable_test(name):
+                continue
             path = repo / name
             # Gitlinks are directories, not files owned by the parent repo.
             if not path.is_file():
@@ -85,6 +98,28 @@ def inventory(root):
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+TEST_UNIT_SUFFIXES = (".c", ".m", ".mm", ".rs", ".py", ".cc", ".cpp", ".cxx")
+
+
+def is_executable_test(name):
+    """Whether a path is a compilable/runnable test unit, runner or harness.
+
+    The ledger tracks tests that compile and run. Markdown, documentation,
+    images, configuration and production source are intentionally excluded.
+    """
+    path = Path(name)
+    base = path.name
+    if base == "run.py" or base.endswith("_run.py"):
+        return True
+    if base == "test_support.h":
+        return True
+    if base.startswith("test_") and path.suffix == ".py":
+        return True
+    if path.suffix in TEST_UNIT_SUFFIXES and path.stem.endswith("_test"):
+        return True
+    return False
 
 
 def cell(text):
