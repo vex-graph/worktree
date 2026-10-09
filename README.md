@@ -100,8 +100,8 @@ scaffolds or designs—not finished IDE, DAW, studio or game products. See the
 | `ecosystem/ecosystem`, `ecosystem/.github`, `personal/vex-graph` | meta | `vexgraph-*/*` |
 
 Local-only (git-ignored, never published): `_trash/` retired checkouts ·
-`_notes/` notes · `_main/` apps · `tools/` workspace helpers · `resources/`
-assets.
+`_notes/` notes · `_main/` apps · `resources/` assets. (`tools/` helpers are
+tracked and published.)
 
 ## Rules
 
