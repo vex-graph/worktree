@@ -103,6 +103,18 @@ if(index_count GREATER 0)
     endforeach()
 endif()
 
+# Harness's draft sources have no runtime b target yet. Reuse its indexing-only
+# adapter instead of inventing a runtime target or duplicating its file list.
+# Scope the local dependency path so other standalone adapters do not inherit it.
+function(vexgraph_index_harness)
+    set(VEXSPOKE_SOURCE_DIR "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/vexspoke/src")
+    add_subdirectory(ecosystem/repos/harness)
+    if(VEXGRAPH_COMPILER_HEADERS)
+        target_compile_options(harness_ide PRIVATE -isystem "${VEXGRAPH_COMPILER_HEADERS}")
+    endif()
+endfunction()
+vexgraph_index_harness()
+
 option(VEXGRAPH_ENABLE_WINDOW_TESTS "Enable window/GPU/UI CTest runs" OFF)
 set(window_tests application_test bridge_seam_test present_surface_test traffic_light_test window_test)
 string(JSON test_count LENGTH "${graph}" tests)
