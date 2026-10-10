@@ -28,23 +28,22 @@ and the readiness Gist plus `tests/test-checklist.md` are the evidence of record
 
 ### CLion: CMake is IDE metadata only
 
-Open this workspace root to load the shared CMake code model. The root imports
-`b`'s registered source contexts and reuses Harness's indexing-only adapter for
-its draft `src/` files. New Harness `.c`/`.h` files are discovered recursively;
-no CMake file is needed per class or source directory. Reload CMake after adding
-files. This supplies compiler/include metadata, not an IDE inlay-display setting.
+Open **this workspace root** in CLion. Its `CMakeLists.txt` is the only maintained
+project entry: no nested repository, application, personal tool or test checkout
+needs one. It imports `b`'s registered contexts and recursively discovers extra
+`.c`/`.m`/`.h` files in the declared source roots, with separate owner include
+paths and host-platform selection. Reload CMake after adding files; do not add
+CMake files per class or folder. Source-free blueprints get no fake target.
 
-Each code repository has its own `CMakeLists.txt` and README guidance for
-navigation, diagnostics and inlay hints. Per-repo source targets are excluded
-from default builds: no dependency downloads, release linking or application
-runner is wired into them. Supply local dependency header paths where required;
-missing headers remain real errors, never fake declarations. Source-free
-blueprints explicitly have no source targets. IDE appearance is user-verified.
+Compiler flags and include paths support diagnostics, completion and inlay hints;
+enable their display in the IDE. Actual IDE appearance is user-verified. Missing
+headers remain real errors. Rust analysis uses the actual `Cargo.toml` packages,
+not CMake. Imported engine comparison source remains separate from runtime proof.
 
-Use [b](https://github.com/vex-graph/b) for actual builds. The workspace-root and
-`tests/` CMake entries retain their existing b-metadata/native-test integration;
-they are separate from the per-repo indexing-only entries. See each repository's
-README for its current build command and stated standalone/runtime gaps.
+Use [b](https://github.com/vex-graph/b) for actual builds. The root retains the
+existing b-metadata/native-test integration, with window/GPU/UI tests opt-in.
+Excluded supplemental source targets do not link releases or run applications.
+No IDE configure pass proves standalone runtime dependency closure.
 
 The build system lives in the independent [`vex-graph/b`](https://github.com/vex-graph/b)
 checkout at `personal/b/`. `b.c` is a language-agnostic CLI — a small suite (`b.h` +
