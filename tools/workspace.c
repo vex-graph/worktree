@@ -1048,6 +1048,39 @@ static void setup_apihaven(TargetList *tl) {
     }
 }
 
+// ── ecosystem/repos/harness (R4 own agent: draft space values) ───────────────
+static void setup_harness(TargetList *tl) {
+    char *base = abspath("ecosystem/repos/harness");
+    StrList c = {0};
+    glob_rec(abspath("ecosystem/repos/harness/src"), ".c", &c);
+    if (c.count == 0) return;  // draft repo: no buildable source yet
+    strl_sort(&c);
+    Target *lib = target_new(tl, "harness", T_LIB);
+    (*lib).srcs = c;
+    strl_push(&(*lib).includes, strf("%s/src", base));
+    strl_push(&(*lib).deps, "vexspoke");
+
+    char *tdir = strf("%s/tests/harness", g_root);
+    StrList ts = {0};
+    glob_rec(tdir, "_test.c", &ts);
+    strl_sort(&ts);
+    for (int i = 0; i < ts.count; i++) {
+        const char *bn = strrchr(ts.items[i], '/');
+        bn = bn ? bn + 1 : ts.items[i];
+        char *name = xstrdup(bn);
+        name[strlen(name) - 2] = 0;
+        Target *t = target_new(tl, name, T_EXE);
+        (*t).is_test = true;
+        strl_push(&(*t).srcs, ts.items[i]);
+        strl_push(&(*t).includes, strf("%s/src", base));
+        strl_push(&(*t).includes, abspath(strf("%s/src", VEXSPOKE)));
+        strl_push(&(*t).includes, abspath("tests"));   // test_support.h
+        strl_push(&(*t).deps, "harness");
+        strl_push(&(*t).deps, "vexspoke");
+        add_exe_libs(t);
+    }
+}
+
 // ── ecosystem/repos/hotcwap (R1: kernel host + hotload machinery) ─────────────
 static void setup_hotcwap(TargetList *tl) {
     char *base = abspath("ecosystem/repos/hotcwap");
@@ -1334,6 +1367,7 @@ static void setup_targets(TargetList *tl) {
     setup_sesh(tl);
     setup_impedance(tl);
     setup_apihaven(tl);
+    setup_harness(tl);         // R4 own agent: draft space values
     setup_darkbase(tl);        // R3 database switchboard + native vex store
     setup_darling(tl);
     setup_apps(tl);            // tests/darling/*.c apps
