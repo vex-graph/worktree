@@ -28,6 +28,12 @@ and the readiness Gist plus `tests/test-checklist.md` are the evidence of record
 
 ### CLion: CMake is IDE metadata only
 
+Open this workspace root to load the shared CMake code model. The root imports
+`b`'s registered source contexts and reuses Harness's indexing-only adapter for
+its draft `src/` files. New Harness `.c`/`.h` files are discovered recursively;
+no CMake file is needed per class or source directory. Reload CMake after adding
+files. This supplies compiler/include metadata, not an IDE inlay-display setting.
+
 Each code repository has its own `CMakeLists.txt` and README guidance for
 navigation, diagnostics and inlay hints. Per-repo source targets are excluded
 from default builds: no dependency downloads, release linking or application
