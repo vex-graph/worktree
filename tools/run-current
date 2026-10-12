@@ -19,7 +19,7 @@ fi
 directory=$(CDPATH= cd -- "$(dirname -- "$file")" && pwd)
 file="$directory/$(basename -- "$file")"
 case "$file" in
-    "$root"/tests/*.c|"$root"/ecosystem/projects/*.c)
+    "$root"/tests/*.c|"$root"/interactables/*.c|"$root"/superapp/*.c)
         exec "$root/tools/b" run "$file" "$@"
         ;;
     *)
