@@ -35,7 +35,7 @@ trap 'rm -f "$TMP_LIST"' EXIT
 
 # shellcheck disable=SC2086
 find -L . ${PRUNE_ARGS[@]} -type f \
-    \( -name "preferences.md" -o -name "CONTRIBUTING.md" -o -name "*.md" \
+    \( -name "PREFERENCES.md" -o -name "CONTRIBUTING.md" -o -name "*.md" \
      -o -name "*.c" -o -name "*.h" -o -name "*.m" \
      -o -name "*.frag" -o -name "*.vert" -o -name "*.comp" \) \
     -print0 | LC_ALL=C sort -z | tr '\0' '\n' | sed 's|^\./||' > "$TMP_LIST"
@@ -51,7 +51,7 @@ echo "Compiling $FILE_COUNT files into $OUT ..."
 {
     echo "CODE.TXT — vexgraph workspace snapshot"
     echo "Generated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-    echo "Files: $FILE_COUNT (preferences.md, CONTRIBUTING.md, .md/.c/.h/.m/.frag/.vert/.comp; excludes _docs, _thoughts, .git, build dirs)"
+    echo "Files: $FILE_COUNT (PREFERENCES.md, CONTRIBUTING.md, .md/.c/.h/.m/.frag/.vert/.comp; excludes _docs, _thoughts, .git, build dirs)"
     echo ""
     while IFS= read -r f; do
         [ -n "$f" ] || continue

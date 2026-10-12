@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
 tools/linter.py — Automated style & architectural compliance checker for vexgraph.
-Enforces rules codified in preferences.md:
-  - Rule 1: No arrow sugar (no '->', always '(*ptr).field')
-  - Rule 2 & 16: Cast & pointer spacing ('(T*) var', 'T *name')
-  - Rule 10: Two-layer access cap (flag 3+ layer member/deref chains)
-  - Rule 17: Multi-repo architectural hierarchy (no upstream layer inversions)
-  - Rule 18: Zero parent hops in includes (no '../')
-  - Rule 23: ;;OVERVIEW presence & 4-tier section banners
+Enforces rules codified in gist/PREFERENCES.md (cite laws by Title, never number):
+  - the Semantic Consistency Law (Reference form): no arrow sugar
+  - the Semantic Consistency Law (Cast and pointer spelling)
+  - the Semantic Consistency Law (Access depth): flag 3+ layer chains
+  - the Vertical Integration Law: no upstream layer inversions
+  - the Canonical Include Paths Law: no '../'
+  - the Living Documentation Law: ;;OVERVIEW presence and section banners
 """
 
 import os
@@ -186,7 +186,7 @@ class Linter:
         self.files_scanned = 0
 
     def check_layer_inversion(self, filepath: str, line: str, lno: int) -> dict | None:
-        """Enforces Rule 17: downward-only dependency hierarchy."""
+        """Enforces the Vertical Integration Law: downward-only dependency hierarchy."""
         m = re.match(r'^\s*#include\s*["<]([^">]+)[">]', line)
         if not m:
             return None
@@ -201,7 +201,7 @@ class Linter:
             for p in prohibited:
                 if inc.startswith(p):
                     return {
-                        "rule": "Rule 17 (Layer Inversion)",
+                        "rule": "Vertical Integration Law (Layer Inversion)",
                         "file": filepath,
                         "line": lno,
                         "snippet": line.strip(),
@@ -214,7 +214,7 @@ class Linter:
             for p in prohibited:
                 if inc.startswith(p):
                     return {
-                        "rule": "Rule 17 (Layer Inversion)",
+                        "rule": "Vertical Integration Law (Layer Inversion)",
                         "file": filepath,
                         "line": lno,
                         "snippet": line.strip(),
@@ -227,7 +227,7 @@ class Linter:
             for p in prohibited:
                 if inc.startswith(p):
                     return {
-                        "rule": "Rule 17 (Layer Inversion)",
+                        "rule": "Vertical Integration Law (Layer Inversion)",
                         "file": filepath,
                         "line": lno,
                         "snippet": line.strip(),
@@ -237,10 +237,10 @@ class Linter:
         return None
 
     def check_two_layer_cap(self, filepath: str, line: str, lno: int) -> dict | None:
-        """Checks Rule 10: member/deref chain touches at most TWO layers deep."""
+        """Checks the Semantic Consistency Law (Access depth): a chain touches at most TWO layers."""
         if re.search(r'\(\*\(\*[A-Za-z_]\w*\)\.[A-Za-z_]\w*\)\.[A-Za-z_]\w*', line):
             return {
-                "rule": "Rule 10 (Two-Layer Cap)",
+                "rule": "Semantic Consistency Law (Access depth)",
                 "file": filepath,
                 "line": lno,
                 "snippet": line.strip(),
@@ -248,7 +248,7 @@ class Linter:
             }
         if re.search(r'\b[A-Za-z_]\w*\.[A-Za-z_]\w*\.[A-Za-z_]\w*\.[A-Za-z_]\w*', line):
             return {
-                "rule": "Rule 10 (Two-Layer Cap)",
+                "rule": "Semantic Consistency Law (Access depth)",
                 "file": filepath,
                 "line": lno,
                 "snippet": line.strip(),
@@ -269,19 +269,19 @@ class Linter:
         for lno, raw_line in enumerate(lines, 1):
             stripped_code, in_multiline = strip_comments_and_strings(raw_line, in_multiline)
 
-            # Check Rule 23: ;;OVERVIEW
+            # Check the Living Documentation Law: ;;OVERVIEW
             if lno <= 150 and ";;OVERVIEW" in raw_line:
                 has_overview = True
 
-            # Check Rule 17: Layer Inversion
+            # Check the Vertical Integration Law: layer inversion
             layer_viol = self.check_layer_inversion(filepath, raw_line, lno)
             if layer_viol:
                 file_violations.append(layer_viol)
 
-            # Check Rule 18: Canonical Includes (no '../')
+            # Check the Canonical Include Paths Law (no '../')
             if re.match(r'^\s*#include\s*["<]\.\./', raw_line):
                 file_violations.append({
-                    "rule": "Rule 18 (Canonical Includes)",
+                    "rule": "Canonical Include Paths Law",
                     "file": filepath,
                     "line": lno,
                     "snippet": raw_line.strip(),
@@ -293,11 +293,11 @@ class Linter:
                         raw_line = fixed_inc
                         modified = True
 
-            # Check Rule 1: No arrow sugar (->)
+            # Check the Semantic Consistency Law (Reference form)
             if "->" in stripped_code:
                 if re.search(r'->\s*[A-Za-z_]\w*', stripped_code):
                     file_violations.append({
-                        "rule": "Rule 1 (No Arrow Sugar)",
+                        "rule": "Semantic Consistency Law (Reference form)",
                         "file": filepath,
                         "line": lno,
                         "snippet": raw_line.strip(),
@@ -309,11 +309,11 @@ class Linter:
                             raw_line = fixed_line
                             modified = True
 
-            # Check Rule 2 & 16: Cast spacing
+            # Check the Semantic Consistency Law (Cast and pointer spelling)
             m_space_inside = RE_CAST_SPACE_INSIDE.search(stripped_code)
             if m_space_inside:
                 file_violations.append({
-                    "rule": "Rule 16 (Cast Spacing)",
+                    "rule": "Semantic Consistency Law (Cast and pointer spelling)",
                     "file": filepath,
                     "line": lno,
                     "snippet": raw_line.strip(),
@@ -328,7 +328,7 @@ class Linter:
             m_no_space = RE_CAST_NO_SPACE_AFTER.search(stripped_code)
             if m_no_space:
                 file_violations.append({
-                    "rule": "Rule 2 (Cast Spacing)",
+                    "rule": "Semantic Consistency Law (Cast and pointer spelling)",
                     "file": filepath,
                     "line": lno,
                     "snippet": raw_line.strip(),
@@ -340,7 +340,7 @@ class Linter:
                         raw_line = fixed_cast
                         modified = True
 
-            # Check Rule 10: Two-Layer Cap
+            # Check the Semantic Consistency Law (Access depth)
             two_layer_viol = self.check_two_layer_cap(filepath, stripped_code, lno)
             if two_layer_viol:
                 file_violations.append(two_layer_viol)
@@ -351,7 +351,7 @@ class Linter:
         if filepath.endswith((".c", ".m")) and not has_overview:
             if not any(x in filepath for x in ["test", "main/vk_test", "main/main", "CMakeLists"]):
                 file_violations.append({
-                    "rule": "Rule 23 (Living Overview)",
+                    "rule": "Living Documentation Law",
                     "file": filepath,
                     "line": 1,
                     "snippet": filepath,
@@ -415,7 +415,7 @@ class Linter:
             print()
 
         if not fix and all_violations:
-            print(f"{YELLOW}Tip:{RESET} Run with {BOLD}--fix{RESET} to automatically refactor fixable violations (Rule 1 arrows, Rule 16 casts, Rule 18 includes).")
+            print(f"{YELLOW}Tip:{RESET} Run with {BOLD}--fix{RESET} to automatically refactor fixable violations (Semantic Consistency Law arrows/casts, Canonical Include Paths Law includes).")
 
         return len(all_violations)
 
