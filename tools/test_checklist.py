@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inventory and record executed evidence in tests/test-checklist.md."""
+"""Inventory and record executed evidence in gist/test-checklist.md."""
 
 import argparse
 import hashlib
@@ -9,12 +9,12 @@ import sys
 import time
 
 
-REPORT = Path("tests/test-checklist.md")
+REPORT = Path("gist/test-checklist.md")
 TITLE = "Timestamped Test Checklist Law"
 HEADER = """# Ecosystem test checklist
 
 Generated test report maintained by `python3 tools/test_checklist.py`.
-Governed by the **Timestamped Test Checklist Law** in `preferences.md`.
+Governed by the **Timestamped Test Checklist Law** in `PREFERENCES.md`.
 
 - ✅ = an automated lab check passed for this exact file hash, in its stated scope.
 - ❌ = untested, failed, skipped, or stale; see evidence. This is not a battle-tested claim.
@@ -23,7 +23,7 @@ Governed by the **Timestamped Test Checklist Law** in `preferences.md`.
 - The hash identifies the tested content. A file change invalidates a previous ✅;
   the old timestamp/evidence remains visible until the next executed check.
 - The ledger tracks **executable tests only**: compilable/runnable test sources
-  (`*_test.c/.m/.rs/.py`), registered runner scripts (`run.py`, `*_run.py`) and
+  (`*_test.c/.m/.rs/.py/.ts`), registered runner scripts (`run.py`, `*_run.py`) and
   the shared test harness (`test_support.h`). Markdown, documentation, images,
   configuration and production source are deliberately excluded — a row exists
   to record a test that can actually run, not a file that never executes.
@@ -70,7 +70,8 @@ def inventory(root):
     repos = {root, root / "tests", root / "b"}
     # Scan independently of the umbrella repo's ignores: nested repositories
     # own their inventory and their own ignore rules. .git may be a worktree file.
-    for directory in ("ecosystem", "repos", "projects", "personal"):
+    for directory in ("host-behavior", "drivers", "interfaces", "interactables",
+                      "superapp", "personal", "ecosystem", "repos", "projects"):
         repos.update(p.parent for p in (root / directory).rglob(".git"))
     groups = {}
     for repo in sorted(repos):
@@ -100,7 +101,7 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-TEST_UNIT_SUFFIXES = (".c", ".m", ".mm", ".rs", ".py", ".cc", ".cpp", ".cxx")
+TEST_UNIT_SUFFIXES = (".c", ".m", ".mm", ".rs", ".py", ".cc", ".cpp", ".cxx", ".ts")
 
 
 def is_executable_test(name):
