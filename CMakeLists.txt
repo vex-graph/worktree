@@ -75,9 +75,6 @@ add_custom_target(vexgraph_runtime
     WORKING_DIRECTORY "${VEXGRAPH_SOURCE_ROOT}"
     COMMENT "Building runtime with b (no apps or tests launched)"
     USES_TERMINAL VERBATIM)
-file(GLOB_RECURSE source_inventory CONFIGURE_DEPENDS
-    "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/*.c" "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/*.m"
-    "${VEXGRAPH_SOURCE_ROOT}/tests/*_test.c")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${VEXGRAPH_SOURCE_ROOT}/tools/workspace.c" "${VEXGRAPH_SOURCE_ROOT}/tools/build_annotation.h"
     "${VEXGRAPH_SOURCE_ROOT}/tools/b")
@@ -121,19 +118,10 @@ function(vexgraph_index_repository name relative template)
     if(NOT APPLE)
         list(FILTER discovered EXCLUDE REGEX "\\.m$")
     endif()
-    if(name STREQUAL "hotcwap")
-        if(APPLE)
-            list(FILTER discovered EXCLUDE REGEX "/window(_linux|_wayland|_win32)?\\.c$")
-        elseif(WIN32)
-            list(FILTER discovered EXCLUDE REGEX "/window(_linux|_wayland)?\\.c$")
-        else()
-            list(FILTER discovered EXCLUDE REGEX "/window_win32\\.c$")
-        endif()
-    elseif(name STREQUAL "samplerate")
-        if(APPLE)
-            list(FILTER discovered EXCLUDE REGEX "audio_stream_stub\\.c$")
-        endif()
-    endif()
+    # Every remaining C/ObjC translation unit stays in the code model, including
+    # other-host platform backends (window_linux, audio_stream_stub, ...). These
+    # targets are EXCLUDE_FROM_ALL and never linked, so including them only adds
+    # clangd diagnostics/inlay hints for files the current host does not build.
     set(unmodeled ${discovered})
     foreach(source IN LISTS VEXGRAPH_MODELED_SOURCES)
         list(REMOVE_ITEM unmodeled "${source}")
@@ -188,11 +176,66 @@ vexgraph_index_repository(harness ecosystem/repos/harness/src "" "${r2_cpu}")
 vexgraph_index_repository(b personal/b "")
 # Source-free blueprints produce no fake target. Future source files are found
 # on CMake reload without introducing repository/directory CMake entries.
-vexgraph_index_repository(language ecosystem/repos/language/src "" "${r2_cpu}" "${r2_storage}")
+vexgraph_index_repository(language ecosystem/repos/language "" "${r2_cpu}" "${r2_storage}")
 vexgraph_index_repository(func personal/func/src "")
+vexgraph_index_repository(primeagen personal/primeagen ""
+    "${r2_cpu}" "${r2_storage}"
+    "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/hotcwap"
+    "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/api-haven/src")
+vexgraph_index_repository(tools tools "")
+vexgraph_index_repository(notes _notes "")
 foreach(application anti drawling semicolon)
     vexgraph_index_repository(${application} "ecosystem/projects/${application}/src" ""
         "${r2_cpu}" "${r2_storage}")
+endforeach()
+
+# Unregistered tests carry no b target, so no compile command reaches clangd.
+# Mirror b's own per-subsystem include context so every test translation unit
+# gets inlay hints without collapsing repositories into one header soup.
+file(GLOB test_subsystems LIST_DIRECTORIES true "${VEXGRAPH_SOURCE_ROOT}/tests/*")
+foreach(subsystem IN LISTS test_subsystems)
+    if(NOT IS_DIRECTORY "${subsystem}")
+        continue()
+    endif()
+    get_filename_component(test_name "${subsystem}" NAME)
+    set(test_includes
+        "${VEXGRAPH_SOURCE_ROOT}/tests"
+        "${subsystem}"
+        "${r2_cpu}" "${r2_storage}")
+    if(test_name STREQUAL "hotcwap")
+        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/hotcwap")
+    elseif(test_name STREQUAL "graphvex")
+        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/graphvex/src")
+    elseif(test_name STREQUAL "darling")
+        list(APPEND test_includes
+            "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/hotcwap"
+            "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/graphvex/src"
+            "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/darling-framework/src")
+    elseif(test_name STREQUAL "api-haven")
+        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/api-haven/src")
+    elseif(test_name STREQUAL "sesh")
+        list(APPEND test_includes
+            "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/sesh/src"
+            "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/sesh"
+            "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/api-haven/src")
+    elseif(test_name STREQUAL "darkbase")
+        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/darkbase/src")
+    elseif(test_name STREQUAL "harness")
+        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/harness/src")
+    elseif(test_name STREQUAL "language")
+        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/language")
+    elseif(test_name STREQUAL "samplerate")
+        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/samplerate/src")
+    elseif(test_name STREQUAL "primeagen")
+        list(APPEND test_includes
+            "${VEXGRAPH_SOURCE_ROOT}/personal/primeagen"
+            "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/hotcwap")
+    elseif(test_name STREQUAL "b")
+        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/personal/b")
+    elseif(test_name STREQUAL "func")
+        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/personal/func/src")
+    endif()
+    vexgraph_index_repository("tests_${test_name}" "tests/${test_name}" "" ${test_includes})
 endforeach()
 
 option(VEXGRAPH_ENABLE_WINDOW_TESTS "Enable window/GPU/UI CTest runs" OFF)
