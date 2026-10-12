@@ -126,7 +126,9 @@ function(vexgraph_index_repository name relative template)
     foreach(source IN LISTS VEXGRAPH_MODELED_SOURCES)
         list(REMOVE_ITEM unmodeled "${source}")
     endforeach()
-    if(NOT unmodeled)
+    set(translation_units ${unmodeled})
+    list(FILTER translation_units INCLUDE REGEX "\\.(c|m)$")
+    if(NOT translation_units)
         return()
     endif()
     set(target "vexgraph_extra_${name}")
@@ -141,7 +143,7 @@ function(vexgraph_index_repository name relative template)
         endforeach()
     else()
         target_include_directories(${target} PRIVATE "${source_root}" ${ARGN})
-        target_compile_options(${target} PRIVATE -Wall -Wextra -Werror)
+        target_compile_options(${target} PRIVATE -std=gnu23 -Wall -Wextra -Werror)
         if(APPLE)
             target_compile_options(${target} PRIVATE -mcpu=apple-m1 "$<$<COMPILE_LANGUAGE:OBJC>:-fobjc-arc>")
         endif()
@@ -159,33 +161,38 @@ if(index_count GREATER 0)
         list(APPEND VEXGRAPH_MODELED_SOURCES ${modeled})
     endforeach()
 endif()
-set(r2_cpu "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/vexspoke/src")
-set(r2_storage "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/relational-engine/src")
-vexgraph_index_repository(vexspoke ecosystem/repos/vexspoke/src vexspoke)
-vexgraph_index_repository(relational_engine ecosystem/repos/relational-engine/src relational_engine)
-vexgraph_index_repository(hotcwap ecosystem/repos/hotcwap hotcwap)
-vexgraph_index_repository(graphvex ecosystem/repos/graphvex/src graphvex)
-vexgraph_index_repository(api_haven ecosystem/repos/api-haven/src api_haven)
-vexgraph_index_repository(darling ecosystem/repos/darling-framework/src darling)
-vexgraph_index_repository(sesh ecosystem/repos/sesh/src sesh)
-vexgraph_index_repository(darkbase ecosystem/repos/darkbase/src darkbase)
-vexgraph_index_repository(impedance ecosystem/projects/impedance/src impedance)
-vexgraph_index_repository(samplerate ecosystem/repos/samplerate/src "" "${r2_cpu}" "${r2_storage}")
+set(r2_cpu "${VEXGRAPH_SOURCE_ROOT}/host-behavior/vexspoke/src")
+set(r2_storage "${VEXGRAPH_SOURCE_ROOT}/host-behavior/relational-engine/src")
+vexgraph_index_repository(vexspoke host-behavior/vexspoke/src vexspoke)
+vexgraph_index_repository(relational_engine host-behavior/relational-engine/src relational_engine)
+vexgraph_index_repository(hotcwap host-behavior/hotcwap hotcwap)
+vexgraph_index_repository(graphvex drivers/graphvex/src graphvex)
+vexgraph_index_repository(api_haven drivers/api-haven/src api_haven)
+vexgraph_index_repository(determinant drivers/determinant/src determinant "${r2_cpu}" "${r2_storage}")
+vexgraph_index_repository(darling interfaces/darling-framework/src darling)
+vexgraph_index_repository(sesh interfaces/sesh/src sesh)
+vexgraph_index_repository(darkbase drivers/darkbase/src darkbase)
+vexgraph_index_repository(impedance interactables/impedance/src impedance)
+vexgraph_index_repository(samplerate drivers/samplerate/src "" "${r2_cpu}" "${r2_storage}")
 set(VEXGRAPH_HARNESS_SOURCE_DIR "" CACHE PATH "Optional local Harness source tree for IDE indexing")
-vexgraph_index_repository(harness ecosystem/repos/harness/src "" "${r2_cpu}")
+vexgraph_index_repository(harness interfaces/harness/src "" "${r2_cpu}")
 vexgraph_index_repository(b personal/b "")
 # Source-free blueprints produce no fake target. Future source files are found
 # on CMake reload without introducing repository/directory CMake entries.
-vexgraph_index_repository(language ecosystem/repos/language "" "${r2_cpu}" "${r2_storage}")
+vexgraph_index_repository(language drivers/language "" "${r2_cpu}" "${r2_storage}")
 vexgraph_index_repository(func personal/func/src "")
 vexgraph_index_repository(primeagen personal/primeagen ""
     "${r2_cpu}" "${r2_storage}"
-    "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/hotcwap"
-    "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/api-haven/src")
+    "${VEXGRAPH_SOURCE_ROOT}/host-behavior/hotcwap"
+    "${VEXGRAPH_SOURCE_ROOT}/drivers/api-haven/src")
 vexgraph_index_repository(tools tools "")
 vexgraph_index_repository(notes _notes "")
-foreach(application anti drawling semicolon)
-    vexgraph_index_repository(${application} "ecosystem/projects/${application}/src" ""
+foreach(application drawling)
+    vexgraph_index_repository(${application} "interactables/${application}/src" ""
+        "${r2_cpu}" "${r2_storage}")
+endforeach()
+foreach(application anti semicolon)
+    vexgraph_index_repository(${application} "superapp/${application}/src" ""
         "${r2_cpu}" "${r2_storage}")
 endforeach()
 
@@ -203,33 +210,37 @@ foreach(subsystem IN LISTS test_subsystems)
         "${subsystem}"
         "${r2_cpu}" "${r2_storage}")
     if(test_name STREQUAL "hotcwap")
-        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/hotcwap")
+        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/host-behavior/hotcwap")
     elseif(test_name STREQUAL "graphvex")
-        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/graphvex/src")
+        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/drivers/graphvex/src")
+    elseif(test_name STREQUAL "determinant")
+        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/drivers/determinant/src")
     elseif(test_name STREQUAL "darling")
         list(APPEND test_includes
-            "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/hotcwap"
-            "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/graphvex/src"
-            "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/darling-framework/src")
+            "${VEXGRAPH_SOURCE_ROOT}/host-behavior/hotcwap"
+            "${VEXGRAPH_SOURCE_ROOT}/drivers/graphvex/src"
+            "${VEXGRAPH_SOURCE_ROOT}/interfaces/darling-framework/src")
     elseif(test_name STREQUAL "api-haven")
-        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/api-haven/src")
+        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/drivers/api-haven/src")
     elseif(test_name STREQUAL "sesh")
         list(APPEND test_includes
-            "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/sesh/src"
-            "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/sesh"
-            "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/api-haven/src")
+            "${VEXGRAPH_SOURCE_ROOT}/interfaces/sesh/src"
+            "${VEXGRAPH_SOURCE_ROOT}/interfaces/sesh"
+            "${VEXGRAPH_SOURCE_ROOT}/drivers/api-haven/src")
     elseif(test_name STREQUAL "darkbase")
-        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/darkbase/src")
+        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/drivers/darkbase/src")
     elseif(test_name STREQUAL "harness")
-        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/harness/src")
+        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/interfaces/harness/src")
     elseif(test_name STREQUAL "language")
-        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/language")
+        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/drivers/language")
     elseif(test_name STREQUAL "samplerate")
-        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/samplerate/src")
+        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/drivers/samplerate/src")
     elseif(test_name STREQUAL "primeagen")
         list(APPEND test_includes
             "${VEXGRAPH_SOURCE_ROOT}/personal/primeagen"
-            "${VEXGRAPH_SOURCE_ROOT}/ecosystem/repos/hotcwap")
+            "${VEXGRAPH_SOURCE_ROOT}/host-behavior/hotcwap"
+            "${VEXGRAPH_SOURCE_ROOT}/drivers/api-haven/src"
+            "${VEXGRAPH_SOURCE_ROOT}/interfaces/harness/src")
     elseif(test_name STREQUAL "b")
         list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/personal/b")
     elseif(test_name STREQUAL "func")

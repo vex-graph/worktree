@@ -14,7 +14,7 @@
 //
 // Laws honoured: Platform Support Floor Law (arm64 / macOS 14.0 / apple-m1),
 // Build & Naming Conventions Law (-Wall -Wextra -Werror, C23).
-// Constitution: workspace-root preferences.md in the owning workspace.
+// Constitution: gist/PREFERENCES.md in the owning workspace.
 // Pointer members follow the Semantic Consistency Law (Reference form).
 //
 // Subcommands:
@@ -42,8 +42,8 @@
  * Its process-global records are private to this one-shot CLI. This overview
  * documents the legacy engine; explicit pointer dereferences preserve its
  * behavior while following the Semantic Consistency Law (Reference form).
- * The reorganized workspace resolves libraries from ecosystem/repos, R5
- * projects from ecosystem/projects, and this project-owned coordinator from
+ * The reorganized workspace resolves R1/R2 from host-behavior, R3 from drivers,
+ * R4 from interfaces, R5 from interactables and R6 from superapp, with this coordinator in
  * tools/workspace.c. The generic b checkout owns no ecosystem graph.
  */
 ;;OVERVIEW
@@ -59,7 +59,9 @@
  * Target graph: tl_push, find_target, target_new, add_exe_libs, setup_targets.
  * Toolchain: apple_frameworks, setup_paths, cc_version, base_cflags, base_lflags.
  * Target declarations: setup_vexspoke, setup_darling, setup_graphvex_tests,
- * setup_vexspoke_tests, setup_sesh, setup_impedance, setup_apihaven, setup_hotcwap,
+ * setup_vexspoke_tests, setup_determinant, setup_sesh, setup_impedance,
+ * setup_apihaven, setup_hotcwap, setup_harness, setup_darkbase,
+ * setup_relational_engine, setup_relational_engine_tests,
  * has_main, setup_apps, setup_graphvex, setup_darling_tests.
  * Compilation/cache: mangle, unit_paths, collect_pub, unit_build_cmd,
  * parse_depfile, unit_up_to_date, write_meta, unit_content_hash, cache_path,
@@ -107,6 +109,10 @@
  * records and all other libraries/modules/apps/tools as excluded index records.
  * Application mains and shared gallery helpers retain their own transitive
  * include/definition context without being admitted to CTest or launched.
+ * setup_determinant discovers real R3 sources, borrows Vexspoke/R2 only, and
+ * registers mirrored owners without treating fixture directories as tests.
+ * Its optional two view modules are loaded externally by terminal_reload_test;
+ * the module paths/marks are test configuration, never R3 loader ownership.
  * setup_graphvex_tests gives explicit Vulkan tests, including color_pass_test
  * gpu_scope_test and filter_gallery_fixture_test, the Homebrew headers and
  * loader link/rpath. Darling gallery apps already link that loader.
@@ -635,8 +641,8 @@ static const char *g_only = nullptr;        // restrict the target graph to one 
 static const char *g_profraw = nullptr;     // LLVM_PROFILE_FILE for the next test run
 static char *g_cc_version = nullptr;
 
-static const char *VEXSPOKE = "ecosystem/repos/vexspoke";
-static const char *REL_ENGINE = "ecosystem/repos/relational-engine";
+static const char *VEXSPOKE = "host-behavior/vexspoke";
+static const char *REL_ENGINE = "host-behavior/relational-engine";
 
 // Resolve configuration-specific output paths and create build-state folders.
 static void setup_paths(void) {
@@ -771,7 +777,7 @@ static void add_exe_libs(Target *t) {
 #endif
 }
 
-// ── ecosystem/repos/vexspoke (R2 CPU computation/behavior) ──────────────────
+// ── host-behavior/vexspoke (R2 CPU computation/behavior) ──────────────────
 static void setup_vexspoke(TargetList *tl) {
     Target *v = target_new(tl, "vexspoke", T_LIB);
     StrList c = {0};
@@ -801,7 +807,7 @@ static void setup_vexspoke(TargetList *tl) {
     if (!g_release) strl_push(&(*v).pub_defs, "DEBUG_BORROW_CHECK=1");
 }
 
-// ── ecosystem/repos/relational-engine (R2 storage/memory owner) ──────────────
+// ── host-behavior/relational-engine (R2 storage/memory owner) ──────────────
 // Production native C Memory/MemoryArena/Transient, File/Cache/VexHome/
 // log/transport, and the type-id algebra, promoted from Vexspoke. Only
 // src/nio + src/io + src/type are production; src/relational, src/reflection
@@ -865,9 +871,9 @@ static void setup_relational_engine_tests(TargetList *tl) {
     }
 }
 
-// ── ecosystem/repos/darling-framework (R4: Frame, Panel) ──────────────────────
+// ── interfaces/darling-framework (R4: Frame, Panel) ──────────────────────
 static void setup_darling(TargetList *tl) {
-    char *base = abspath("ecosystem/repos/darling-framework");
+    char *base = abspath("interfaces/darling-framework");
     Target *lib = target_new(tl, "darling", T_LIB);
     StrList c = {0};
     // R4 is split by concern: src/ (Frame, Panel), src/input (accessibility),
@@ -894,7 +900,7 @@ static void setup_graphvex_tests(TargetList *tl) {
         Target *t = target_new(tl, name, T_EXE);
         (*t).is_test = true;
         strl_push(&(*t).srcs, ts.items[i]);
-        strl_push(&(*t).includes, abspath("ecosystem/repos/graphvex/src"));
+        strl_push(&(*t).includes, abspath("drivers/graphvex/src"));
         strl_push(&(*t).includes, abspath("tests"));   // test_support.h
         strl_push(&(*t).defs, "UNDEBUG");
         strl_push(&(*t).deps, "graphvex");
@@ -945,6 +951,10 @@ static void setup_vexspoke_tests(TargetList *tl) {
         if (!is_test && strcmp(base, "touchid_demo.c")) continue;
         char *name = xstrdup(base);
         name[strlen(name) - 2] = 0;
+        if (!strcmp(name, "console_test")) {
+            free(name);
+            name = xstrdup("bare_console_test");
+        }
         bool dup = false;
         for (int k = 0; k < seen.count; k++)
             if (!strcmp(seen.items[k], name)) { dup = true; break; }
@@ -962,9 +972,77 @@ static void setup_vexspoke_tests(TargetList *tl) {
     }
 }
 
-// ── ecosystem/repos/sesh (caller-buffer snapshot core) ───────────────────────
+// Register the R3 terminal toolkit only when real sources exist. R2 stays independent.
+static void setup_determinant(TargetList *tl) {
+    char *src = abspath("drivers/determinant/src");
+    StrList sources = {0};
+    glob_rec(src, ".c", &sources);
+    if (sources.count == 0)
+        return;
+    strl_sort(&sources);
+    Target *lib = target_new(tl, "determinant", T_LIB);
+    (*lib).srcs = sources;
+    strl_push(&(*lib).includes, src);
+    strl_push(&(*lib).deps, "vexspoke");
+#ifdef __APPLE__
+    strl_push(&(*lib).cflags, "-mcpu=apple-m1");
+#endif
+
+    // Fixture code is host-loaded by the owner, never included in the R3 archive.
+    char *fixture = abspath("tests/determinant/fixtures/view_module.c");
+    char *moduleA = nullptr;
+    char *moduleB = nullptr;
+    if (path_exists(fixture)) {
+        const char *names[] = {"determinant_view_a", "determinant_view_b"};
+        for (size_t i = 0; i < sizeof names / sizeof names[0]; i++) {
+            Target *module = target_new(tl, names[i], T_MOD);
+            strl_push(&(*module).srcs, fixture);
+            strl_push(&(*module).includes, src);
+            strl_push(&(*module).includes, abspath(strf("%s/src", VEXSPOKE)));
+            strl_pushf(&(*module).defs, "DETERMINANT_FIXTURE_MARK=%u", (unsigned) ('A' + i));
+            if (i == 0)
+                moduleA = xstrdup((*module).out_path);
+            else
+                moduleB = xstrdup((*module).out_path);
+        }
+    }
+
+    StrList tests = {0};
+    glob_rec(abspath("tests/determinant"), "_test.c", &tests);
+    strl_sort(&tests);
+    for (int i = 0; i < tests.count; i++) {
+        const char *path = tests.items[i];
+        if (strstr(path, "/fixtures/") || strstr(path, "/fixture/"))
+            continue;
+        const char *leaf = strrchr(path, '/');
+        char *name = xstrdup(leaf ? leaf + 1 : path);
+        name[strlen(name) - 2] = 0;
+        if (!strcmp(name, "console_test")) {
+            free(name);
+            name = xstrdup("determinant_console_test");
+        }
+        Target *test = target_new(tl, name, T_EXE);
+        (*test).is_test = true;
+        strl_push(&(*test).srcs, path);
+        strl_push(&(*test).includes, abspath("tests"));
+        strl_push(&(*test).defs, "UNDEBUG");
+        strl_push(&(*test).deps, "determinant");
+        if (!strcmp(name, "terminal_reload_test")) {
+            if (!moduleA || !moduleB)
+                die("terminal_reload_test requires determinant view module fixtures");
+            strl_pushf(&(*test).defs, "DETERMINANT_MODULE_A=\"%s\"", moduleA);
+            strl_pushf(&(*test).defs, "DETERMINANT_MODULE_B=\"%s\"", moduleB);
+#ifndef __APPLE__
+            strl_push(&(*test).syslibs, "-ldl");
+#endif
+        }
+        add_exe_libs(test);
+    }
+}
+
+// ── interfaces/sesh (caller-buffer snapshot core) ───────────────────────
 static void setup_sesh(TargetList *tl) {
-    char *src = abspath("ecosystem/repos/sesh/src");
+    char *src = abspath("interfaces/sesh/src");
     StrList c = {0};
     glob_rec(src, ".c", &c);
     if (c.count == 0) return;
@@ -972,15 +1050,15 @@ static void setup_sesh(TargetList *tl) {
     Target *t = target_new(tl, "sesh", T_LIB);
     (*t).srcs = c;
     strl_push(&(*t).includes, src);
-    strl_push(&(*t).includes, abspath("ecosystem/repos/sesh"));
+    strl_push(&(*t).includes, abspath("interfaces/sesh"));
     strl_push(&(*t).includes, abspath(strf("%s/src", VEXSPOKE)));
-    strl_push(&(*t).includes, abspath("ecosystem/repos/api-haven/src"));
+    strl_push(&(*t).includes, abspath("drivers/api-haven/src"));
     strl_push(&(*t).deps, "vexspoke");
 }
 
-// ── ecosystem/projects/impedance ────────────────────────────────────────────
+// ── interactables/impedance ────────────────────────────────────────────
 static void setup_impedance(TargetList *tl) {
-    char *base = abspath("ecosystem/projects/impedance");
+    char *base = abspath("interactables/impedance");
     Target *lib = target_new(tl, "impedance", T_LIB);
     strl_push(&(*lib).srcs, strf("%s/src/impedance.c", base));
     strl_push(&(*lib).includes, strf("%s/src", base));
@@ -999,9 +1077,9 @@ static void setup_impedance(TargetList *tl) {
     }
 }
 
-// ── ecosystem/repos/api-haven ────────────────────────────────────────────────
+// ── drivers/api-haven ────────────────────────────────────────────────
 static void setup_apihaven(TargetList *tl) {
-    char *base = abspath("ecosystem/repos/api-haven");
+    char *base = abspath("drivers/api-haven");
     const char *libs[] = {
         "src/api/client.c", "src/api/auth.c", "src/api/rest.c",
         "src/api/haven_ws_fanout.c", "src/com/discord/discord.c",
@@ -1048,11 +1126,11 @@ static void setup_apihaven(TargetList *tl) {
     }
 }
 
-// ── ecosystem/repos/harness (R4 own agent: draft space values) ───────────────
+// ── interfaces/harness (R4 own agent: draft space values) ───────────────
 static void setup_harness(TargetList *tl) {
-    char *base = abspath("ecosystem/repos/harness");
+    char *base = abspath("interfaces/harness");
     StrList c = {0};
-    glob_rec(abspath("ecosystem/repos/harness/src"), ".c", &c);
+    glob_rec(abspath("interfaces/harness/src"), ".c", &c);
     if (c.count == 0) return;  // draft repo: no buildable source yet
     strl_sort(&c);
     Target *lib = target_new(tl, "harness", T_LIB);
@@ -1081,9 +1159,9 @@ static void setup_harness(TargetList *tl) {
     }
 }
 
-// ── ecosystem/repos/hotcwap (R1: kernel host + hotload machinery) ─────────────
+// ── host-behavior/hotcwap (R1: kernel host + hotload machinery) ─────────────
 static void setup_hotcwap(TargetList *tl) {
-    char *base = abspath("ecosystem/repos/hotcwap");
+    char *base = abspath("host-behavior/hotcwap");
     Target *lib = target_new(tl, "hotcwap", T_LIB);
     const char *csrc[] = {
         "kernel/application.c", "kernel/process.c", "kernel/console.c",
@@ -1211,12 +1289,12 @@ static void setup_apps(TargetList *tl) {
     }
 }
 
-// ── ecosystem/repos/graphvex (R3: GPU driver + graphics core) ──────────────────
+// ── drivers/graphvex (R3: GPU driver + graphics core) ──────────────────
 static void add_gen(const char *src, const char *out, Cmd cmd);   // defined below
 
 // Register Graphvex sources and shader generation dependencies.
 static void setup_graphvex(TargetList *tl) {
-    char *base = abspath("ecosystem/repos/graphvex");
+    char *base = abspath("drivers/graphvex");
     Target *lib = target_new(tl, "graphvex", T_LIB);
     StrList c = {0};
     glob_rec(strf("%s/src", base), ".c", &c);
@@ -1292,7 +1370,7 @@ static void setup_darling_tests(TargetList *tl) {
         Target *t = target_new(tl, name, T_EXE);
         (*t).is_test = true;
         strl_push(&(*t).srcs, ts.items[i]);
-        strl_push(&(*t).includes, abspath("ecosystem/repos/darling-framework/src"));
+        strl_push(&(*t).includes, abspath("interfaces/darling-framework/src"));
         if (!strcmp(name, "gallery_photo_test")) {
             strl_push(&(*t).srcs, abspath("tests/darling/compositor/gallery_photo.c"));
             strl_pushf(&(*t).defs, "FILTER_GALLERY_SOURCE_RESOURCE=\"%s\"",
@@ -1308,11 +1386,11 @@ static void setup_darling_tests(TargetList *tl) {
     }
 }
 
-// ── ecosystem/repos/darkbase (R3: Database interface + native vex store) ─────
+// ── drivers/darkbase (R3: Database interface + native vex store) ─────
 // Sources land per class; until then the source glob is empty and this is a
 // no-op, so the blueprint stays buildable without inventing targets.
 static void setup_darkbase(TargetList *tl) {
-    char *base = abspath("ecosystem/repos/darkbase");
+    char *base = abspath("drivers/darkbase");
     char *src = strf("%s/src", base);
     StrList c = {0};
     glob_rec(src, ".c", &c);
@@ -1362,6 +1440,7 @@ static void setup_targets(TargetList *tl) {
     }
     setup_relational_engine(tl);  // R2 storage/memory first (Vexspoke depends on it)
     setup_vexspoke(tl);        // libs first
+    setup_determinant(tl);     // R3 terminal borrows R2, never the reverse
     setup_hotcwap(tl);
     setup_graphvex(tl);
     setup_sesh(tl);
@@ -1916,7 +1995,7 @@ static void build_all(void) {
 //   b coverage   dynamic: instrument, run, lcov, function-execution gate
 // ─────────────────────────────────────────────────────────────────────────────
 
-#define VEX_SRC_REL   "ecosystem/repos/vexspoke"
+#define VEX_SRC_REL   "host-behavior/vexspoke"
 #define VEX_TESTS_REL "tests/vexspoke"
 
 // Identify characters that may occur inside a C identifier.
@@ -2804,7 +2883,7 @@ static char *find_source_for(const char *name) {
     // a bare stem: search the runnable roots, tests/ first
     const char *base = strrchr(direct, '/');
     base = base ? base + 1 : direct;
-    const char *roots[] = {"tests", "projects", "ecosystem"};
+    const char *roots[] = {"tests", "host-behavior", "drivers", "interfaces", "interactables", "superapp"};
     for (size_t i = 0; i < sizeof roots / sizeof roots[0]; i++) {
         StrList hits = {0};
         match_sources(abspath(roots[i]), base, &hits);
