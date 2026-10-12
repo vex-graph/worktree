@@ -4,7 +4,7 @@
 # Usage: ./tools/make_code_txt.sh [output_file]
 #   Default output: code_2.txt at the workspace root.
 #
-# Includes: preferences.md, CONTRIBUTING.md files, and all .md / .c / .h /
+# Includes: PREFERENCES.md, CONTRIBUTING.md files, and all .md / .c / .h /
 #           .m / .frag / .vert / .comp sources — including _main/vk_test.c
 #           and _main/darling_gallery.c.
 # Excludes: _docs, _thoughts, .git, build/output dirs, IDE caches.

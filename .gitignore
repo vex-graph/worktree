@@ -38,6 +38,7 @@ __pycache__/
 .b/
 personal/b/b.json
 personal/b/compile_commands.json
+/b.json
 run/hello
 
 # Private assets — never published
@@ -50,7 +51,12 @@ resources/
 .antigravity/
 
 # Local constitution; published separately as a GitHub Gist.
-/preferences.md
+/PREFERENCES.md
 
-# Local backlog notes (not tracked)
-/blockers.md
+# directories that go r1-r6
+gist/
+drivers/
+host-behavior/
+interfaces/
+interactables/
+superapp/

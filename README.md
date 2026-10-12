@@ -11,7 +11,7 @@ harness, assets) is git-ignored, so this repo stays tiny.
 **Implemented:** the wrapper structure, the `b`-driven build entry (`tools/b` →
 `personal/b/b run exec tools/workspace.c`), the workspace build graph, the shared
 `tests/` suite and this documentation. **Proven:** macOS builds and the scoped
-test suites recorded in `tests/test-checklist.md`; the nested repositories range
+test suites recorded in `gist/test-checklist.md`; the nested repositories range
 from implemented slices to source-free blueprints. **The R5 applications are
 unfinished** — shells, scaffolds or designs, not shipped products.
 
@@ -22,7 +22,7 @@ together through `b`; it owns no product code. **Deliberately not covered:**
 feature implementation (each repo owns its own) and visual acceptance (the
 user's). **Known limits and gaps:** no monorepo semantics — each nested repo is
 committed and pushed independently; nothing here proves any application runtime,
-and the readiness Gist plus `tests/test-checklist.md` are the evidence of record.
+and the readiness Gist plus `gist/test-checklist.md` are the evidence of record.
 
 ## Build: `b`
 
@@ -110,19 +110,22 @@ scaffolds or designs—not finished IDE, DAW, studio or game products. See the
 |---|---|---|
 | `personal/b` | standalone build-system CLI + workspace engine | `vex-graph/b` |
 | `personal/func` | standalone compile-time opcode orchestrator | `vex-graph/func` |
-| `ecosystem/repos/hotcwap` | R1 kernel host · windows | `vexgraph-ecosystem/hotcwap` |
-| `ecosystem/repos/relational-engine` | R2 memory/storage · native C search | `vexgraph-ecosystem/relational-engine` |
-| `ecosystem/repos/vexspoke` | R2 CPU computation · behavior; legacy storage ABI retained | `vexgraph-ecosystem/vexspoke` |
-| `ecosystem/repos/graphvex` | R3 GPU driver (rect-first, no swapchain) | `vexgraph-ecosystem/graphvex` |
-| `ecosystem/repos/api-haven` | R3 API / connectors | `vexgraph-ecosystem/api-haven` |
-| `ecosystem/repos/language`, `ecosystem/repos/darkbase` | R3 *(scaffolds)* | `vexgraph-ecosystem/*` |
-| `ecosystem/repos/darling-framework` | R4 widget interfaces · partial implementation | `vexgraph-ecosystem/darling-framework` |
-| `ecosystem/repos/sesh` | R4 interface · session relay blueprint | `vexgraph-ecosystem/sesh` |
-| `ecosystem/repos/harness` | R4 interface · the user's own agent (integrates projects/tools/R5 apps) | `vexgraph-ecosystem/harness` |
-| `ecosystem/repos/samplerate` | R3 driver · native audio engine (CoreAudio/WASAPI/ALSA) | `vexgraph-ecosystem/samplerate` |
-| `ecosystem/projects/{anti,drawling,semicolon,impedance}` | R5 · unfinished apps | `vexgraph-ecosystem/*` |
+| `host-behavior/hotcwap` | R1 kernel host · windows | `vexgraph-ecosystem/hotcwap` |
+| `host-behavior/relational-engine` | R2 memory/storage · native C search | `vexgraph-ecosystem/relational-engine` |
+| `host-behavior/vexspoke` | R2 CPU computation · behavior; legacy storage ABI retained | `vexgraph-ecosystem/vexspoke` |
+| `drivers/graphvex` | R3 GPU driver (rect-first, no swapchain) | `vexgraph-ecosystem/graphvex` |
+| `drivers/api-haven` | R3 API / connectors | `vexgraph-ecosystem/api-haven` |
+| `drivers/determinant` | R3 terminal rendering, widgets, CLI parsing and caller-fed input | `vexgraph-ecosystem/determinant` |
+| `drivers/language`, `drivers/darkbase` | R3 *(scaffolds)* | `vexgraph-ecosystem/*` |
+| `interfaces/darling-framework` | R4 widget interfaces · partial implementation | `vexgraph-ecosystem/darling-framework` |
+| `interfaces/sesh` | R4 interface · session relay blueprint | `vexgraph-ecosystem/sesh` |
+| `interfaces/harness` | R4 interface · the user's own agent (integrates projects/tools/R5 apps) | `vexgraph-ecosystem/harness` |
+| `drivers/samplerate` | R3 driver · native audio engine (CoreAudio/WASAPI/ALSA) | `vexgraph-ecosystem/samplerate` |
+| `interactables/{drawling,impedance}` | R5 · unfinished apps | `vexgraph-ecosystem/*` |
+| `personal/primeagen` | standalone personal R5 agent client; future Semicolon consumer seam | `vex-graph/primeagen` |
+| `superapp/{anti,semicolon}` | R6 · unfinished workflow-composing superapps | `vexgraph-ecosystem/*` |
 | `tests` | the shared test suite | `vexgraph-ecosystem/tests` |
-| `ecosystem/ecosystem`, `ecosystem/.github`, `personal/vex-graph` | meta | `vexgraph-*/*` |
+| `ecosystem/.github`, `personal/vex-graph` | meta | `vexgraph-*/*` |
 
 Local-only (git-ignored, never published): `_trash/` retired checkouts ·
 `_notes/` notes · `_main/` apps · `resources/` assets. (`tools/` helpers are
@@ -130,9 +133,9 @@ tracked and published.)
 
 ## Rules
 
-The workspace is governed by a constitution: **`preferences.md`** — read it in
+The workspace is governed by a constitution: **`gist/PREFERENCES.md`** — read it in
 full; repositories with local laws add their own `<repo>-preferences.md`.
-Locally it is one real, Git-ignored workspace-root file, not a symlink or a
+Locally it is one real, Git-ignored Gist-owned file, not a symlink or a
 tracked Vexspoke file. Its published canonical edition is:
 
 **https://gist.github.com/vex-graph/4132a6c45cb6d3797c3e8eff2e94035a**

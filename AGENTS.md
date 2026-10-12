@@ -3,16 +3,16 @@
 ## Read the constitution first
 
 Before proposing a design, editing, or running implementation work, read the
-complete current `preferences.md`. It is the universal constitution, not optional
+complete current `gist/PREFERENCES.md`. It is the universal constitution, not optional
 background. Read the relevant implementation before making claims about it;
 distinguish existing behavior from proposals. Every primary agent and subagent
 must follow this order, then consult the owning repo preferences and test laws.
-Follow the repository reading map in `preferences.md`'s Rule Taxonomy: read the
+Follow the repository reading map in `gist/PREFERENCES.md`'s Rule Taxonomy: read the
 complete owning repo-local preferences before work in that repo. For cross-repo
 changes, read every affected owner's rules; report missing lawbooks explicitly.
 The OpenCode preferences plugin injects the full constitution first among its
 project context blocks on every model request. If it is unavailable, explicitly
-read `preferences.md` before proceeding; the config reference alone is not enough.
+read `gist/PREFERENCES.md` before proceeding; the config reference alone is not enough.
 
 Minimal core, opt-in everything else. Six capabilities, nothing more by default:
 **read · write · edit · bash · web search · agents**.
@@ -30,12 +30,12 @@ Minimal core, opt-in everything else. Six capabilities, nothing more by default:
 - Use `bash` for build/test/git and read-only inspection. Prefer the umbrella
   build (`./tools/b`) over inventing commands.
 - Keep changes small and cohesive; cite laws by Title, never number
-  (`preferences.md` is the constitution). Never push without an explicit,
+  (`gist/PREFERENCES.md` is the constitution). Never push without an explicit,
   one-off order (the Git Workflow Law).
 
 ## Test evidence
 
-Before changing any part, consult `tests/test-checklist.md` and
+Before changing any part, consult `gist/test-checklist.md` and
 `tests/test-preferences.md` (the Timestamped Test Checklist Law). Update affected
 rows with actual automated lab evidence, descriptions, and Unix timestamps in
 the same work cycle. Do not record author identities or session IDs. Visual

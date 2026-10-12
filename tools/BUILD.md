@@ -11,16 +11,17 @@ The saved CLion **b Runner → Run current file** tool invokes `tools/run-curren
 with the active file path. The existing **b** play configuration still references
 that same tool action. Reopen CLion to load the corrected saved settings.
 
-- C files under `tests/` or `ecosystem/projects/` use the project graph for linking.
+- Registered C files under `tests/` or application trees use the project graph for linking.
 - Other files use generic `b run exec`, selected by extension.
 - No file, missing files, compiler errors and program exit status propagate.
 - Finder-launched CLion gains Homebrew/rustup search paths after its existing PATH.
 - A standalone Rust file must have a `main`; Cargo library modules are not standalone
   programs. Use `personal/b/b build cargo <crate-directory>` for the crate.
 
-For example, select `../ecosystem/repos/relational-engine/rust/src/helloworld.rs` and use
-the b action. Its current code prints its arguments and deliberately exits 5;
-an exit-code-5 report is not a compiler or launcher failure. That file is untouched.
+The test-owned Rust fixture prints its arguments and deliberately exits 5;
+an exit-code-5 report is not a compiler or launcher failure. The Finder-PATH
+regression uses disposable source rather than depending on an editable user
+scratch file such as `host-behavior/relational-engine/rust/src/helloworld.rs`.
 
 Automated proof uses `tests/tools/run_current_test.py` and
 `tests/b/workspace_test.py`, without opening windows. Saved XML wiring is proved;
@@ -35,6 +36,15 @@ retain assertions, and window/GPU/UI CTest execution is disabled by default.
 The adapter also indexes every registered application/tool and its shared helper
 sources, including `tests/darling/compositor/filter_gallery.c` and
 `tests/darling/darling_tests.c`. Each keeps its own transitive include context;
-gallery indexing does not register or launch it as a test. The tests-only
-`tests/CMakeLists.txt` reuses this same complete graph. After changing the graph,
+gallery indexing does not register or launch it as a test. Tests borrow the only
+workspace CMake entry; there is no `tests/CMakeLists.txt`. After changing the graph,
 reload the active CMake project so CLion replaces its old source contexts.
+
+Repository inventory follows `host-behavior/` (R1/R2), `drivers/` (R3),
+`interfaces/` (R4), `interactables/` (R5), and `superapp/` (R6 Anti/Semicolon).
+Determinant is an R3 library over Vexspoke's R2 public contracts and its transitive
+Relational Engine storage dependency. Recursive owner-test registration excludes
+fixture directories. R3 screen ownership is `Terminal`, not a competing Console;
+R2 bare output is `bare_console_test`, distinct from R1 `console_test`.
+Source-free blueprints have no fabricated compile target. Indexing and compilation
+do not establish terminal appearance, live reload, or other-platform runtime proof.
