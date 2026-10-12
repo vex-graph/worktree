@@ -6,9 +6,11 @@ set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 REPOS=(
   "$ROOT"
-  "$ROOT"/ecosystem/repos/*
-  "$ROOT"/ecosystem/projects/*
-  "$ROOT/ecosystem/ecosystem"
+  "$ROOT"/host-behavior/*
+  "$ROOT"/drivers/*
+  "$ROOT"/interfaces/*
+  "$ROOT"/interactables/*
+  "$ROOT"/superapp/*
   "$ROOT/ecosystem/.github"
   "$ROOT/tests"
   "$ROOT"/personal/*
