@@ -1165,6 +1165,7 @@ static void setup_hotcwap(TargetList *tl) {
     Target *lib = target_new(tl, "hotcwap", T_LIB);
     const char *csrc[] = {
         "kernel/application.c", "kernel/process.c", "kernel/console.c",
+        "kernel/commandline.c", "kernel/commandline_ncurses.c",
         "kernel/kernel.c", "spoke/lifetime.c", "hot/hot.c",
         "hot/hot_trampoline.c", "hot/hot_retire.c", "hot/manifest.c",
         "hot/ledger.c", "hot/throwable.c", "window/window_event.c",
@@ -1174,6 +1175,9 @@ static void setup_hotcwap(TargetList *tl) {
         strl_push(&(*lib).srcs, strf("%s/%s", base, csrc[i]));
     strl_push(&(*lib).includes, base);
     strl_push(&(*lib).deps, "vexspoke");
+    // CommandLine owns the TTY through ncurses (the terminal analog of AppKit in
+    // window_cocoa.m); the backend is one translation unit behind CommandLineIo.
+    strl_push(&(*lib).syslibs, "-lncurses");
 #ifdef __APPLE__
     const char *msrc[] = {
         "window/window_cocoa.m", "window/traffic_light_cocoa.m",
@@ -1227,6 +1231,9 @@ static void setup_hotcwap(TargetList *tl) {
         } else {
             strl_push(&(*t).deps, "hotcwap");
         }
+        // libhotcwap now owns the TTY (CommandLine), so every consumer resolves
+        // ncurses symbols (the default backend is linked, not weak).
+        strl_push(&(*t).syslibs, "-lncurses");
         add_exe_libs(t);
         for (size_t k = 0; k < sizeof needs_mod / sizeof needs_mod[0]; k++)
             if (!strcmp(name, needs_mod[k]))
