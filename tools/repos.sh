@@ -11,6 +11,7 @@ REPOS=(
   "$ROOT"/interfaces/*
   "$ROOT"/interactables/*
   "$ROOT"/superapp/*
+  "$ROOT/ecosystem"
   "$ROOT/ecosystem/.github"
   "$ROOT/tests"
   "$ROOT"/personal/*
