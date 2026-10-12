@@ -12,8 +12,8 @@ harness, assets) is git-ignored, so this repo stays tiny.
 `personal/b/b run exec tools/workspace.c`), the workspace build graph, the shared
 `tests/` suite and this documentation. **Proven:** macOS builds and the scoped
 test suites recorded in `gist/test-checklist.md`; the nested repositories range
-from implemented slices to source-free blueprints. **The R5 applications are
-unfinished** — shells, scaffolds or designs, not shipped products.
+from implemented slices to source-free blueprints. **The R5 applications and R6
+superapps are unfinished** — shells, scaffolds or designs, not shipped products.
 
 ## Scope and Limitations
 
@@ -100,8 +100,9 @@ are preserved, not rewritten into Rust; broader collection migration is staged. 
 storage residency/lifetimes; GPU shaders and dispatch remain Graphvex R3.
 
 **This ecosystem is unfinished.** The layer map describes intended ownership,
-not a completion claim. In particular the R5 applications are unfinished shells,
-scaffolds or designs—not finished IDE, DAW, studio or game products. See the
+not a completion claim. In particular the R5 applications and R6 superapps are
+unfinished shells, scaffolds or blueprints—not finished IDE, DAW, studio, game or
+superapp products. See the
 [readiness Gist](https://gist.github.com/vex-graph/6943f92acb931b25dad1073c46da6ce7) and file-specific test evidence.
 
 ## The repositories
