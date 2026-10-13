@@ -803,6 +803,8 @@ static void setup_vexspoke(TargetList *tl) {
     strl_push(&(*v).cflags, "-mcpu=apple-m1");
     apple_frameworks(&(*v).syslibs);
 #endif
+    // image/png decode uses system zlib for DEFLATE.
+    strl_push(&(*v).syslibs, "-lz");
     strl_push(&(*v).syslibs, "-lpthread");
     if (!g_release) strl_push(&(*v).pub_defs, "DEBUG_BORROW_CHECK=1");
 }
@@ -969,6 +971,9 @@ static void setup_vexspoke_tests(TargetList *tl) {
         strl_push(&(*t).defs, "UNDEBUG");
         strl_push(&(*t).deps, "vexspoke");
         add_exe_libs(t);
+        // The PNG owner pulls the decoder, whose DEFLATE comes from system zlib.
+        if (!strcmp(name, "png_test"))
+            strl_push(&(*t).syslibs, "-lz");
     }
 }
 
