@@ -1416,7 +1416,7 @@ static void setup_darkbase(TargetList *tl) {
     strl_push(&(*lib).deps, "relational_engine");   // Memory_* / File / VexHome
     strl_push(&(*lib).deps, "vexspoke");            // oop/type.h, reflection
 
-    char *tdir = strf("%s/tests/darkbase", g_root);
+    char *tdir = strf("%s/tests/darkbase-engine", g_root);
     StrList ts = {0};
     glob_rec(tdir, "_test.c", &ts);
     strl_sort(&ts);

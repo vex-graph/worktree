@@ -117,7 +117,8 @@ superapp products. See the
 | `drivers/graphvex` | R3 GPU driver (rect-first, no swapchain) | `vexgraph-ecosystem/graphvex` |
 | `drivers/api-haven` | R3 API / connectors | `vexgraph-ecosystem/api-haven` |
 | `drivers/determinant` | R3 terminal rendering, widgets, CLI parsing and caller-fed input | `vexgraph-ecosystem/determinant` |
-| `drivers/language`, `drivers/darkbase` | R3 *(scaffolds)* | `vexgraph-ecosystem/*` |
+| `drivers/language` | R3 language grammars *(scaffold)* | `vexgraph-ecosystem/language` |
+| `drivers/darkbase-engine` | R3 native vex store · `Database` M1 + `.vexdb` persistence implemented | `vexgraph-ecosystem/darkbase-engine` |
 | `interfaces/darling-framework` | R4 widget interfaces · partial implementation | `vexgraph-ecosystem/darling-framework` |
 | `interfaces/sesh` | R4 interface · session relay blueprint | `vexgraph-ecosystem/sesh` |
 | `interfaces/harness` | R4 interface · the user's own agent (integrates projects/tools/R5 apps) | `vexgraph-ecosystem/harness` |
