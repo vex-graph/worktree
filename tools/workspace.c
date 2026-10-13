@@ -1398,17 +1398,17 @@ static void setup_darling_tests(TargetList *tl) {
     }
 }
 
-// ── drivers/darkbase (R3: Database interface + native vex store) ─────
+// ── drivers/darkbase-engine (R3: Database interface + native vex store) ─────
 // Sources land per class; until then the source glob is empty and this is a
 // no-op, so the blueprint stays buildable without inventing targets.
 static void setup_darkbase(TargetList *tl) {
-    char *base = abspath("drivers/darkbase");
+    char *base = abspath("drivers/darkbase-engine");
     char *src = strf("%s/src", base);
     StrList c = {0};
     glob_rec(src, ".c", &c);
     if (c.count == 0) return;              // blueprint until the first class lands
     strl_sort(&c);
-    Target *lib = target_new(tl, "darkbase", T_LIB);
+    Target *lib = target_new(tl, "darkbase-engine", T_LIB);
     (*lib).srcs = c;
     strl_push(&(*lib).includes, src);
     strl_push(&(*lib).includes, abspath(strf("%s/src", VEXSPOKE)));
@@ -1433,7 +1433,7 @@ static void setup_darkbase(TargetList *tl) {
         strl_push(&(*t).includes, abspath(strf("%s/src", REL_ENGINE)));
         strl_push(&(*t).includes, abspath("tests"));   // test_support.h
         strl_push(&(*t).defs, "UNDEBUG");
-        strl_push(&(*t).deps, "darkbase");
+        strl_push(&(*t).deps, "darkbase-engine");
         add_exe_libs(t);
     }
 }
