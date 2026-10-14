@@ -563,7 +563,11 @@ static void glob_rec(const char *dir, const char *suffix, StrList *out) {
 // target graph
 // ─────────────────────────────────────────────────────────────────────────────
 
-typedef enum { T_LIB, T_MOD, T_EXE, T_APP } TKind;
+// T_EXT is an artifact an EXTERNAL tool produces (a cargo-built Rust static
+// library, today). The graph owns its generation and its place on the link line,
+// but never compiles or archives it: `ar rcs` over a cargo archive would replace a
+// real library with an empty one.
+typedef enum { T_LIB, T_MOD, T_EXE, T_APP, T_EXT } TKind;
 
 typedef struct {
     const char *name;
@@ -815,6 +819,54 @@ static void setup_vexspoke(TargetList *tl) {
 // src/nio + src/io + src/type are production; src/relational, src/reflection
 // and src/search stay reference-only and must never shadow Vexspoke's
 // canonical headers (consumers put Vexspoke src first).
+static void add_gen(const char *src, const char *out, Cmd cmd);   // the generator seam below
+
+// The R2 mapping's C ABI — reached from C through ONE thin extern-C surface,
+// implemented in a cargo-built STATIC LIBRARY.
+//
+// This target exists because the graph previously could not link that library at
+// all: a C client of the Rust ABI had to be named `*_abi_test.c` so the test sweep
+// skipped it, and only a Python runner (cargo + clang) could build one. That made
+// the store impossible to write, because the store's data file IS this reservation
+// mapping. So the artifact becomes an ordinary graph dependency: a generator builds
+// it, and any target that declares `relational_mapping` links it.
+//
+// Cargo runs --offline --locked so a build is reproducible and needs no network, and
+// its target dir lives INSIDE the build output so no Rust artifact lands in the
+// source tree. Cargo missing is a loud build failure, never a silent skip.
+static void setup_rust_mapping(TargetList *tl) {
+    char *rust = abspath(strf("%s/rust", REL_ENGINE));
+    char *manifest = strf("%s/Cargo.toml", rust);
+    char *targetDir = strf("%s/rust", g_out);
+    char *archive = strf("%s/debug/librelational_engine_scratchpad.a", targetDir);
+
+    Cmd cmd = {0};
+    strl_push(&cmd, "cargo");
+    strl_push(&cmd, "build");
+    strl_push(&cmd, "--offline");
+    strl_push(&cmd, "--locked");
+    strl_push(&cmd, "--manifest-path");
+    strl_push(&cmd, manifest);
+    strl_push(&cmd, "--target-dir");
+    strl_push(&cmd, targetDir);
+
+    // Rebuild on ANY Rust input, not a chosen few: the mapping spans several
+    // modules, and a stale archive is a silently wrong mapping. Every input is
+    // registered BEFORE the first add_gen, because add_gen copies the command.
+    StrList rs = {0};
+    glob_rec(strf("%s/src", rust), ".rs", &rs);
+    glob_rec(strf("%s/annotations/src", rust), ".rs", &rs);
+    strl_sort(&rs);
+    add_gen(manifest, archive, cmd);
+    add_gen(strf("%s/Cargo.lock", rust), archive, cmd);
+    for (int i = 0; i < rs.count; i++)
+        add_gen(rs.items[i], archive, cmd);
+
+    Target *m = target_new(tl, "relational_mapping", T_EXT);
+    (*m).out_path = archive;
+    strl_push(&(*m).includes, strf("%s/include", rust));   // the ABI headers
+}
+
 static void setup_relational_engine(TargetList *tl) {
     Target *e = target_new(tl, "relational_engine", T_LIB);
     StrList c = {0};
@@ -1420,7 +1472,9 @@ static void setup_darkbase(TargetList *tl) {
     strl_push(&(*lib).includes, src);
     strl_push(&(*lib).includes, abspath(strf("%s/src", VEXSPOKE)));
     strl_push(&(*lib).includes, abspath(strf("%s/src", REL_ENGINE)));
+    strl_push(&(*lib).includes, abspath(strf("%s/rust/include", REL_ENGINE)));  // the mapping's C ABI
     strl_push(&(*lib).deps, "relational_engine");   // Memory_* / File / VexHome
+    strl_push(&(*lib).deps, "relational_mapping");  // the cargo-built Rust static library
     strl_push(&(*lib).deps, "vexspoke");            // oop/type.h, reflection
 
     char *tdir = strf("%s/tests/darkbase-engine", g_root);
@@ -1438,6 +1492,7 @@ static void setup_darkbase(TargetList *tl) {
         strl_push(&(*t).includes, src);
         strl_push(&(*t).includes, abspath(strf("%s/src", VEXSPOKE)));
         strl_push(&(*t).includes, abspath(strf("%s/src", REL_ENGINE)));
+        strl_push(&(*t).includes, abspath(strf("%s/rust/include", REL_ENGINE)));
         strl_push(&(*t).includes, abspath("tests"));   // test_support.h
         strl_push(&(*t).defs, "UNDEBUG");
         strl_push(&(*t).deps, "darkbase-engine");
@@ -1460,6 +1515,7 @@ static void setup_darkbase_headless(TargetList *tl) {
     strl_push(&(*lib).includes, abspath("drivers/darkbase-engine/src"));
     strl_push(&(*lib).includes, abspath("host-behavior/vexspoke/src"));
     strl_push(&(*lib).includes, abspath("host-behavior/relational-engine/src"));
+    strl_push(&(*lib).includes, abspath("host-behavior/relational-engine/rust/include"));
     strl_push(&(*lib).deps, "darkbase-engine");
     strl_push(&(*lib).deps, "api_haven");
     strl_push(&(*lib).deps, "vexspoke");
@@ -1481,6 +1537,7 @@ static void setup_darkbase_headless(TargetList *tl) {
         strl_push(&(*t).includes, abspath("drivers/darkbase-engine/src"));
         strl_push(&(*t).includes, abspath("host-behavior/vexspoke/src"));
         strl_push(&(*t).includes, abspath("host-behavior/relational-engine/src"));
+        strl_push(&(*t).includes, abspath("host-behavior/relational-engine/rust/include"));
         strl_push(&(*t).includes, abspath("tests"));
         strl_push(&(*t).defs, "UNDEBUG");
         strl_push(&(*t).deps, "darkbase-headless");
@@ -1500,6 +1557,7 @@ static void setup_targets(TargetList *tl) {
         }
         return;
     }
+    setup_rust_mapping(tl);       // the R2 mapping's cargo-built C ABI archive
     setup_relational_engine(tl);  // R2 storage/memory first (Vexspoke depends on it)
     setup_vexspoke(tl);        // libs first
     setup_determinant(tl);     // R3 terminal borrows R2, never the reverse
@@ -1935,6 +1993,10 @@ static uint64_t target_dep_sig(const Target *t) {
 
 // Rebuild a target when its objects or transitive dependency signature changed.
 static void link_target(Target *t) {
+    // An EXTERNAL artifact is made by its own generator and has no link step here.
+    // Running `ar`/`cc` over it would clobber the real library it points at.
+    if ((*t).kind == T_EXT)
+        return;
     uint64_t listh = target_obj_hash(t);
     uint64_t depsig = target_dep_sig(t);
     bool need = target_objs_changed(t);
