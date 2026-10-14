@@ -1445,6 +1445,49 @@ static void setup_darkbase(TargetList *tl) {
     }
 }
 
+// ── interfaces/darkbase-headless (R4: darkbase service boundary) ───────────
+// Source and test targets appear independently as their mirrored units land.
+static void setup_darkbase_headless(TargetList *tl) {
+    char *base = abspath("interfaces/darkbase-headless");
+    char *src = strf("%s/src", base);
+    StrList c = {0};
+    glob_rec(src, ".c", &c);
+    if (c.count == 0) return;              // blueprint until the first class lands
+    strl_sort(&c);
+    Target *lib = target_new(tl, "darkbase-headless", T_LIB);
+    (*lib).srcs = c;
+    strl_push(&(*lib).includes, src);
+    strl_push(&(*lib).includes, abspath("drivers/darkbase-engine/src"));
+    strl_push(&(*lib).includes, abspath("host-behavior/vexspoke/src"));
+    strl_push(&(*lib).includes, abspath("host-behavior/relational-engine/src"));
+    strl_push(&(*lib).deps, "darkbase-engine");
+    strl_push(&(*lib).deps, "api_haven");
+    strl_push(&(*lib).deps, "vexspoke");
+    strl_push(&(*lib).deps, "relational_engine");
+
+    char *tdir = strf("%s/tests/darkbase-headless", g_root);
+    StrList ts = {0};
+    glob_rec(tdir, "_test.c", &ts);
+    strl_sort(&ts);
+    for (int i = 0; i < ts.count; i++) {
+        const char *bn = strrchr(ts.items[i], '/');
+        bn = bn ? bn + 1 : ts.items[i];
+        char *name = xstrdup(bn);
+        name[strlen(name) - 2] = 0;
+        Target *t = target_new(tl, name, T_EXE);
+        (*t).is_test = true;
+        strl_push(&(*t).srcs, ts.items[i]);
+        strl_push(&(*t).includes, src);
+        strl_push(&(*t).includes, abspath("drivers/darkbase-engine/src"));
+        strl_push(&(*t).includes, abspath("host-behavior/vexspoke/src"));
+        strl_push(&(*t).includes, abspath("host-behavior/relational-engine/src"));
+        strl_push(&(*t).includes, abspath("tests"));
+        strl_push(&(*t).defs, "UNDEBUG");
+        strl_push(&(*t).deps, "darkbase-headless");
+        add_exe_libs(t);
+    }
+}
+
 // Declare the workspace target graph in dependency-aware registration order.
 static void setup_targets(TargetList *tl) {
     if (g_only) {
@@ -1467,6 +1510,7 @@ static void setup_targets(TargetList *tl) {
     setup_apihaven(tl);
     setup_harness(tl);         // R4 own agent: draft space values
     setup_darkbase(tl);        // R3 database switchboard + native vex store
+    setup_darkbase_headless(tl); // R4 service boundary over the R3 store
     setup_darling(tl);
     setup_apps(tl);            // tests/darling/*.c apps
     setup_graphvex_tests(tl);  // tests/graphvex mirrors graphvex/src
