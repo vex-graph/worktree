@@ -851,10 +851,13 @@ static void setup_relational_engine_tests(TargetList *tl) {
         size_t bl = strlen(base);
         if (!(bl > 7 && !strcmp(base + bl - 7, "_test.c"))) continue;
         if (!strcmp(base, "relational_memory_test.c")) continue;  // Rust ABI runner
-        // Same reason: this client calls the Rust extern-C mapping ABI, which the
-        // workspace graph cannot link (Cargo owns the staticlib). It runs in the
-        // Rust owner runner with -Irust/include and the built archive.
-        if (!strcmp(base, "fixed_mapped_file_abi_test.c")) continue;
+        // Same reason, and it is a RULE rather than a list: a client of a Rust
+        // extern-C ABI ends in `_abi_test.c`, because this graph cannot link the
+        // Cargo-built staticlib at all. Those clients belong to the Rust owner
+        // runner, which supplies -Irust/include and the archive. Naming it by
+        // suffix means the next one is skipped automatically instead of turning
+        // the whole test sweep red again.
+        if (strstr(base, "_abi_test.c") != nullptr) continue;
         char *name = xstrdup(base);
         name[strlen(name) - 2] = 0;
         bool dup = false;
