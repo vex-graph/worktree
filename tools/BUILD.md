@@ -3,7 +3,7 @@
 `./tools/b build` remains the project build entry point. Vexgraph owns
 `tools/workspace.c` and `tools/build_annotation.h`: repository names, dependencies,
 shader generation and registered tests belong here, not in the generic b repo.
-The launcher uses `personal/b/b run exec tools/workspace.c -- <arguments>`.
+The launcher uses `suite/personal/b/b run exec tools/workspace.c -- <arguments>`.
 Generic b compiles and executes the C coordinator; it has no workspace subcommand.
 This is a project-owned executable graph, not a new declarative manifest format.
 
@@ -16,7 +16,7 @@ that same tool action. Reopen CLion to load the corrected saved settings.
 - No file, missing files, compiler errors and program exit status propagate.
 - Finder-launched CLion gains Homebrew/rustup search paths after its existing PATH.
 - A standalone Rust file must have a `main`; Cargo library modules are not standalone
-  programs. Use `personal/b/b build cargo <crate-directory>` for the crate.
+programs. Use `suite/personal/b/b build cargo <crate-directory>` for the crate.
 
 The test-owned Rust fixture prints its arguments and deliberately exits 5;
 an exit-code-5 report is not a compiler or launcher failure. The Finder-PATH

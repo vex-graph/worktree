@@ -9,9 +9,9 @@ harness, assets) is git-ignored, so this repo stays tiny.
 ## Current State
 
 **Implemented:** the wrapper structure, the `b`-driven build entry (`tools/b` →
-`personal/b/b run exec tools/workspace.c`), the workspace build graph, the shared
+`suite/personal/b/b run exec tools/workspace.c`), the workspace build graph, the shared
 `tests/` suite and this documentation. **Proven:** macOS builds and the scoped
-test suites recorded in `gist/test-checklist.md`; the nested repositories range
+test suites recorded in `metadata/gists/test-checklist.md`; the nested repositories range
 from implemented slices to source-free blueprints. **The R5 applications and R6
 superapps are unfinished** — shells, scaffolds or designs, not shipped products.
 
@@ -22,7 +22,7 @@ together through `b`; it owns no product code. **Deliberately not covered:**
 feature implementation (each repo owns its own) and visual acceptance (the
 user's). **Known limits and gaps:** no monorepo semantics — each nested repo is
 committed and pushed independently; nothing here proves any application runtime,
-and the readiness Gist plus `gist/test-checklist.md` are the evidence of record.
+and the readiness Gist plus `metadata/gists/test-checklist.md` are the evidence of record.
 
 ## Build: `b`
 
@@ -46,7 +46,7 @@ Excluded supplemental source targets do not link releases or run applications.
 No IDE configure pass proves standalone runtime dependency closure.
 
 The build system lives in the independent [`vex-graph/b`](https://github.com/vex-graph/b)
-checkout at `personal/b/`. `b.c` is a language-agnostic CLI — a small suite (`b.h` +
+checkout at `suite/personal/b/`. `b.c` is a language-agnostic CLI — a small suite (`b.h` +
 `util.c` + pluggable `languages/*` adapters) that owns `run`, `build` and the
 planned `export` surface. The adapter set is open-ended and grows over time;
 `personal/b/README.md` lists the languages wired today. `tools/workspace.c` remains the
@@ -63,9 +63,9 @@ apps); `tools/b` is a thin forwarding launcher for it.
 Drop a `_main/<name>.c` containing a `main()` and `./tools/b run <name>` builds,
 bundles and launches it as an ad-hoc-codesigned `.app`. All build state lives
 *outside* the tree (`~/Library/Application Support/vexgraph/b/`, override
-`$B_HOME`); compilation databases in `personal/b/` are ignored.
+`$B_HOME`); compilation databases in `suite/personal/b/` are ignored.
 
-For standalone projects, add the `personal/b/` checkout to `PATH`, or invoke `personal/b/b`:
+For standalone projects, add the `suite/personal/b/` checkout to `PATH`, or invoke `suite/personal/b/b`:
 
 ```sh
 ./b/b run exec ./hello.c
@@ -135,7 +135,7 @@ tracked and published.)
 
 ## Rules
 
-The workspace is governed by a constitution: **`gist/PREFERENCES.md`** — read it in
+The workspace is governed by a constitution: **`PREFERENCES.md`** — read it in
 full; repositories with local laws add their own `<repo>-preferences.md`.
 Locally it is one real, Git-ignored Gist-owned file, not a symlink or a
 tracked Vexspoke file. Its published canonical edition is:

@@ -54,9 +54,5 @@ resources/
 /PREFERENCES.md
 
 # directories that go r1-r6
-gist/
-drivers/
-host-behavior/
-interfaces/
-interactables/
-superapp/
+suite/
+metadata/

@@ -5,4 +5,40 @@ here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 root=$(CDPATH= cd -- "$here/.." && pwd)
 export B_HOME="${B_HOME:-$HOME/Library/Application Support/vexgraph/b}"
 cd "$root"
-exec "$root/personal/b/b" run exec "$root/tools/workspace.c" -- "$@"
+binary="$root/suite/personal/b/b"
+
+run_tooling_test() {
+    case "$1" in
+        opencode_preferences)
+            bun test "$root/tests/tools/opencode_preferences_test.ts"
+            ;;
+        checklist_runner)
+            python3 -B "$root/tests/tools/test_checklist_test.py"
+            ;;
+        *)
+            return 2
+            ;;
+    esac
+}
+
+if [ "${1:-}" = test ]; then
+    shift
+    if [ "${1:-}" = opencode_preferences ] || [ "${1:-}" = checklist_runner ]; then
+        run_tooling_test "$1"
+        exit $?
+    fi
+    if [ "${1:-}" = preferences ]; then
+        run_tooling_test opencode_preferences && run_tooling_test checklist_runner
+        exit $?
+    fi
+    if [ "$#" -eq 0 ]; then
+        "$binary" run exec "$root/tools/workspace.c" -- test
+        result=$?
+        if [ "$result" -ne 0 ]; then exit "$result"; fi
+        run_tooling_test opencode_preferences && run_tooling_test checklist_runner
+        exit $?
+    fi
+    exec "$binary" run exec "$root/tools/workspace.c" -- test "$@"
+fi
+
+exec "$binary" run exec "$root/tools/workspace.c" -- "$@"

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-# IDE adapter only: b owns the ecosystem graph and runtime builds.
+# IDE adapter only: b owns the vexgraph-ecosystem-gitrepo graph and runtime builds.
 if(APPLE)
     set(CMAKE_OSX_ARCHITECTURES arm64 CACHE STRING "Native architecture")
     set(CMAKE_OSX_DEPLOYMENT_TARGET 14.0 CACHE STRING "Supported macOS floor")
@@ -22,6 +22,18 @@ endif()
 include(CTest)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(VEXGRAPH_SOURCE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
+function(vexgraph_resolve_path output relative)
+    if(relative MATCHES "^(host-behavior|drivers|interfaces)/(.*)$")
+        set(resolved "suite/ecosystem/${CMAKE_MATCH_2}")
+    elseif(relative MATCHES "^(interactables|superapp)/(.*)$")
+        set(resolved "suite/projects/${CMAKE_MATCH_2}")
+    elseif(relative MATCHES "^personal/(.*)$")
+        set(resolved "suite/personal/${CMAKE_MATCH_1}")
+    else()
+        set(resolved "${relative}")
+    endif()
+    set(${output} "${VEXGRAPH_SOURCE_ROOT}/${resolved}" PARENT_SCOPE)
+endfunction()
 # Some IDE clangd bundles omit their resource headers. Discover the selected
 # compiler's headers instead of pinning an Xcode version or SDK installation.
 set(VEXGRAPH_COMPILER_HEADERS "")
@@ -108,7 +120,7 @@ endif()
 # untouched; supplemental excluded targets cover drafts and new source files.
 # Each repository keeps its own include context, never one global header soup.
 function(vexgraph_index_repository name relative template)
-    set(source_root "${VEXGRAPH_SOURCE_ROOT}/${relative}")
+    vexgraph_resolve_path(source_root "${relative}")
     if(name STREQUAL "harness" AND VEXGRAPH_HARNESS_SOURCE_DIR)
         set(source_root "${VEXGRAPH_HARNESS_SOURCE_DIR}")
     endif()
@@ -161,8 +173,8 @@ if(index_count GREATER 0)
         list(APPEND VEXGRAPH_MODELED_SOURCES ${modeled})
     endforeach()
 endif()
-set(r2_cpu "${VEXGRAPH_SOURCE_ROOT}/host-behavior/vexspoke/src")
-set(r2_storage "${VEXGRAPH_SOURCE_ROOT}/host-behavior/relational-engine/src")
+set(r2_cpu "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/vexspoke/src")
+set(r2_storage "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/relational-engine/src")
 vexgraph_index_repository(vexspoke host-behavior/vexspoke/src vexspoke)
 vexgraph_index_repository(relational_engine host-behavior/relational-engine/src relational_engine)
 vexgraph_index_repository(hotcwap host-behavior/hotcwap hotcwap)
@@ -183,8 +195,8 @@ vexgraph_index_repository(language drivers/language "" "${r2_cpu}" "${r2_storage
 vexgraph_index_repository(func personal/func/src "")
 vexgraph_index_repository(primeagen personal/primeagen ""
     "${r2_cpu}" "${r2_storage}"
-    "${VEXGRAPH_SOURCE_ROOT}/host-behavior/hotcwap"
-    "${VEXGRAPH_SOURCE_ROOT}/drivers/api-haven/src")
+    "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/hotcwap"
+    "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/api-haven/src")
 vexgraph_index_repository(tools tools "")
 vexgraph_index_repository(notes _notes "")
 foreach(application drawling)
@@ -210,41 +222,41 @@ foreach(subsystem IN LISTS test_subsystems)
         "${subsystem}"
         "${r2_cpu}" "${r2_storage}")
     if(test_name STREQUAL "hotcwap")
-        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/host-behavior/hotcwap")
+        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/hotcwap")
     elseif(test_name STREQUAL "graphvex")
-        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/drivers/graphvex/src")
+        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/graphvex/src")
     elseif(test_name STREQUAL "determinant")
-        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/drivers/determinant/src")
+        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/determinant/src")
     elseif(test_name STREQUAL "darling")
         list(APPEND test_includes
-            "${VEXGRAPH_SOURCE_ROOT}/host-behavior/hotcwap"
-            "${VEXGRAPH_SOURCE_ROOT}/drivers/graphvex/src"
-            "${VEXGRAPH_SOURCE_ROOT}/interfaces/darling-framework/src")
+            "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/hotcwap"
+            "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/graphvex/src"
+            "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/darling-framework/src")
     elseif(test_name STREQUAL "api-haven")
-        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/drivers/api-haven/src")
+        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/api-haven/src")
     elseif(test_name STREQUAL "sesh")
         list(APPEND test_includes
-            "${VEXGRAPH_SOURCE_ROOT}/interfaces/sesh/src"
-            "${VEXGRAPH_SOURCE_ROOT}/interfaces/sesh"
-            "${VEXGRAPH_SOURCE_ROOT}/drivers/api-haven/src")
+            "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/sesh/src"
+            "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/sesh"
+            "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/api-haven/src")
     elseif(test_name STREQUAL "darkbase-engine")
-        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/drivers/darkbase-engine/src")
+        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/darkbase-engine/src")
     elseif(test_name STREQUAL "harness")
-        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/interfaces/harness/src")
+        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/harness/src")
     elseif(test_name STREQUAL "language")
-        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/drivers/language")
+        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/language")
     elseif(test_name STREQUAL "samplerate")
-        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/drivers/samplerate/src")
+        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/samplerate/src")
     elseif(test_name STREQUAL "primeagen")
         list(APPEND test_includes
-            "${VEXGRAPH_SOURCE_ROOT}/personal/primeagen"
-            "${VEXGRAPH_SOURCE_ROOT}/host-behavior/hotcwap"
-            "${VEXGRAPH_SOURCE_ROOT}/drivers/api-haven/src"
-            "${VEXGRAPH_SOURCE_ROOT}/interfaces/harness/src")
+            "${VEXGRAPH_SOURCE_ROOT}/suite/personal/primeagen"
+            "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/hotcwap"
+            "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/api-haven/src"
+            "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/harness/src")
     elseif(test_name STREQUAL "b")
-        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/personal/b")
+        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/suite/personal/b")
     elseif(test_name STREQUAL "func")
-        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/personal/func/src")
+        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/suite/personal/func/src")
     endif()
     vexgraph_index_repository("tests_${test_name}" "tests/${test_name}" "" ${test_includes})
 endforeach()
@@ -280,6 +292,14 @@ if(test_count GREATER 0)
             endif()
         endif()
     endforeach()
+endif()
+if(BUILD_TESTING)
+    add_test(NAME opencode_preferences_test
+        COMMAND "${VEXGRAPH_SOURCE_ROOT}/tools/b" test opencode_preferences)
+    add_test(NAME checklist_runner_test
+        COMMAND "${VEXGRAPH_SOURCE_ROOT}/tools/b" test checklist_runner)
+    set_tests_properties(opencode_preferences_test checklist_runner_test PROPERTIES
+        WORKING_DIRECTORY "${VEXGRAPH_SOURCE_ROOT}" TIMEOUT 120 RUN_SERIAL TRUE LABELS "lab;tooling")
 endif()
 message(STATUS "CLion: ${index_count} non-test indexing targets, ${test_count} native test targets from b")
 message(STATUS "b remains build truth; window/GPU/UI CTest execution is opt-in")

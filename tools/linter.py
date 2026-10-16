@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 tools/linter.py — Automated style & architectural compliance checker for vexgraph.
-Enforces rules codified in gist/PREFERENCES.md (cite laws by Title, never number):
+Enforces rules codified in metadata/gists/preferences.md (cite laws by Title, never number):
   - the Semantic Consistency Law (Reference form): no arrow sugar
   - the Semantic Consistency Law (Cast and pointer spelling)
   - the Semantic Consistency Law (Access depth): flag 3+ layer chains

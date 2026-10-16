@@ -6,15 +6,10 @@ set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 REPOS=(
   "$ROOT"
-  "$ROOT"/host-behavior/*
-  "$ROOT"/drivers/*
-  "$ROOT"/interfaces/*
-  "$ROOT"/interactables/*
-  "$ROOT"/superapp/*
-  "$ROOT/ecosystem"
-  "$ROOT/ecosystem/.github"
+  "$ROOT"/suite/ecosystem/*
+  "$ROOT"/suite/projects/*
+  "$ROOT"/suite/personal/*
   "$ROOT/tests"
-  "$ROOT"/personal/*
 )
 printf "%-40s %-10s %-6s %-6s %-6s %s\n" REPO BRANCH DIRTY AHEAD BEHIND LAST
 for d in "${REPOS[@]}"; do

@@ -14,7 +14,7 @@
 //
 // Laws honoured: Platform Support Floor Law (arm64 / macOS 14.0 / apple-m1),
 // Build & Naming Conventions Law (-Wall -Wextra -Werror, C23).
-// Constitution: gist/PREFERENCES.md in the owning workspace.
+// Constitution: metadata/gists/preferences.md links to workspace PREFERENCES.md.
 // Pointer members follow the Semantic Consistency Law (Reference form).
 //
 // Subcommands:
@@ -44,7 +44,7 @@
  * behavior while following the Semantic Consistency Law (Reference form).
  * The reorganized workspace resolves R1/R2 from host-behavior, R3 from drivers,
  * R4 from interfaces, R5 from interactables and R6 from superapp, with this coordinator in
- * tools/workspace.c. The generic b checkout owns no ecosystem graph.
+ * tools/workspace.c. The generic b checkout owns no vexgraph-ecosystem-gitrepo graph.
  */
 ;;OVERVIEW
 /* MODULE: workspace compatibility graph. PUBLIC ENTRY: main.
@@ -755,9 +755,26 @@ static void base_lflags(StrList *out) {
 // the vexspoke module (v0.1 proof; later this becomes per-repo declarations)
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Resolve a workspace-relative path by prefixing the absolute workspace root.
+// Resolve current suite paths while keeping the target declarations readable
+// in their original tier vocabulary.
 static char *abspath(const char *rel) {
-    return strf("%s/%s", g_root, rel);
+    const char *mapped = rel;
+    static const struct { const char *from; const char *to; } prefixes[] = {
+        {"host-behavior/", "suite/ecosystem/"},
+        {"drivers/", "suite/ecosystem/"},
+        {"interfaces/", "suite/ecosystem/"},
+        {"interactables/", "suite/projects/"},
+        {"superapp/", "suite/projects/"},
+        {"personal/", "suite/personal/"},
+    };
+    for (size_t i = 0; i < sizeof prefixes / sizeof prefixes[0]; i++) {
+        size_t length = strlen(prefixes[i].from);
+        if (!strncmp(rel, prefixes[i].from, length)) {
+            mapped = strf("%s%s", prefixes[i].to, rel + length);
+            break;
+        }
+    }
+    return strf("%s/%s", g_root, mapped);
 }
 
 // Register a selected target and initialize its configuration-specific output path.
@@ -1427,7 +1444,7 @@ static void setup_graphvex(TargetList *tl) {
 }
 
 // ── darling tests (tests/darling — the battle suite lives in tests/, never in
-//    an ecosystem repo) ──────────────────────────────────────────────────────
+//    an vexgraph-ecosystem-gitrepo repo) ──────────────────────────────────────────────────────
 static void setup_darling_tests(TargetList *tl) {
     char *tdir = strf("%s/tests/darling", g_root);
     StrList ts = {0};
@@ -2448,9 +2465,9 @@ static char *baseline_path(const char *name) {
 static int ratchet(const char *covdir, bool strict, bool list,
                    bool emit_units, bool emit_surface, bool emit_functions) {
     StrList units = {0};
-    glob_rec(strf("%s/%s/src", g_root, VEX_SRC_REL), ".c", &units);
+    glob_rec(abspath(strf("%s/src", VEX_SRC_REL)), ".c", &units);
 #ifdef __APPLE__
-    glob_rec(strf("%s/%s/src", g_root, VEX_SRC_REL), ".m", &units);
+    glob_rec(abspath(strf("%s/src", VEX_SRC_REL)), ".m", &units);
 #endif
     strl_sort(&units);
 
@@ -3008,7 +3025,7 @@ static char *find_source_for(const char *name) {
     // a bare stem: search the runnable roots, tests/ first
     const char *base = strrchr(direct, '/');
     base = base ? base + 1 : direct;
-    const char *roots[] = {"tests", "host-behavior", "drivers", "interfaces", "interactables", "superapp"};
+    const char *roots[] = {"tests", "suite/ecosystem", "suite/projects", "suite/personal"};
     for (size_t i = 0; i < sizeof roots / sizeof roots[0]; i++) {
         StrList hits = {0};
         match_sources(abspath(roots[i]), base, &hits);

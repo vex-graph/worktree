@@ -19,10 +19,10 @@ fi
 directory=$(CDPATH= cd -- "$(dirname -- "$file")" && pwd)
 file="$directory/$(basename -- "$file")"
 case "$file" in
-    "$root"/tests/*.c|"$root"/interactables/*.c|"$root"/superapp/*.c)
+    "$root"/tests/*.c|"$root"/suite/projects/*.c)
         exec "$root/tools/b" run "$file" "$@"
         ;;
     *)
-        exec "$root/personal/b/b" run exec "$file" -- "$@"
+        exec "$root/suite/personal/b/b" run exec "$file" -- "$@"
         ;;
 esac

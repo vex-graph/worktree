@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inventory and record executed evidence in gist/test-checklist.md."""
+"""Inventory and record executed evidence in metadata/gists/test-checklist.md."""
 
 import argparse
 import hashlib
@@ -9,7 +9,7 @@ import sys
 import time
 
 
-REPORT = Path("gist/test-checklist.md")
+REPORT = Path("metadata/gists/test-checklist.md")
 TITLE = "Timestamped Test Checklist Law"
 HEADER = """# Ecosystem test checklist
 
