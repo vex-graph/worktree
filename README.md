@@ -120,7 +120,7 @@ does not own compilers, drivers, or lower-tier implementations.
 | :--- | :--- | :--- |
 | R1 Hotcwap | No direct runtime host integration in the terminal shell. | Supervised hot module and application lifetime. |
 | R2 Relational Engine + Vexspoke | Its build directly links engine native Memory and Vexspoke CPU helpers. | Broader resident storage/computation contracts remain separately proved. |
-| R3 Determinant | Its terminal-cell panel, input, and Markdown toolkit are built into the shell. | Language has an explicit C23 lexical adapter and caller-fed project/index contracts, but Semicolon does not consume them yet; Graphvex GUI is also future work. |
+| R3 Determinant + Language | Determinant's terminal-cell panel, input and Markdown toolkit plus Language's public C23 lexer are linked into the shell. SemicolonSyntax supplies live `.c`/`.h` lexical colors and bold brackets. | Semantic classification, inlays, Language project/index services and Graphvex GUI remain future integration. |
 | R4 interfaces | No Darling, Sesh, or Harness integration in this terminal path. | GUI widgets, sessions, and agent interface through their public seams. |
 | R5 applications | Primeagen stays independent. | Optional registered consumer workflow, not a reverse dependency. |
 | R6 Semicolon | A working, limited file-browser/editor and `b` run-console shell. | Full workflow composition and the graphical IDE remain unfinished. |
@@ -128,7 +128,8 @@ does not own compilers, drivers, or lower-tier implementations.
 The [Semicolon README](suite/projects/semicolon/README.md) records the current
 console, platform proof, and limitations. Language's own source and
 [status](suite/ecosystem/language/README.md) govern what its lexical subset
-actually offers; a planned adapter edge is not a delivered IDE feature.
+actually offers; this direct lexical consumer is not a parser, semantic IDE or
+generic adapter/project-engine integration.
 
 **This ecosystem is unfinished.** The layer map describes intended ownership,
 not a completion claim. In particular the R5 applications and R6 superapps are
