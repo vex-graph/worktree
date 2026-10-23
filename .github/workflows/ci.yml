@@ -1,0 +1,114 @@
+name: Vexgraph Ecosystem CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  # ───────────────────────────────────────────────────────────────────────────
+  # Job 1: Architectural & Security Audit
+  # ───────────────────────────────────────────────────────────────────────────
+  audit:
+    name: Architecture & Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Workspace Root
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Architectural Compliance (Linter)
+        run: |
+          python3 tools/linter.py || {
+            echo "::error::Architectural violations detected. See linter output above."
+            exit 1
+          }
+
+      - name: Security Baseline Check (SECURITY.md Compliance)
+        run: |
+          echo "=== Scanning for Accidental Secrets & Private Keys ==="
+          # Reject private keys, tokens, or obvious credentials
+          if git grep -E -i "BEGIN (RSA|EC|DSA|OPENSSH|PRIVATE) KEY" -- ':!_notes/' ':!_trash/'; then
+            echo "::error::Private keys detected in tracked files!"
+            exit 1
+          fi
+
+          echo "=== Auditing Declared Security Obligations (;;SECURITY) ==="
+          grep -rn ';;SECURITY' . --exclude-dir={.git,_notes,_trash} || true
+
+          echo "=== Auditing Deliberate Delays (;;FREEZE) ==="
+          grep -rn ';;FREEZE' . --exclude-dir={.git,_notes,_trash} || true
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Job 2: Cross-Platform Build & Verification (macOS & Linux)
+  # ───────────────────────────────────────────────────────────────────────────
+  semicolon-tui:
+    name: Semicolon TUI & Bedrock (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: audit
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            platform: darwin
+          - os: ubuntu-latest
+            platform: linux
+
+    steps:
+      - name: Checkout Workspace Root
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install System Dependencies (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang libncursesw5-dev
+
+      - name: Clone Required Semicolon & Bedrock Repositories
+        shell: bash
+        run: |
+          mkdir -p suite/ecosystem suite/projects
+          REPOS=(
+            "suite/ecosystem/determinant determinant"
+            "suite/ecosystem/vexspoke vexspoke"
+            "suite/ecosystem/relational-engine relational-engine"
+            "suite/ecosystem/language language"
+            "suite/projects/semicolon semicolon"
+            "tests tests"
+          )
+          for entry in "${REPOS[@]}"; do
+            path=$(echo "$entry" | cut -d' ' -f1)
+            repo=$(echo "$entry" | cut -d' ' -f2)
+            echo "Cloning $repo into $path..."
+            git clone --depth 1 "https://github.com/vexgraph-ecosystem/${repo}.git" "$path"
+          done
+
+      - name: Build Semicolon TUI Binary
+        shell: bash
+        run: |
+          python3 suite/projects/semicolon/build.py --compiler clang --output suite/projects/semicolon/.build/semicolon-tui
+
+      - name: Run Memory-Sanitized Tests (ASan / UBSan & PTY Proof)
+        shell: bash
+        run: |
+          # Executes strict C23, AddressSanitizer, UndefinedBehaviorSanitizer,
+          # and PTY syntax highlighting proof
+          python3 tests/semicolon/editor/run.py
+
+      - name: Upload Semicolon Binary Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: semicolon-tui-${{ matrix.platform }}
+          path: suite/projects/semicolon/.build/semicolon-tui
