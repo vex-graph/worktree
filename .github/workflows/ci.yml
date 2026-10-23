@@ -9,7 +9,7 @@ on:
 
 jobs:
   # ───────────────────────────────────────────────────────────────────────────
-  # Job 1: Architectural & Security Audit
+  # Job 1: Architectural & Security Audit (Runs on Root Repo)
   # ───────────────────────────────────────────────────────────────────────────
   audit:
     name: Architecture & Security Audit
@@ -33,7 +33,6 @@ jobs:
       - name: Security Baseline Check (SECURITY.md Compliance)
         run: |
           echo "=== Scanning for Accidental Secrets & Private Keys ==="
-          # Reject private keys, tokens, or obvious credentials
           if git grep -E -i "BEGIN (RSA|EC|DSA|OPENSSH|PRIVATE) KEY" -- ':!_notes/' ':!_trash/'; then
             echo "::error::Private keys detected in tracked files!"
             exit 1
@@ -74,10 +73,12 @@ jobs:
         if: matrix.platform == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang libncursesw5-dev
+          sudo apt-get install -y clang libncurses-dev
 
       - name: Clone Required Semicolon & Bedrock Repositories
         shell: bash
+        env:
+          ECOSYSTEM_PAT: ${{ secrets.ECOSYSTEM_PAT }}
         run: |
           mkdir -p suite/ecosystem suite/projects
           REPOS=(
@@ -88,11 +89,20 @@ jobs:
             "suite/projects/semicolon semicolon"
             "tests tests"
           )
+
+          AUTH=""
+          if [ -n "$ECOSYSTEM_PAT" ]; then
+            AUTH="${ECOSYSTEM_PAT}@"
+          fi
+
           for entry in "${REPOS[@]}"; do
             path=$(echo "$entry" | cut -d' ' -f1)
             repo=$(echo "$entry" | cut -d' ' -f2)
             echo "Cloning $repo into $path..."
-            git clone --depth 1 "https://github.com/vexgraph-ecosystem/${repo}.git" "$path"
+            git clone --depth 1 "https://${AUTH}github.com/vexgraph-ecosystem/${repo}.git" "$path" || {
+              echo "::error::Failed to clone vexgraph-ecosystem/$repo. If this repository is private, add a personal access token named 'ECOSYSTEM_PAT' to this repository's secrets."
+              exit 1
+            }
           done
 
       - name: Build Semicolon TUI Binary
@@ -103,8 +113,6 @@ jobs:
       - name: Run Memory-Sanitized Tests (ASan / UBSan & PTY Proof)
         shell: bash
         run: |
-          # Executes strict C23, AddressSanitizer, UndefinedBehaviorSanitizer,
-          # and PTY syntax highlighting proof
           python3 tests/semicolon/editor/run.py
 
       - name: Upload Semicolon Binary Artifact
