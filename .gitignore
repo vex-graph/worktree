@@ -16,6 +16,7 @@ tests/
 _notes/
 _main/
 _trash/
+metadata/vexgraph-ecosystem-gitrepo/
 
 # Build output
 cmake-build-*/
