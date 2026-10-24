@@ -402,6 +402,13 @@ def iter_files(root_paths, cwd=None):
                 yield os.path.join(dirpath, name)
 
 
+def rel(path, cwd):
+    try:
+        return os.path.relpath(path, cwd).replace(os.sep, "/").replace("\\", "/")
+    except ValueError:
+        return str(path).replace(os.sep, "/").replace("\\", "/")
+
+
 def collect(root_paths, cwd=None):
     cwd = os.path.abspath(cwd or os.getcwd())
     violations = []
@@ -411,7 +418,7 @@ def collect(root_paths, cwd=None):
                 text = handle.read()
         except OSError:
             continue
-        display = os.path.relpath(path, cwd).replace(os.sep, "/")
+        display = rel(path, cwd)
         found, _replacements, _deletions, _insertions = analyze(display, text)
         violations.extend(found)
     return violations
@@ -424,7 +431,7 @@ def rewrite(paths, cwd=None):
     for path in iter_files(paths, cwd):
         with open(path, "r", encoding="utf-8", errors="replace") as handle:
             text = handle.read()
-        updated = fixpoint(os.path.relpath(path, cwd).replace(os.sep, "/"), text)
+        updated = fixpoint(rel(path, cwd), text)
         if updated == text:
             continue
         with open(path, "w", encoding="utf-8", newline="\n") as handle:

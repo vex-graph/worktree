@@ -719,9 +719,18 @@ static char *cc_version(void) {
     return out;
 }
 
+// C23 standard dialect flag (Apple Clang 15 uses gnu2x; Linux/newer LLVM use gnu23).
+static const char *c23_flag(void) {
+#ifdef __APPLE__
+    return "-std=gnu2x";
+#else
+    return "-std=gnu23";
+#endif
+}
+
 // base flags: the Build & Naming Conventions Law + Platform Support Floor Law
 static void base_cflags(StrList *out) {
-    strl_push(out, "-std=gnu23");
+    strl_push(out, c23_flag());
     strl_push(out, "-Wall");
     strl_push(out, "-Wextra");
     strl_push(out, "-Werror");
@@ -2903,16 +2912,18 @@ static void rebuild_self(char **argv) {
     mkdir_p(g_state);
     Cmd c = {0};
     strl_push(&c, "cc");
-    strl_push(&c, "-std=gnu23");
+    strl_push(&c, c23_flag());
     strl_push(&c, "-O2");
     strl_push(&c, "-Wall");
     strl_push(&c, "-Wextra");
     strl_push(&c, src);
     strl_push(&c, "-Werror");
+#ifdef __APPLE__
     strl_push(&c, "-arch");
     strl_push(&c, "arm64");
     strl_push(&c, "-mcpu=apple-m1");
     strl_push(&c, "-mmacosx-version-min=14.0");
+#endif
     strl_push(&c, "-o");
     char *tmp = strf("%s/b.new", g_state);
     strl_push(&c, tmp);
