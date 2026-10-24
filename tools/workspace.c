@@ -128,6 +128,7 @@
 
 #include <stdarg.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -140,6 +141,16 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+
+#if defined(__has_feature)
+#  if !__has_feature(c_nullptr) && !defined(nullptr)
+#    define nullptr ((void*) 0)
+#  endif
+#elif !defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L
+#  ifndef nullptr
+#    define nullptr ((void*) 0)
+#  endif
+#endif
 
 // ─────────────────────────────────────────────────────────────────────────────
 // small utilities
@@ -403,7 +414,11 @@ static bool stamp_of(const char *path, Stamp *out) {
     struct stat st;
     if (stat(path, &st) != 0) return false;
     (*out).sec = (long long)st.st_mtime;
+#ifdef __APPLE__
     (*out).nsec = (long long)st.st_mtimespec.tv_nsec;
+#else
+    (*out).nsec = (long long)st.st_mtim.tv_nsec;
+#endif
     (*out).size = (long long)st.st_size;
     return true;
 }
@@ -705,11 +720,16 @@ static int run_test(const char *name, Cmd *cmd, int timeout_s) {
     return WIFEXITED(st) ? WEXITSTATUS(st) : -2;
 }
 
+static const char *compiler_cmd(void) {
+    const char *cc = getenv("CC");
+    return (cc && *cc) ? cc : "cc";
+}
+
 // Cache and return the first output line from `cc --version`, or "unknown" on failure.
 static char *cc_version(void) {
     if (g_cc_version) return g_cc_version;
     Cmd c = {0};
-    strl_push(&c, "cc");
+    strl_push(&c, compiler_cmd());
     strl_push(&c, "--version");
     char *out = nullptr;
     if (run_capture(&c, &out) != 0) out = xstrdup("unknown");
@@ -719,13 +739,9 @@ static char *cc_version(void) {
     return out;
 }
 
-// C23 standard dialect flag (Apple Clang 15 uses gnu2x; Linux/newer LLVM use gnu23).
+// C23 standard dialect flag (Apple Clang 15 and Linux GCC 13 both support gnu2x).
 static const char *c23_flag(void) {
-#ifdef __APPLE__
     return "-std=gnu2x";
-#else
-    return "-std=gnu23";
-#endif
 }
 
 // base flags: the Build & Naming Conventions Law + Platform Support Floor Law
@@ -1700,7 +1716,7 @@ static void unit_build_cmd(Unit *u) {
     Cmd *cmd = &(*u).cmd;
     Target *target = (*u).t;
     const StrList *definitions = &(*target).defs;
-    strl_push(cmd, "cc");
+    strl_push(cmd, compiler_cmd());
     StrList base = {0};
     base_cflags(&base);
     strl_extend(cmd, &base);
@@ -2080,7 +2096,7 @@ static void link_target(Target *t) {
         for (int i = 0; i < g_unit_count; i++)
             if (g_units[i].t == t) strl_push(&c, g_units[i].obj);
     } else if ((*t).kind == T_MOD) {
-        strl_push(&c, "cc");
+        strl_push(&c, compiler_cmd());
         for (int i = 0; i < g_unit_count; i++)
             if (g_units[i].t == t) strl_push(&c, g_units[i].obj);
 #ifdef __APPLE__
@@ -2094,7 +2110,7 @@ static void link_target(Target *t) {
         strl_push(&c, "-o");
         strl_push(&c, (*t).out_path);
     } else {
-        strl_push(&c, "cc");
+        strl_push(&c, compiler_cmd());
         StrList base = {0};
         base_lflags(&base);
         strl_extend(&c, &base);
@@ -2911,7 +2927,7 @@ static void rebuild_self(char **argv) {
     printf("b: rebuilding itself…\n");
     mkdir_p(g_state);
     Cmd c = {0};
-    strl_push(&c, "cc");
+    strl_push(&c, compiler_cmd());
     strl_push(&c, c23_flag());
     strl_push(&c, "-O2");
     strl_push(&c, "-Wall");

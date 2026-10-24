@@ -250,6 +250,7 @@ jobs:
       - name: Verify Workspace Build Graph (${{ matrix.platform }})
         shell: bash
         run: |
+          export CC="${{ matrix.compiler }}"
           export B_HOME="${RUNNER_TEMP:-/tmp}/vexgraph_b"
           ./tools/b targets
 

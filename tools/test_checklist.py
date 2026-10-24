@@ -131,7 +131,7 @@ def cell(text):
 def load(report):
     records = {}
     if report.exists():
-        text = report.read_text()
+        text = report.read_text(encoding="utf-8")
         legacy_authors = "| Written by |" in text
         for line in text.splitlines():
             if not line.startswith("| `"):
@@ -174,7 +174,7 @@ def render(root, groups, records):
 def save(root, groups, records):
     report = root / REPORT
     report.parent.mkdir(parents=True, exist_ok=True)
-    report.write_text(render(root, groups, records), newline="\n")
+    report.write_text(render(root, groups, records), encoding="utf-8", newline="\n")
 
 
 def main(argv=None):
@@ -199,7 +199,7 @@ def main(argv=None):
     records = load(root / REPORT)
     if opts.action == "check":
         report = root / REPORT
-        if not report.exists() or report.read_text() != render(root, groups, records):
+        if not report.exists() or report.read_text(encoding="utf-8") != render(root, groups, records):
             print("Checklist missing or stale: run python3 tools/test_checklist.py sync", file=sys.stderr)
             return 1
         print("Checklist inventory and recorded hashes are current (not a claim that all files pass).")
