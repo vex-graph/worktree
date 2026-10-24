@@ -155,10 +155,16 @@ jobs:
           python tools/arrange.py \
             --baseline .github/arrange-baseline.json
 
+      - name: Native Build Tooling Proof (Windows)
+        shell: bash
+        run: |
+          export B_HOME="${RUNNER_TEMP:-/tmp}/vexgraph_b"
+          python -B tests/b/util_test.py
+
       - name: Scope statement
         shell: bash
         run: |
-          echo 'Tooling portability only. The ecosystem build stays macOS/Linux until tools/b is ported (Bounded scope, no compile-only placeholder).' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Tooling portability and native b/util.c execution proven on Windows. Full ecosystem target builds run on macOS/Linux runners.' >> "$GITHUB_STEP_SUMMARY"
 
   # ───────────────────────────────────────────────────────────────────────────
   # Job 2: Ecosystem readiness scoreboard (weekly / on demand)
@@ -259,6 +265,12 @@ jobs:
               exit 1
             }
           done
+
+      - name: Verify Workspace Build Graph (${{ matrix.platform }})
+        shell: bash
+        run: |
+          export B_HOME="${RUNNER_TEMP:-/tmp}/vexgraph_b"
+          ./tools/b targets
 
       - name: Build Semicolon TUI Binary
         shell: bash

@@ -28,7 +28,12 @@
 //
 // Flags: -j N  --release  -v/--verbose
 
+#ifndef _DARWIN_C_SOURCE
 #define _DARWIN_C_SOURCE
+#endif
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
 
 #include "build_annotation.h"
 
@@ -747,6 +752,8 @@ static void base_lflags(StrList *out) {
     if (g_release) {
 #ifdef __APPLE__
         strl_push(out, "-Wl,-dead_strip");
+#elif defined(__linux__)
+        strl_push(out, "-Wl,--gc-sections");
 #endif
     }
 }
@@ -795,6 +802,21 @@ static void add_exe_libs(Target *t) {
     strl_push(&(*t).syslibs, "-lpthread");
 #ifdef __APPLE__
     apple_frameworks(&(*t).syslibs);
+#elif defined(__linux__)
+    strl_push(&(*t).syslibs, "-ldl");
+    strl_push(&(*t).syslibs, "-lm");
+#endif
+}
+
+// Add Vulkan dependencies respecting platform layout (Homebrew on macOS, standard system on Linux).
+static void add_vulkan_libs(Target *t) {
+#ifdef __APPLE__
+    strl_push(&(*t).includes, "/opt/homebrew/include");
+    strl_push(&(*t).syslibs, "-L/opt/homebrew/lib");
+    strl_push(&(*t).syslibs, "-lvulkan");
+    strl_push(&(*t).syslibs, "-Wl,-rpath,/opt/homebrew/lib");
+#else
+    strl_push(&(*t).syslibs, "-lvulkan");
 #endif
 }
 
@@ -995,21 +1017,20 @@ static void setup_graphvex_tests(TargetList *tl) {
             !strcmp(name, "surface_gpu_test") || !strcmp(name, "clip_rounded_test") ||
             !strcmp(name, "color_pass_test") || !strcmp(name, "gpu_scope_test") ||
             !strcmp(name, "filter_gallery_fixture_test")) {
-            strl_push(&(*t).includes, "/opt/homebrew/include");
-            strl_push(&(*t).syslibs, "-L/opt/homebrew/lib");
-            strl_push(&(*t).syslibs, "-lvulkan");
-            strl_push(&(*t).syslibs, "-Wl,-rpath,/opt/homebrew/lib");
+            add_vulkan_libs(t);
         }
         if (!strcmp(name, "surface_gpu_test")) {
             // the zero-copy seam test creates a real IOSurface (Foundation).
             // The host helper is its own TU so the Apple headers never meet
             // graphvex's Rect in one translation unit.
+#ifdef __APPLE__
             strl_push(&(*t).srcs, strf("%s/vulkan/iosurface_host.c", tdir));
             strl_push(&(*t).includes, strf("%s/vulkan", tdir));
             strl_push(&(*t).syslibs, "-framework");
             strl_push(&(*t).syslibs, "IOSurface");
             strl_push(&(*t).syslibs, "-framework");
             strl_push(&(*t).syslibs, "CoreFoundation");
+#endif
         }
     }
 }
@@ -1372,9 +1393,7 @@ static void setup_apps(TargetList *tl) {
         strl_push(&(*t).deps, "*");  // auto-link every library that exists
         add_exe_libs(t);
         // darling pulls in the Vulkan backend, so apps link the loader
-        strl_push(&(*t).syslibs, "-L/opt/homebrew/lib");
-        strl_push(&(*t).syslibs, "-lvulkan");
-        strl_push(&(*t).syslibs, "-Wl,-rpath,/opt/homebrew/lib");
+        add_vulkan_libs(t);
     }
 }
 
@@ -1391,7 +1410,9 @@ static void setup_graphvex(TargetList *tl) {
     (*lib).srcs = c;
     strl_push(&(*lib).includes, strf("%s/src", base));
     strl_push(&(*lib).includes, abspath(strf("%s/src", VEXSPOKE)));   // R3 borrows R2
+#ifdef __APPLE__
     strl_push(&(*lib).cflags, "-I/opt/homebrew/include");             // Vulkan headers
+#endif
     strl_push(&(*lib).cflags, strf("-I%s/shader", g_out));           // embedded SPIR-V header
     strl_push(&(*lib).deps, "vexspoke");
 
@@ -1469,9 +1490,7 @@ static void setup_darling_tests(TargetList *tl) {
         strl_push(&(*t).defs, "UNDEBUG");
         strl_push(&(*t).deps, "darling");
         add_exe_libs(t);
-        strl_push(&(*t).syslibs, "-L/opt/homebrew/lib");
-        strl_push(&(*t).syslibs, "-lvulkan");
-        strl_push(&(*t).syslibs, "-Wl,-rpath,/opt/homebrew/lib");
+        add_vulkan_libs(t);
     }
 }
 
@@ -1676,6 +1695,9 @@ static void unit_build_cmd(Unit *u) {
     StrList base = {0};
     base_cflags(&base);
     strl_extend(cmd, &base);
+#ifndef __APPLE__
+    strl_push(cmd, "-fPIC");
+#endif
     strl_extend(cmd, &(*target).cflags);
     for (int i = 0; i < (*definitions).count; i++)
         strl_pushf(cmd, "-D%s", (*definitions).items[i]);
@@ -2052,9 +2074,13 @@ static void link_target(Target *t) {
         strl_push(&c, "cc");
         for (int i = 0; i < g_unit_count; i++)
             if (g_units[i].t == t) strl_push(&c, g_units[i].obj);
+#ifdef __APPLE__
         // a loadable bundle: unresolved symbols bind at dlopen time
         strl_push(&c, "-bundle");
         strl_push(&c, "-Wl,-undefined,dynamic_lookup");
+#else
+        strl_push(&c, "-shared");
+#endif
         if (g_coverage) strl_push(&c, "-fprofile-instr-generate");
         strl_push(&c, "-o");
         strl_push(&c, (*t).out_path);
@@ -3057,12 +3083,12 @@ static Target *synth_target(TargetList *tl, const char *src) {
     char *slash = strrchr(dir, '/');
     if (slash) *slash = 0; else { free(dir); dir = xstrdup(g_root); }
     strl_push(&(*t).includes, dir);                                  // local headers
+#ifdef __APPLE__
     strl_push(&(*t).cflags, "-I/opt/homebrew/include");              // Vulkan headers
+#endif
     strl_push(&(*t).deps, "*");                                      // link + include everything
     add_exe_libs(t);
-    strl_push(&(*t).syslibs, "-L/opt/homebrew/lib");
-    strl_push(&(*t).syslibs, "-lvulkan");
-    strl_push(&(*t).syslibs, "-Wl,-rpath,/opt/homebrew/lib");
+    add_vulkan_libs(t);
     return t;
 }
 
