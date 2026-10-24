@@ -262,6 +262,7 @@ jobs:
       - name: Run Memory-Sanitized Tests (ASan / UBSan & PTY Proof)
         shell: bash
         run: |
+          export CC="${{ matrix.compiler }}"
           python3 tests/semicolon/editor/run.py
 
       - name: Upload Semicolon Binary Artifact
