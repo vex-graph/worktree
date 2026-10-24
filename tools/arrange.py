@@ -449,7 +449,7 @@ def diff_report(paths, cwd=None):
         updated = fixpoint(path, text)
         if updated == text:
             continue
-        relative = os.path.relpath(path, cwd).replace(os.sep, "/")
+        relative = rel(path, cwd)
         chunks.extend(difflib.unified_diff(
             text.splitlines(), updated.splitlines(),
             fromfile=f"a/{relative}", tofile=f"b/{relative}", lineterm=""))
