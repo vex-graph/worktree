@@ -23,3 +23,9 @@ for d in "${REPOS[@]}"; do
   last=$(git -C "$d" log -1 --pretty='%h %s' 2>/dev/null | cut -c1-46)
   printf "%-40s %-10s %-6s %-6s %-6s %s\n" "$name" "$br" "$dirty" "$ahead" "$behind" "$last"
 done
+
+
+
+
+
+# hello world!!! so yeah... 

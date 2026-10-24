@@ -243,7 +243,8 @@
         "windows"
       ],
       "proven": [
-        "macos"
+        "macos",
+        "linux"
       ],
       "remote": "https://github.com/vex-graph/b.git"
     },

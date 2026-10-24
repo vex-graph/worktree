@@ -833,9 +833,10 @@ static void setup_vexspoke(TargetList *tl) {
 // ── host-behavior/relational-engine (R2 storage/memory owner) ──────────────
 // Production native C Memory/MemoryArena/Transient, File/Cache/VexHome/
 // log/transport, and the type-id algebra, promoted from Vexspoke. Only
-// src/nio + src/io + src/type are production; src/relational, src/reflection
-// and src/search stay reference-only and must never shadow Vexspoke's
-// canonical headers (consumers put Vexspoke src first).
+// src/nio + src/io + src/type are production; the C relational/reflection
+// collections have one owner, Vexspoke (consumers put Vexspoke src first).
+// Engine storage is the Rust variable/struct layer plus this ABI; the
+// duplicated reference copies were deleted rather than left to drift.
 static void add_gen(const char *src, const char *out, Cmd cmd);   // the generator seam below
 
 // The R2 mapping's C ABI — reached from C through ONE thin extern-C surface,
