@@ -1,0 +1,529 @@
+#!/usr/bin/env python3
+"""Read the workspace preferences by law, never whole.
+
+Two files carry the constitution: `metadata/gists/preferences/gist.md` is the
+compressed form injected every request, and `PREFERENCES.md` is the full
+documentation an agent must never ingest whole. This command does the slicing, so
+a session asks for exactly the law or clause it needs.
+
+    prefs list                  law map: number and title
+    prefs law 6                 compressed law 6: every sub-section and clause
+    prefs law 6 --full          the same law in the full documentation
+    prefs law "vertical"        same, resolved by title (title is the identity)
+    prefs section 6.4           one compressed sub-section
+    prefs section "compose down"  same, resolved by title
+    prefs section 6.4 --full
+    prefs find <text>           matching lines, each with its law and sub-section
+    prefs find <text> --gist    compressed form only
+    prefs find <text> --full    full documentation only
+    prefs repo <name>           print that repo's complete lawbook
+    prefs repo <name> <law>     one law out of that lawbook, by title
+    prefs repo <name> --path    just its path
+    prefs repos                 every repo lawbook in the tree
+    prefs test                  proof lawbook map: every law title
+    prefs test <law>            one proof law, by title
+    prefs prompt                the exact block injected every request
+    prefs check                 shape consistency + injected size + lawbook links
+    prefs files                 the five published files: local path -> Gist name
+    prefs publish [file...]     publish to the Gist, then verify each file
+    prefs verify                download from the Gist and compare bytes
+
+Every call reads the files fresh; nothing is cached, indexed or generated.
+Numbers are slice addresses inside their own file, never law identity.
+"""
+
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+GIST = "4132a6c45cb6d3797c3e8eff2e94035a"
+
+LAW = re.compile(r"^## (\d+)\. (.+)$")
+SECTION = re.compile(r"^### (\d+)\.(\d+) (.+)$")
+HEADING = re.compile(r"^#{2,3} ")
+DOC_HEADING = re.compile(r"^(#{1,3}) (.+)$")
+
+# Structure markers inside the proof lawbook, not laws an agent cites.
+NOT_A_LAW = {
+    "Definition:",
+    "The Why:",
+    "The Rule:",
+    "Seams to Prove",
+    "Owner coverage",
+    "How to use this document",
+    "Table of Contents",
+    "Current State",
+    "Scope and Limitations",
+}
+
+INJECTED_LIMIT = 32 * 1024
+
+
+def published(root: Path) -> list[tuple[str, Path]]:
+    """(Gist filename, local path) for every file the constitution publishes."""
+    working = root / "metadata" / "gists" / "preferences"
+    return [
+        ("_introduction.md", working / "_introduction.md"),
+        ("gist.md", working / "gist.md"),
+        ("overview-template.c", working / "overview-template.c"),
+        ("main-template.c", working / "main-template.c"),
+        ("preferences-full-documentation.md", root / "PREFERENCES.md"),
+    ]
+
+
+def workspace_root() -> Path:
+    """Walk up from here to the workspace that owns the preferences.
+
+    The compressed constitution is committed; `PREFERENCES.md` is the full
+    rationale document and is Git-ignored, so it may be absent in a clean
+    checkout. Commands that need the full text ask `full()` and say so; the
+    compressed-only check validates what the repository actually ships.
+    """
+    here = Path.cwd().resolve()
+    for directory in (here, *here.parents):
+        if (directory / "metadata" / "gists" / "preferences" / "gist.md").is_file():
+            return directory
+    raise SystemExit("prefs: workspace not found (metadata/gists/preferences/gist.md)")
+
+
+def compressed(root: Path) -> Path:
+    return root / "metadata" / "gists" / "preferences" / "gist.md"
+
+
+def full(root: Path) -> Path:
+    path = root / "PREFERENCES.md"
+    if not path.is_file():
+        raise SystemExit(
+            "prefs: PREFERENCES.md is absent (Git-ignored); "
+            "this command needs the full document")
+    return path
+
+
+def read(path: Path) -> list[str]:
+    return path.read_text(encoding="utf-8").splitlines()
+
+
+def trim(lines: list[str]) -> list[str]:
+    while lines and (not lines[-1].strip() or lines[-1].strip() == "---"):
+        lines.pop()
+    return lines
+
+
+def law_index(lines: list[str]) -> list[tuple[int, str, str]]:
+    """Every (line index, number, title) for a `## N. Title` heading."""
+    found = []
+    for index, line in enumerate(lines):
+        match = LAW.match(line)
+        if match:
+            found.append((index, match.group(1), match.group(2)))
+    return found
+
+
+def section_index(lines: list[str]) -> list[tuple[int, str, str]]:
+    """Every (line index, `N.M`, title) for a `### N.M Title` heading."""
+    found = []
+    for index, line in enumerate(lines):
+        match = SECTION.match(line)
+        if match:
+            found.append((index, f"{match.group(1)}.{match.group(2)}", match.group(3)))
+    return found
+
+
+def law_block(lines: list[str], key: str) -> list[str]:
+    """Print one law by number, or by a case-insensitive title fragment."""
+    entries = law_index(lines)
+    chosen = next((entry for entry in entries if entry[1] == key), None)
+    if chosen is None:
+        folded = key.lower()
+        matches = [entry for entry in entries if folded in entry[2].lower()]
+        if len(matches) != 1:
+            if len(matches) > 1:
+                print(f"prefs: {key!r} matches several laws: " + "; ".join(f"{e[1]}. {e[2]}" for e in matches), file=sys.stderr)
+            return []
+        chosen = matches[0]
+    start = chosen[0]
+    out = [lines[start]]
+    for line in lines[start + 1 :]:
+        if line.startswith("## "):
+            break
+        out.append(line)
+    return trim(out)
+
+
+def section_block(lines: list[str], key: str) -> list[str]:
+    """Print one sub-section by `N.M`, or by a case-insensitive title fragment."""
+    entries = section_index(lines)
+    chosen = next((entry for entry in entries if entry[1] == key), None)
+    if chosen is None:
+        folded = key.lower()
+        matches = [entry for entry in entries if folded in entry[2].lower()]
+        if len(matches) != 1:
+            if len(matches) > 1:
+                print(f"prefs: {key!r} matches several sub-sections: " + "; ".join(f"{e[1]} {e[2]}" for e in matches), file=sys.stderr)
+            return []
+        chosen = matches[0]
+    start = chosen[0]
+    out = [lines[start]]
+    for line in lines[start + 1 :]:
+        if HEADING.match(line):
+            break
+        out.append(line)
+    return trim(out)
+
+
+def cmd_list(root: Path) -> int:
+    for _, number, title in law_index(read(compressed(root))):
+        print(f"{number:>2}  {title}")
+    return 0
+
+
+def cmd_law(root: Path, key: str, source: Path) -> int:
+    lines = law_block(read(source), key)
+    if not lines:
+        print(f"prefs: no law {key!r} in {source.name}", file=sys.stderr)
+        return 1
+    print("\n".join(lines))
+    return 0
+
+
+def cmd_section(root: Path, key: str, source: Path) -> int:
+    lines = section_block(read(source), key)
+    if not lines:
+        print(f"prefs: no section {key!r} in {source.name}", file=sys.stderr)
+        return 1
+    print("\n".join(lines))
+    return 0
+
+
+def cmd_find(root: Path, needle: str, sources: list[Path], limit: int = 40) -> int:
+    wanted = needle.lower()
+    hits = 0
+    for source in sources:
+        law = section = ""
+        for number, line in enumerate(read(source), 1):
+            match = LAW.match(line)
+            if match:
+                law, section = f"{match.group(1)}. {match.group(2)}", ""
+            elif line.startswith("## "):
+                law, section = f"{line[3:].strip()} (unnumbered)", ""
+            match = SECTION.match(line)
+            if match:
+                section = f"{match.group(1)}.{match.group(2)} {match.group(3)}"
+            if wanted in line.lower():
+                where = law + (f" / {section}" if section else "")
+                print(f"{source.name}:{number}  [{where}]")
+                print(f"  {line.strip()}")
+                hits += 1
+                if hits >= limit:
+                    print(f"prefs: stopped at {limit} matches", file=sys.stderr)
+                    return 0
+    if not hits:
+        print(f"prefs: no match for {needle!r}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def repo_lawbooks(root: Path) -> list[Path]:
+    return sorted(path for path in (root / "suite").rglob("*-preferences.md"))
+
+
+LINK = re.compile(r"`(\.\./[^`\s]*)`")
+
+
+def dead_lawbook_links(path: Path) -> list[str]:
+    """Backticked relative links in one lawbook that do not resolve from its directory."""
+    text = path.read_text(encoding="utf-8")
+    return [
+        token
+        for token in LINK.findall(text)
+        if not (path.parent / token).exists()
+    ]
+
+
+def doc_headings(lines: list[str]) -> list[tuple[int, int, str]]:
+    """(line index, level, title) for structural headings, structure markers out."""
+    found = []
+    for index, line in enumerate(lines):
+        match = DOC_HEADING.match(line)
+        if match and match.group(2).strip() not in NOT_A_LAW:
+            found.append((index, len(match.group(1)), match.group(2).strip()))
+    return found
+
+
+def heading_block(lines: list[str], key: str) -> list[str]:
+    """One heading's body by title, up to the next heading at its level or above."""
+    entries = doc_headings(lines)
+    key = key.strip()
+    chosen = next((entry for entry in entries if entry[2].lower() == key.lower()), None)
+    if chosen is None:
+        folded = key.lower()
+        matches = [entry for entry in entries if folded in entry[2].lower()]
+        if len(matches) != 1:
+            if len(matches) > 1:
+                print(f"prefs: {key!r} matches several headings: " + "; ".join(e[2] for e in matches), file=sys.stderr)
+            return []
+        chosen = matches[0]
+    start, level, _ = chosen
+    out = [lines[start]]
+    for index in range(start + 1, len(lines)):
+        match = DOC_HEADING.match(lines[index])
+        if match and len(match.group(1)) <= level:
+            break
+        out.append(lines[index])
+    return trim(out)
+
+
+def cmd_repos(root: Path) -> int:
+    for path in repo_lawbooks(root):
+        print(path.relative_to(root))
+    return 0
+
+
+def cmd_repo(root: Path, name: str, key: str | None, path_only: bool) -> int:
+    matches = [path for path in repo_lawbooks(root) if path.parent.name == name or path.stem == f"{name}-preferences"]
+    if not matches:
+        matches = [path for path in repo_lawbooks(root) if name.lower() in str(path).lower()]
+    if not matches:
+        print(f"prefs: no lawbook for {name!r} (try: prefs repos)", file=sys.stderr)
+        return 1
+    for path in matches:
+        if path_only:
+            print(path.relative_to(root))
+            continue
+        if key is None:
+            print(f"# {path.relative_to(root)}")
+            print(path.read_text(encoding="utf-8"), end="")
+            continue
+        lines = heading_block(read(path), key)
+        if not lines:
+            print(f"prefs: no law {key!r} in {path.relative_to(root)}", file=sys.stderr)
+            print(f"prefs: its headings are `./tools/prefs repo {name} | grep '^#'`", file=sys.stderr)
+            return 1
+        print("\n".join(lines))
+    return 0
+
+
+def test_lawbook(root: Path) -> Path:
+    return root / "tests" / "test-preferences.md"
+
+
+def cmd_test(root: Path, key: str | None) -> int:
+    source = test_lawbook(root)
+    lines = read(source)
+    if key is None:
+        for _, level, title in doc_headings(lines):
+            print(("  " if level == 3 else "") + "- " + title)
+        return 0
+    block = heading_block(lines, key)
+    if not block:
+        print(f"prefs: no law {key!r} in {source.name} (try: prefs test)", file=sys.stderr)
+        return 1
+    print("\n".join(block))
+    return 0
+
+
+def repo_registry(root: Path) -> list[str]:
+    """One line per repo lawbook: path and its own title."""
+    registry = []
+    for path in repo_lawbooks(root):
+        title = ""
+        for line in read(path):
+            if line.startswith("# "):
+                title = line[2:].strip()
+                break
+        registry.append(f"- {path.relative_to(root)} — {title}" if title else f"- {path.relative_to(root)}")
+    return registry
+
+
+def prompt_text(root: Path) -> str:
+    """The assembled block the preferences plugin injects on every request."""
+    sections = [
+        "# Complete workspace preferences\n\n"
+        "The author's live architecture preferences for the vexgraph ecosystem. This "
+        "block carries the whole compressed constitution plus an index of the proof "
+        "lawbook and of every repository lawbook; it does not carry their bodies.\n\n"
+        "Read before acting:\n\n"
+        "- the compressed constitution below is the universal law — cite it by Title;\n"
+        "- before work in a repository, read its complete lawbook: "
+        "`./tools/prefs repo <name>`;\n"
+        "- before writing proof, read the owning test law: `./tools/prefs test \"<law>\"`;\n"
+        "- never read `/PREFERENCES.md` whole — slice it with `./tools/prefs law <n> --full`.\n\n"
+        "Laws are cited by Title, never by number; numbers are slice addresses inside "
+        "one file only.",
+        "## Universal constitution (compressed)\n\n" + compressed(root).read_text(encoding="utf-8").rstrip("\n"),
+        "## Proof lawbook index — `tests/test-preferences.md`\n\n"
+        "Read the owning law before writing a test: `./tools/prefs test \"<law>\"`.\n\n"
+        + "\n".join(("  " if level == 3 else "") + "- " + title for _, level, title in doc_headings(read(test_lawbook(root)))),
+        "## Repository lawbook index\n\n"
+        "Read the complete owning lawbook before work in that repository: "
+        "`./tools/prefs repo <name>`. Each file's own body stays on disk.\n\n"
+        + "\n".join(repo_registry(root)),
+    ]
+    return "\n\n".join(sections)
+
+
+def cmd_prompt(root: Path) -> int:
+    print(prompt_text(root))
+    return 0
+
+
+def cmd_files(root: Path) -> int:
+    for remote, local in published(root):
+        print(f"{local.relative_to(root)}  ->  {remote}")
+    return 0
+
+
+def gh(arguments: list[str]) -> subprocess.CompletedProcess[bytes]:
+    """One bounded `gh` child, literal argv, no shell."""
+    return subprocess.run(["gh", *arguments], capture_output=True, timeout=120)
+
+
+def cmd_publish(root: Path, wanted: list[str]) -> int:
+    full(root)  # publishing ships the full document; refuse when it is absent
+    files = published(root)
+    if wanted:
+        folded = [name.lower() for name in wanted]
+        files = [pair for pair in files if pair[0].lower() in folded or pair[1].stem.lower() in folded]
+        if not files:
+            print(f"prefs: nothing to publish for {wanted!r} (try: prefs files)", file=sys.stderr)
+            return 1
+    for remote, local in files:
+        result = gh(["gist", "edit", GIST, "--filename", remote, str(local)])
+        if result.returncode:
+            print(f"prefs: publish failed for {remote}", file=sys.stderr)
+            print(result.stderr.decode(errors="replace").strip(), file=sys.stderr)
+            return 1
+        print(f"published {remote}")
+    return cmd_verify(root)
+
+
+def cmd_verify(root: Path) -> int:
+    full(root)  # verification compares the full document too
+    problems = 0
+    for remote, local in published(root):
+        result = gh(["gist", "view", GIST, "--filename", remote, "--raw"])
+        if result.returncode:
+            print(f"MISMATCH {remote}: not readable ({result.stderr.decode(errors='replace').strip()})")
+            problems += 1
+            continue
+        local_bytes = local.read_bytes()
+        same = result.stdout == local_bytes
+        problems += 0 if same else 1
+        print(f"{'match' if same else 'MISMATCH'}  {remote}  {len(local_bytes)}B")
+    if problems:
+        print(f"FAIL {problems} of {len(published(root))} files differ from the Gist")
+        return 1
+    print("PASS all published files match")
+    return 0
+
+
+def cmd_check(root: Path) -> int:
+    gist = read(compressed(root))
+    full_path = root / "PREFERENCES.md"
+    doc_missing = not full_path.is_file()
+    doc = [] if doc_missing else read(full_path)
+    gist_laws = law_index(gist)
+    doc_laws = law_index(doc)
+    sections = section_index(gist)
+    problems: list[str] = []
+
+    if doc_missing:
+        print(f"laws: {len(gist_laws)} compressed / full document absent "
+              "(Git-ignored; compressed-only check)")
+    else:
+        if len(gist_laws) != len(doc_laws):
+            problems.append(f"law counts differ: gist {len(gist_laws)}, full {len(doc_laws)}")
+        else:
+            for (_, number, title), (_, other, other_title) in zip(gist_laws, doc_laws):
+                head = " ".join(title.split()[:3]).lower()
+                if head not in other_title.lower():
+                    problems.append(f"law {number}: {title!r} not in {other_title!r}")
+        print(f"laws: {len(gist_laws)} compressed / {len(doc_laws)} full")
+
+    if any(line.startswith("####") for line in gist):
+        problems.append("gist has a level-4 heading (shape is ## law, ### section, * clause)")
+
+    for (index, _, _) in sections:
+        following = gist[index + 1] if index + 1 < len(gist) else ""
+        if not following.startswith("* "):
+            problems.append(f"section {gist[index].strip()!r} has no clause bullet")
+
+    print(f"sections: {len(sections)} compressed")
+
+    injected = len(prompt_text(root).encode("utf-8"))
+    print(f"injected: {injected} bytes (~{injected / 4 / 1000:.1f}k tokens at 4 bytes/token)")
+    if injected > INJECTED_LIMIT:
+        problems.append(f"injected block is {injected} bytes, over the {INJECTED_LIMIT}-byte ceiling")
+
+    for remote, local in published(root):
+        if not local.is_file():
+            if local == full_path:
+                continue  # Git-ignored full document: checked when present
+            problems.append(f"{local.relative_to(root)} is missing")
+            continue
+        if not local.read_bytes().endswith(b"\n"):
+            problems.append(f"{remote} does not end with a newline (the Gist adds one, so publishing would differ)")
+
+    books = repo_lawbooks(root)
+    dead = [(book, token) for book in books for token in dead_lawbook_links(book)]
+    print(f"lawbooks: {len(books)} repo lawbooks, {len(dead)} dead links")
+    if not books:
+        problems.append("no repo lawbooks found under suite/")
+    for book, token in dead:
+        problems.append(f"{book.relative_to(root)}: dead link {token!r}")
+
+    if problems:
+        for problem in problems:
+            print(f"FAIL {problem}")
+        return 1
+    print("PASS (compressed-only; full-document parity not verified)" if doc_missing else "PASS")
+    return 0
+
+
+def main(argv: list[str]) -> int:
+    if not argv or argv[0] in {"-h", "--help", "help"}:
+        print(__doc__.strip())
+        return 0
+    root = workspace_root()
+    everything = "--full" in argv
+    gist_only = "--gist" in argv
+    path_only = "--path" in argv
+    args = [arg for arg in argv if arg not in {"--full", "--gist", "--path"}]
+    command, rest = args[0], args[1:]
+    source = full(root) if everything else compressed(root)
+
+    if command == "list":
+        return cmd_list(root)
+    if command == "law" and rest:
+        return cmd_law(root, " ".join(rest), source)
+    if command == "section" and rest:
+        return cmd_section(root, " ".join(rest), source)
+    if command == "find" and rest:
+        sources = [source] if everything or gist_only else [
+            path for path in (compressed(root), root / "PREFERENCES.md")
+            if path.is_file()]
+        return cmd_find(root, " ".join(rest), sources)
+    if command == "repo" and rest:
+        return cmd_repo(root, rest[0], " ".join(rest[1:]) or None, path_only)
+    if command == "repos":
+        return cmd_repos(root)
+    if command == "test":
+        return cmd_test(root, " ".join(rest) or None)
+    if command == "prompt":
+        return cmd_prompt(root)
+    if command == "files":
+        return cmd_files(root)
+    if command == "publish":
+        return cmd_publish(root, rest)
+    if command == "verify":
+        return cmd_verify(root)
+    if command == "check":
+        return cmd_check(root)
+
+    print(f"prefs: bad command {command!r}; see prefs --help", file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

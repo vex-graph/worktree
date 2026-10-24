@@ -174,7 +174,7 @@ def render(root, groups, records):
 def save(root, groups, records):
     report = root / REPORT
     report.parent.mkdir(parents=True, exist_ok=True)
-    report.write_text(render(root, groups, records))
+    report.write_text(render(root, groups, records), newline="\n")
 
 
 def main(argv=None):

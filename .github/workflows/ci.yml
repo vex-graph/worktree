@@ -6,13 +6,19 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+  schedule:
+    # Weekly readiness scoreboard over the whole ecosystem (Monday 06:00 UTC).
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
 
 jobs:
   # ───────────────────────────────────────────────────────────────────────────
-  # Job 1: Architectural & Security Audit (Runs on Root Repo)
+  # Job 1: Architecture, preferences, ledger and tooling (root repo)
   # ───────────────────────────────────────────────────────────────────────────
   audit:
-    name: Architecture & Security Audit
+    name: Architecture, Preferences & Tooling Audit
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Workspace Root
@@ -23,14 +29,50 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Architectural Compliance (Linter)
+      # The tooling tests, the ledger and the ratchets live in nested checkouts
+      # (`tests/`) or scan them (`suite/`), so the manifest must be present
+      # before anything else runs. A root-only checkout would also make the
+      # workspace-scoped ratchets vacuous: zero files scanned, every recorded
+      # violation reported "retired".
+      - name: Clone declared repositories
+        env:
+          ECOSYSTEM_PAT: ${{ secrets.ECOSYSTEM_PAT }}
         run: |
-          python3 tools/linter.py || {
-            echo "::error::Architectural violations detected. See linter output above."
-            exit 1
-          }
+          if [ -n "${ECOSYSTEM_PAT:-}" ]; then
+            python3 tools/ci_repos.py clone --auth "$ECOSYSTEM_PAT"
+          else
+            python3 tools/ci_repos.py clone
+          fi
 
-      - name: Security Baseline Check (SECURITY.md Compliance)
+      - name: Require every checkout
+        run: python3 tools/ci_repos.py check --require-all
+
+      - name: Tooling tests
+        run: |
+          python3 -B tests/tools/linter_test.py
+          python3 -B tests/tools/arrange_test.py
+          python3 -B tests/tools/readiness_test.py
+          python3 -B tests/tools/test_checklist_test.py
+          python3 -B tests/tools/ci_repos_test.py
+          python3 -B tests/tools/prefs_test.py
+
+      - name: Preferences integrity (budget, injection, lawbooks)
+        run: ./tools/prefs check
+
+      - name: Checklist evidence ledger is current
+        run: python3 tools/test_checklist.py check
+
+      - name: Architectural compliance (ratchet baseline)
+        run: |
+          python3 tools/linter.py --no-color \
+            --baseline .github/lint-baseline.json
+
+      - name: Structural layout (ratchet baseline)
+        run: |
+          python3 tools/arrange.py \
+            --baseline .github/arrange-baseline.json
+
+      - name: Security baseline (SECURITY.md compliance)
         run: |
           echo "=== Scanning for Accidental Secrets & Private Keys ==="
           if git grep -E -i "BEGIN (RSA|EC|DSA|OPENSSH|PRIVATE) KEY" -- ':!_notes/' ':!_trash/'; then
@@ -39,13 +81,120 @@ jobs:
           fi
 
           echo "=== Auditing Declared Security Obligations (;;SECURITY) ==="
-          grep -rn ';;SECURITY' . --exclude-dir={.git,_notes,_trash} || true
+          grep -rn ';;SECURITY' . --exclude-dir={.git,_notes,_trash,suite} || true
 
           echo "=== Auditing Deliberate Delays (;;FREEZE) ==="
-          grep -rn ';;FREEZE' . --exclude-dir={.git,_notes,_trash} || true
+          grep -rn ';;FREEZE' . --exclude-dir={.git,_notes,_trash,suite} || true
 
   # ───────────────────────────────────────────────────────────────────────────
-  # Job 2: Cross-Platform Build & Verification (macOS & Linux)
+  # Job 1b: Tooling portability on Windows
+  #
+  # This proves the Python toolchain (linter, arranger, readiness, ci_repos,
+  # checklist, preferences) runs on Windows with the same ratchet baselines.
+  # It does NOT build the ecosystem: tools/b is still macOS/Linux (POSIX
+  # fork/waitpid, -arch arm64, .so/.dylib). The ecosystem build job stays
+  # absent until that port lands; no compile-only placeholder here.
+  # ───────────────────────────────────────────────────────────────────────────
+  tools-windows:
+    name: Tooling Portability (windows-latest)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Workspace Root
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Same reason as the Linux audit: the tests and the ratchets need the
+      # nested checkouts, not just this root repository.
+      - name: Clone declared repositories
+        shell: bash
+        env:
+          ECOSYSTEM_PAT: ${{ secrets.ECOSYSTEM_PAT }}
+        run: |
+          if [ -n "${ECOSYSTEM_PAT:-}" ]; then
+            python tools/ci_repos.py clone --auth "$ECOSYSTEM_PAT"
+          else
+            python tools/ci_repos.py clone
+          fi
+
+      - name: Require every checkout
+        shell: bash
+        run: python tools/ci_repos.py check --require-all
+
+      - name: Tooling tests
+        shell: bash
+        run: |
+          python -B tests/tools/linter_test.py
+          python -B tests/tools/arrange_test.py
+          python -B tests/tools/readiness_test.py
+          python -B tests/tools/test_checklist_test.py
+          python -B tests/tools/ci_repos_test.py
+          python -B tests/tools/prefs_test.py
+
+      - name: Preferences integrity (budget, injection, lawbooks)
+        shell: bash
+        run: python tools/prefs check
+
+      # The ledger hashes exact file bytes. A Windows checkout can apply
+      # CRLF, which would report every row stale for a line-ending artifact
+      # rather than a content change, so the ledger gate stays on Linux and
+      # the checklist's own unit test above still proves the tool on Windows.
+
+      - name: Architectural compliance (ratchet baseline)
+        shell: bash
+        run: |
+          python tools/linter.py --no-color \
+            --baseline .github/lint-baseline.json
+
+      - name: Structural layout (ratchet baseline)
+        shell: bash
+        run: |
+          python tools/arrange.py \
+            --baseline .github/arrange-baseline.json
+
+      - name: Scope statement
+        shell: bash
+        run: |
+          echo 'Tooling portability only. The ecosystem build stays macOS/Linux until tools/b is ported (Bounded scope, no compile-only placeholder).' >> "$GITHUB_STEP_SUMMARY"
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Job 2: Ecosystem readiness scoreboard (weekly / on demand)
+  # Clones every declared repository from tools/platforms.json, then reports.
+  # ───────────────────────────────────────────────────────────────────────────
+  readiness:
+    name: Readiness Scoreboard
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Workspace Root
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Clone declared repositories
+        run: python3 tools/ci_repos.py clone
+
+      - name: Require every checkout
+        run: python3 tools/ci_repos.py check --require-all
+
+      - name: Publish scoreboard
+        run: |
+          python3 tools/readiness.py --markdown >> "$GITHUB_STEP_SUMMARY"
+          python3 tools/readiness.py
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Job 3: Semicolon TUI build and memory-sanitized proof (macOS & Linux)
+  #
+  # Windows is intentionally absent from the *build* matrix: tools/b is
+  # macOS/Linux today (POSIX fork/waitpid, -arch arm64, .so suffix). The
+  # tools-windows job above proves the Python tooling there; the build job is
+  # added after the port lands, never faked with a compile-only placeholder.
   # ───────────────────────────────────────────────────────────────────────────
   semicolon-tui:
     name: Semicolon TUI & Bedrock (${{ matrix.os }})

@@ -10,9 +10,13 @@ harness, assets) is git-ignored, so this repo stays tiny.
 
 **Implemented:** the wrapper structure, the `b`-driven build entry (`tools/b` →
 `suite/personal/b/b run exec tools/workspace.c`), the workspace build graph, the shared
-`tests/` suite and this documentation. **Proven:** macOS builds and the scoped
+`tests/` suite, the lint and layout ratchets, the readiness scoreboard and the
+per-repository CI caller generator, and this documentation. **Proven:** macOS builds and the scoped
 test suites recorded in `metadata/gists/test-checklist.md`; the nested repositories range
-from implemented slices to source-free blueprints. **The R5 applications and R6
+from implemented slices to source-free blueprints. **No sibling repository has an
+installed CI caller or baseline yet**, and the Windows *build* waits on the
+`tools/b` port even though the Python tooling already runs there.
+**The R5 applications and R6
 superapps are unfinished** — shells, scaffolds or designs, not shipped products.
 Semicolon's working R6 terminal shell is a dogfooding surface for editing this
 workspace and trying its registered `b` workflows, not proof that the intended
@@ -97,6 +101,65 @@ exit code or signal belongs to the launched `b` process. A successful launch
 of a windowed app is not a visual test or proof its GUI behaved correctly.
 Semicolon's own terminal build is currently `suite/projects/semicolon/build.py`;
 do not infer a registered R6 build target or a general project-graph resolver.
+
+## CI and readiness
+
+Three workspace tools answer "what is good to go?" without adding a second build
+system:
+
+```sh
+python3 tools/linter.py --baseline .github/lint-baseline.json     # lint ratchet
+python3 tools/arrange.py --baseline .github/arrange-baseline.json  # layout ratchet
+python3 tools/readiness.py [--markdown|--json|--execute]          # scoreboard
+python3 tools/ci_repos.py list|clone|check|baselines|callers      # manifest wiring
+```
+
+`tools/platforms.json` is the single manifest: every repository, its tier, the
+platforms it declares support for and the platforms its own documentation claims
+as proven. `readiness.py` composes that manifest with the checklist ledger and
+the linter; a skip, a compile-only job or an unproven platform is never counted
+as a pass. `ci_repos.py` validates the manifest, clones missing checkouts (dry
+run by default), records each repository's repo-relative ratchet baseline, and
+installs the reusable-workflow caller. It refuses to install a caller into a
+repository that has no lawbook or baseline, because that caller would be red on
+arrival.
+
+The root workflow (`.github/workflows/ci.yml`) clones every declared repository,
+runs the tooling tests, then runs preference integrity, the checklist check, the
+lint and layout ratchets and the secret audit on Linux. The tooling tests,
+preference check and both ratchets repeat on `windows-latest`; the byte-hash
+ledger gate stays on Linux because a CRLF checkout would report every row stale
+for a line-ending artifact. The clone is not decoration: the tests and the
+ledger live in nested checkouts, and the ratchets, the lawbook check and the
+checklist are workspace-scoped, so a root-only checkout would find no tests,
+scan zero ecosystem files and report every recorded violation "retired".
+The windows job is a real portability check, not a build claim: it proves the
+Python tools and the ratchets behave identically there, while the ecosystem
+build stays macOS/Linux. A weekly scoreboard job clones every declared
+repository and publishes the table to the job summary. Each repository can call
+`.github/workflows/repo-check.yml` through a generated
+`.github/workflows/vexgraph-ci.yml`: that caller lints and arranges against the
+repository's own baselines, checks its lawbook exists, audits secrets, and
+accepts optional trusted build/test commands. The lint job of that reusable
+workflow runs on both Ubuntu and Windows.
+
+**Declared proof is not observed proof.** Today macOS is proven for 14 of 24
+repositories; Linux and Windows are proven for none. No sibling repository has a
+checked-in baseline or caller yet, and eight have no `<repo>-preferences.md`.
+The Windows **build** is deliberately absent until `tools/b` is ported off
+macOS-only flags and POSIX calls; a compile-only placeholder would be a false
+green. Windows tooling coverage is real but narrower than a build: it runs the
+Python tools, the checklist and both ratchets on a Windows runner. Linux is
+exercised by the Semicolon job and the weekly scoreboard. The ratchets record
+899 lint entries and 60,804 layout findings. Both baselines are generated from
+clean `origin/main` checkouts of every declared repository, not from a live
+working tree: the audit job clones `main`, so a tree snapshot would either hide
+debt that is already published or, once the working tree retires findings,
+report the published state as new debt. A live tree can therefore show new
+findings in files a session has not pushed yet, and the snapshot has to be
+regenerated immediately before the root commit that carries it. New debt is
+blocked while old debt is retired gradually. `--write` is opt-in and has not
+been run across the workspace.
 
 ## Architecture and implementation status
 
@@ -187,3 +250,8 @@ feature implementation (each repo owns its own) and visual acceptance (the
 user's). **Known limits and gaps:** no monorepo semantics — each nested repo is
 committed and pushed independently; nothing here proves any application runtime,
 and the readiness Gist plus `metadata/gists/test-checklist.md` are the evidence of record.
+CI observes lint debt, the evidence ledger, lawbook presence, the Semicolon
+macOS/Linux job and the Python tooling on Windows; it does not prove the other
+repositories' runtimes, and the Windows ecosystem build is unported. The
+readiness table reports declared proof separately from observed CI so the two
+cannot be confused.

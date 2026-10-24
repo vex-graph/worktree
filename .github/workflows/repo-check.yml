@@ -1,0 +1,170 @@
+# Reusable per-repo check. Callers live in each repository as
+# .github/workflows/vexgraph-ci.yml (installed by tools/ci_repos.py callers).
+#
+# The caller is trusted (same ecosystem). `build` and `test` are shell commands
+# supplied by the caller; they are executed verbatim from the repo root.
+name: Vexgraph repo check
+
+on:
+  workflow_call:
+    inputs:
+      baseline:
+        description: Repo-relative lint baseline recorded by tools/ci_repos.py baselines.
+        required: false
+        type: string
+        default: .github/lint-baseline.json
+      layout:
+        description: Repo-relative layout baseline recorded by tools/ci_repos.py baselines.
+        required: false
+        type: string
+        default: .github/arrange-baseline.json
+      tools-ref:
+        description: Branch or tag of vex-graph/worktree that supplies tools/linter.py.
+        required: false
+        type: string
+        default: main
+      build:
+        description: Optional trusted build command, run from the repo root.
+        required: false
+        type: string
+        default: ""
+      test:
+        description: Optional trusted test command, run from the repo root.
+        required: false
+        type: string
+        default: ""
+    secrets:
+      ECOSYSTEM_PAT:
+        description: Optional token, only needed if vex-graph/worktree is private.
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint, lawbook and secret audit (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: python3
+          # Tooling is cross-platform; this proves the same ratchet holds
+          # when the caller's checkout lives on a Windows runner. It is a
+          # tooling check, not an ecosystem build.
+          - os: windows-latest
+            python: python
+    steps:
+      - name: Checkout caller
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Fetch the worktree tools
+        shell: bash
+        env:
+          TOKEN: ${{ secrets.ECOSYSTEM_PAT }}
+          REF: ${{ inputs.tools-ref }}
+        run: |
+          set -euo pipefail
+          auth=""
+          if [ -n "${TOKEN:-}" ]; then auth="${TOKEN}@"; fi
+          # RUNNER_TEMP is a native path on Windows (D:\a\_temp); forward
+          # slashes keep the same string usable by bash and native Python.
+          dir="${RUNNER_TEMP//\\//}/worktree-tools"
+          rm -rf "$dir"
+          git clone --depth 1 --branch "$REF" --filter=blob:none --sparse \
+            "https://${auth}github.com/vex-graph/worktree.git" "$dir"
+          git -C "$dir" sparse-checkout set tools
+          echo "WORKTREE_TOOLS=$dir" >> "$GITHUB_ENV"
+
+      - name: Require ratchet baselines
+        shell: bash
+        env:
+          BASELINE: ${{ inputs.baseline }}
+          LAYOUT: ${{ inputs.layout }}
+        run: |
+          set -euo pipefail
+          for file in "$BASELINE" "$LAYOUT"; do
+            if [ ! -f "$file" ]; then
+              echo "::error::Ratchet baseline '$file' is missing. Record both with 'python3 tools/ci_repos.py baselines --write' from the workspace root, commit them, and push."
+              exit 1
+            fi
+          done
+
+      - name: Architectural compliance (ratchet)
+        shell: bash
+        env:
+          BASELINE: ${{ inputs.baseline }}
+        run: |
+          set -euo pipefail
+          ${{ matrix.python }} "$WORKTREE_TOOLS/tools/linter.py" \
+            --no-color --baseline "$BASELINE" .
+
+      - name: Structural layout (ratchet)
+        shell: bash
+        env:
+          LAYOUT: ${{ inputs.layout }}
+        run: |
+          set -euo pipefail
+          ${{ matrix.python }} "$WORKTREE_TOOLS/tools/arrange.py" \
+            --baseline "$LAYOUT" .
+
+      - name: Lawbook present
+        shell: bash
+        run: |
+          set -euo pipefail
+          count=$(find . -maxdepth 1 -name '*-preferences.md' -type f | wc -l)
+          if [ "$count" -lt 1 ]; then
+            echo "::error::No <repo>-preferences.md at the repository root (Per-Repo Preferences Extension Law)."
+            exit 1
+          fi
+          find . -maxdepth 1 -name '*-preferences.md' -type f -print
+
+      - name: Secret audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git grep -E -i "BEGIN (RSA|EC|DSA|OPENSSH|PRIVATE) KEY" -- ':!_notes/' ':!_trash/'; then
+            echo "::error::Private keys detected in tracked files!"
+            exit 1
+          fi
+
+      - name: Declared obligations (informational)
+        shell: bash
+        run: |
+          echo "=== ;;SECURITY ==="
+          grep -rn ';;SECURITY' . --exclude-dir={.git,_notes,_trash,.info} || true
+          echo "=== ;;FREEZE ==="
+          grep -rn ';;FREEZE' . --exclude-dir={.git,_notes,_trash,.info} || true
+
+  # The optional build stays on Linux on purpose: tools/b still needs POSIX
+  # process control and macOS/Linux link flags. Tooling portability is proven
+  # by the lint matrix above; a Windows build arrives with the tools/b port.
+  build:
+    name: Build and test (optional)
+    if: inputs.build != '' || inputs.test != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout caller
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build
+        if: inputs.build != ''
+        shell: bash
+        run: ${{ inputs.build }}
+
+      - name: Test
+        if: inputs.test != ''
+        shell: bash
+        run: ${{ inputs.test }}

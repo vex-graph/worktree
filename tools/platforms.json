@@ -1,0 +1,297 @@
+{
+  "version": 1,
+  "note": "Declared, reviewable platform intent and proof. `support` is what the repo intends to run on; `proven` is what its own documentation claims has executed. Observed CI evidence is separate and never edits this file.",
+  "platforms": [
+    "macos",
+    "linux",
+    "windows"
+  ],
+  "repos": {
+    "(worktree)": {
+      "tier": "workspace",
+      "subsystem": "tools",
+      "support": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "proven": [
+        "macos"
+      ],
+      "remote": "https://github.com/vex-graph/worktree.git"
+    },
+    "suite/ecosystem/hotcwap": {
+      "tier": "R1",
+      "subsystem": "hotcwap",
+      "support": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "proven": [
+        "macos"
+      ],
+      "remote": "https://github.com/vexgraph-ecosystem/hotcwap.git"
+    },
+    "suite/ecosystem/vexspoke": {
+      "tier": "R2",
+      "subsystem": "vexspoke",
+      "support": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "proven": [
+        "macos"
+      ],
+      "remote": "https://github.com/vexgraph-ecosystem/vexspoke.git"
+    },
+    "suite/ecosystem/relational-engine": {
+      "tier": "R2",
+      "subsystem": "relational-engine",
+      "support": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "proven": [
+        "macos"
+      ],
+      "remote": "https://github.com/vexgraph-ecosystem/relational-engine.git"
+    },
+    "suite/ecosystem/graphvex": {
+      "tier": "R3",
+      "subsystem": "graphvex",
+      "support": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "proven": [
+        "macos"
+      ],
+      "remote": "https://github.com/vexgraph-ecosystem/graphvex.git"
+    },
+    "suite/ecosystem/api-haven": {
+      "tier": "R3",
+      "subsystem": "api-haven",
+      "support": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "proven": [
+        "macos"
+      ],
+      "remote": "https://github.com/vexgraph-ecosystem/api-haven.git"
+    },
+    "suite/ecosystem/determinant": {
+      "tier": "R3",
+      "subsystem": "determinant",
+      "support": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "proven": [],
+      "remote": "https://github.com/vexgraph-ecosystem/determinant.git"
+    },
+    "suite/ecosystem/language": {
+      "tier": "R3",
+      "subsystem": "language",
+      "support": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "proven": [],
+      "remote": "https://github.com/vexgraph-ecosystem/language.git"
+    },
+    "suite/ecosystem/darkbase-engine": {
+      "tier": "R3",
+      "subsystem": "darkbase-engine",
+      "support": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "proven": [
+        "macos"
+      ],
+      "remote": "https://github.com/vexgraph-ecosystem/darkbase-engine.git"
+    },
+    "suite/ecosystem/samplerate": {
+      "tier": "R3",
+      "subsystem": null,
+      "support": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "proven": [],
+      "remote": "https://github.com/vexgraph-ecosystem/samplerate.git"
+    },
+    "suite/ecosystem/darkbase-headless": {
+      "tier": "R4",
+      "subsystem": "darkbase-headless",
+      "support": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "proven": [
+        "macos"
+      ],
+      "remote": "https://github.com/vexgraph-ecosystem/darkbase-headless.git"
+    },
+    "suite/ecosystem/darling-framework": {
+      "tier": "R4",
+      "subsystem": "darling",
+      "support": [
+        "macos",
+        "windows"
+      ],
+      "proven": [
+        "macos"
+      ],
+      "remote": "https://github.com/vexgraph-ecosystem/darling-framework.git"
+    },
+    "suite/ecosystem/sesh": {
+      "tier": "R4",
+      "subsystem": "sesh",
+      "support": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "proven": [
+        "macos"
+      ],
+      "remote": "https://github.com/vexgraph-ecosystem/sesh.git"
+    },
+    "suite/ecosystem/harness": {
+      "tier": "R4",
+      "subsystem": "harness",
+      "support": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "proven": [],
+      "remote": "https://github.com/vexgraph-ecosystem/harness.git"
+    },
+    "suite/personal/primeagen": {
+      "tier": "R5",
+      "subsystem": "primeagen",
+      "support": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "proven": [],
+      "remote": "https://github.com/vex-graph/primeagen.git"
+    },
+    "suite/projects/impedance": {
+      "tier": "R5",
+      "subsystem": null,
+      "support": [
+        "macos",
+        "windows"
+      ],
+      "proven": [],
+      "remote": "https://github.com/vexgraph-ecosystem/impedance.git"
+    },
+    "suite/projects/drawling": {
+      "tier": "R5",
+      "subsystem": null,
+      "support": [
+        "macos",
+        "windows"
+      ],
+      "proven": [],
+      "remote": "https://github.com/vexgraph-ecosystem/drawling.git"
+    },
+    "suite/projects/anti": {
+      "tier": "R6",
+      "subsystem": null,
+      "support": [
+        "macos",
+        "windows"
+      ],
+      "proven": [],
+      "remote": "https://github.com/vexgraph-ecosystem/anti.git"
+    },
+    "suite/projects/semicolon": {
+      "tier": "R6",
+      "subsystem": "semicolon",
+      "support": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "proven": [
+        "macos"
+      ],
+      "remote": "https://github.com/vexgraph-ecosystem/semicolon.git"
+    },
+    "suite/personal/b": {
+      "tier": "tooling",
+      "subsystem": "b",
+      "support": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "proven": [
+        "macos"
+      ],
+      "remote": "https://github.com/vex-graph/b.git"
+    },
+    "suite/personal/func": {
+      "tier": "tooling",
+      "subsystem": "func",
+      "support": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "proven": [],
+      "remote": "https://github.com/vex-graph/func.git"
+    },
+    "tests": {
+      "tier": "proof",
+      "subsystem": null,
+      "support": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "proven": [
+        "macos"
+      ],
+      "remote": "https://github.com/vexgraph-ecosystem/tests.git"
+    },
+    "suite/personal/darkbase": {
+      "tier": "tooling",
+      "subsystem": "darkbase",
+      "support": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "proven": [
+        "macos"
+      ],
+      "remote": "https://github.com/vex-graph/darkbase.git"
+    },
+    "suite/personal/vex-graph": {
+      "tier": "meta",
+      "subsystem": null,
+      "support": [
+        "macos"
+      ],
+      "proven": [],
+      "remote": "https://github.com/vexgraph-dev/vexgraph-dev.git"
+    }
+  }
+}

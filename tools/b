@@ -15,6 +15,21 @@ run_tooling_test() {
         checklist_runner)
             python3 -B "$root/tests/tools/test_checklist_test.py"
             ;;
+        linter)
+            python3 -B "$root/tests/tools/linter_test.py"
+            ;;
+        readiness)
+            python3 -B "$root/tests/tools/readiness_test.py"
+            ;;
+        ci_repos)
+            python3 -B "$root/tests/tools/ci_repos_test.py"
+            ;;
+        arrange)
+            python3 -B "$root/tests/tools/arrange_test.py"
+            ;;
+        prefs)
+            python3 -B "$root/tests/tools/prefs_test.py"
+            ;;
         *)
             return 2
             ;;
@@ -23,12 +38,21 @@ run_tooling_test() {
 
 if [ "${1:-}" = test ]; then
     shift
-    if [ "${1:-}" = opencode_preferences ] || [ "${1:-}" = checklist_runner ]; then
+    if [ "${1:-}" = opencode_preferences ] || [ "${1:-}" = checklist_runner ] \
+        || [ "${1:-}" = linter ] || [ "${1:-}" = readiness ] \
+        || [ "${1:-}" = ci_repos ] || [ "${1:-}" = arrange ] \
+        || [ "${1:-}" = prefs ]; then
         run_tooling_test "$1"
         exit $?
     fi
     if [ "${1:-}" = preferences ]; then
-        run_tooling_test opencode_preferences && run_tooling_test checklist_runner
+        run_tooling_test opencode_preferences \
+            && run_tooling_test checklist_runner \
+            && run_tooling_test linter \
+            && run_tooling_test readiness \
+            && run_tooling_test ci_repos \
+            && run_tooling_test arrange \
+            && run_tooling_test prefs
         exit $?
     fi
     if [ "$#" -eq 0 ]; then
