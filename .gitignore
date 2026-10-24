@@ -50,9 +50,21 @@ resources/
 .codex/
 .antigravity/
 
-# Local constitution; published separately as a GitHub Gist.
+# Local constitution; published separately as a GitHub Gist (monolith + split tree).
 /PREFERENCES.md
-
 # directories that go r1-r6
 suite/
 metadata/
+
+# metadata/gists/preferences/ is the hand-maintained working view of the constitution.
+# Track only its small human/agent-facing files.
+# (Negations must come after the `metadata/` ignore rule above to take effect.)
+!metadata/
+!metadata/gists/
+!metadata/gists/preferences/
+!metadata/gists/preferences/.gitignore
+!metadata/gists/preferences/_introduction.md
+!metadata/gists/preferences/gist.md
+!metadata/gists/preferences/README.md
+!metadata/gists/preferences/overview-template.c
+!metadata/gists/preferences/main-template.c

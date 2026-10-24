@@ -206,8 +206,10 @@ jobs:
         include:
           - os: macos-14
             platform: darwin
+            compiler: /opt/homebrew/opt/llvm/bin/clang
           - os: ubuntu-latest
             platform: linux
+            compiler: clang
 
     steps:
       - name: Checkout Workspace Root
@@ -223,6 +225,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang libncurses-dev
+
+      - name: Install LLVM (macOS)
+        if: matrix.platform == 'darwin'
+        run: brew install llvm
 
       - name: Clone Required Semicolon & Bedrock Repositories
         shell: bash
@@ -257,7 +263,7 @@ jobs:
       - name: Build Semicolon TUI Binary
         shell: bash
         run: |
-          python3 suite/projects/semicolon/build.py --compiler clang --output suite/projects/semicolon/.build/semicolon-tui
+          python3 suite/projects/semicolon/build.py --compiler ${{ matrix.compiler }} --output suite/projects/semicolon/.build/semicolon-tui
 
       - name: Run Memory-Sanitized Tests (ASan / UBSan & PTY Proof)
         shell: bash

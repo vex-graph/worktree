@@ -1,0 +1,9 @@
+# Hand-maintained working view of the universal constitution.
+# Track the small human/agent-facing files; nothing here is generated.
+*
+!.gitignore
+!_introduction.md
+!gist.md
+!README.md
+!overview-template.c
+!main-template.c

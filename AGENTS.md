@@ -2,17 +2,29 @@
 
 ## Read the constitution first
 
-Before proposing a design, editing, or running implementation work, read the
-complete current `PREFERENCES.md`. It is the universal constitution, not optional
-background. Read the relevant implementation before making claims about it;
-distinguish existing behavior from proposals. Every primary agent and subagent
-must follow this order, then consult the owning repo preferences and test laws.
-Follow the repository reading map in `PREFERENCES.md`'s Rule Taxonomy: read the
-complete owning repo-local preferences before work in that repo. For cross-repo
-changes, read every affected owner's rules; report missing lawbooks explicitly.
-The OpenCode preferences plugin injects the full constitution first among its
-project context blocks on every model request. If it is unavailable, explicitly
-read `metadata/gists/preferences.md` before proceeding; the config reference alone is not enough.
+The rules are live in two files: `metadata/gists/preferences/gist.md` (compressed,
+injected on every request) and `/PREFERENCES.md` (full documentation). Never load
+the full document whole — ask for exactly the law you need:
+
+    ./tools/prefs list              # law map: number + title
+    ./tools/prefs law 6             # one law, every clause
+    ./tools/prefs law 6 --full      # that law in the full documentation
+    ./tools/prefs section 6.3       # one sub-section
+    ./tools/prefs find "compose"    # where a rule lives
+    ./tools/prefs repo vexspoke     # the owning repo lawbook
+    ./tools/prefs test              # proof law map: every law title
+    ./tools/prefs prompt            # the exact block injected every request
+
+Read the relevant implementation before making claims about it; distinguish
+existing behavior from proposals. The injected block carries the compressed
+constitution whole plus an index of the proof lawbook and every repo lawbook; the
+bodies stay on disk. Before work in a repo, read its complete
+`<repo>-preferences.md` with `./tools/prefs repo <name>`; before writing proof,
+read the owning test law with `./tools/prefs test "<law>"`. For cross-repo changes
+read every affected owner's rules and report missing lawbooks explicitly. If the
+preferences plugin is unavailable, read `gist.md` directly and use the same
+command. The reading order is: this map, the compressed law, then the owning repo
+lawbook.
 
 Minimal core, opt-in everything else. Six capabilities, nothing more by default:
 **read · write · edit · bash · web search · agents**.
