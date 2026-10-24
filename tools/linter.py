@@ -328,9 +328,9 @@ class Linter:
 
     def rel(self, path):
         try:
-            return os.path.relpath(path, self.cwd).replace(os.sep, "/")
+            return os.path.relpath(path, self.cwd).replace(os.sep, "/").replace("\\", "/")
         except ValueError:
-            return path
+            return str(path).replace(os.sep, "/").replace("\\", "/")
 
     def violation(self, rule, path, line, snippet, msg, fixable=False):
         return {

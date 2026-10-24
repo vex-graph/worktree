@@ -236,35 +236,16 @@ jobs:
         if: matrix.platform == 'darwin'
         run: brew install llvm
 
-      - name: Clone Required Semicolon & Bedrock Repositories
+      - name: Clone declared repositories
         shell: bash
         env:
           ECOSYSTEM_PAT: ${{ secrets.ECOSYSTEM_PAT }}
         run: |
-          mkdir -p suite/ecosystem suite/projects
-          REPOS=(
-            "suite/ecosystem/determinant determinant"
-            "suite/ecosystem/vexspoke vexspoke"
-            "suite/ecosystem/relational-engine relational-engine"
-            "suite/ecosystem/language language"
-            "suite/projects/semicolon semicolon"
-            "tests tests"
-          )
-
-          AUTH=""
-          if [ -n "$ECOSYSTEM_PAT" ]; then
-            AUTH="${ECOSYSTEM_PAT}@"
+          if [ -n "${ECOSYSTEM_PAT:-}" ]; then
+            python3 tools/ci_repos.py clone --auth "$ECOSYSTEM_PAT"
+          else
+            python3 tools/ci_repos.py clone
           fi
-
-          for entry in "${REPOS[@]}"; do
-            path=$(echo "$entry" | cut -d' ' -f1)
-            repo=$(echo "$entry" | cut -d' ' -f2)
-            echo "Cloning $repo into $path..."
-            git clone --depth 1 "https://${AUTH}github.com/vexgraph-ecosystem/${repo}.git" "$path" || {
-              echo "::error::Failed to clone vexgraph-ecosystem/$repo. If this repository is private, add a personal access token named 'ECOSYSTEM_PAT' to this repository's secrets."
-              exit 1
-            }
-          done
 
       - name: Verify Workspace Build Graph (${{ matrix.platform }})
         shell: bash
