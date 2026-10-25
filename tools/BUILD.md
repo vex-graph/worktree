@@ -7,7 +7,7 @@ The launcher uses `suite/personal/b/b run exec tools/workspace.c -- <arguments>`
 Generic b compiles and executes the C coordinator; it has no workspace subcommand.
 This is a project-owned executable graph, not a new declarative manifest format.
 
-The saved CLion **b Runner → Run current file** tool invokes `tools/run-current`
+The saved CLion **b Runner → Run current file** tool invokes `tools/scripts/run-current`
 with the active file path. The existing **b** play configuration still references
 that same tool action. Reopen CLion to load the corrected saved settings.
 

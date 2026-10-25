@@ -42,7 +42,7 @@ Minimal core, opt-in everything else. Six capabilities, nothing more by default:
 - Use `bash` for build/test/git and read-only inspection. Prefer the umbrella
   build (`./tools/b`) over inventing commands.
 - Keep changes small and cohesive; cite laws by Title, never number
-  (`PREFERENCES.md` is the constitution). Never push without an explicit,
+  (`metadata/gists/preferences/PREFERENCES.md` is the constitution). Never push without an explicit,
   one-off order (the Git Workflow Law).
 
 ## Test evidence
@@ -57,7 +57,7 @@ applies to every framework, directory, test, document, and workspace tool.
 
 ## Talking to other agents
 
-`tools/agents.sh` is the bus — sibling sessions in this workspace, over the
+`tools/shell` is the bus — sibling sessions in this workspace, over the
 OpenCode session API:
 
 ```
@@ -87,7 +87,7 @@ Protocol:
    session title. `AGENTS_RAW=1` sends unsigned.
 6. **Reply to the sender, then summarize to the user.** A turn signed
    `— <name> (agent <shortid>)` is a sibling agent's message, not the human's.
-   Respond to that agent with `tools/agents.sh say <id|title> "<reply>"` first;
+   Respond to that agent with `tools/scripts/agents.sh say <id|title> "<reply>"` first;
    use `peers` to resolve the sender if needed. Do not substitute a user-facing
    answer for the actual `say` delivery. Then give the human a brief summary
    referring to the other agent in the third person, for example:

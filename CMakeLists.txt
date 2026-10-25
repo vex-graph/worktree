@@ -200,13 +200,18 @@ vexgraph_index_repository(primeagen personal/primeagen ""
 vexgraph_index_repository(tools tools "")
 vexgraph_index_repository(notes _notes "")
 foreach(application drawling)
-    vexgraph_index_repository(${application} "interactables/${application}/src" ""
+    vexgraph_index_repository(${application} "interactables/${application}" ""
         "${r2_cpu}" "${r2_storage}")
 endforeach()
-foreach(application anti semicolon)
-    vexgraph_index_repository(${application} "superapp/${application}/src" ""
-        "${r2_cpu}" "${r2_storage}")
-endforeach()
+vexgraph_index_repository(anti "superapp/anti" ""
+    "${r2_cpu}" "${r2_storage}")
+vexgraph_index_repository(semicolon "superapp/semicolon" ""
+    "${VEXGRAPH_SOURCE_ROOT}/suite/projects/semicolon"
+    "${VEXGRAPH_SOURCE_ROOT}/suite/projects/semicolon/src"
+    "${VEXGRAPH_SOURCE_ROOT}/suite/projects/semicolon/icon"
+    "${r2_cpu}" "${r2_storage}"
+    "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/determinant/src"
+    "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/language")
 
 # Unregistered tests carry no b target, so no compile command reaches clangd.
 # Mirror b's own per-subsystem include context so every test translation unit
@@ -257,6 +262,13 @@ foreach(subsystem IN LISTS test_subsystems)
         list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/suite/personal/b")
     elseif(test_name STREQUAL "func")
         list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/suite/personal/func/src")
+    elseif(test_name STREQUAL "semicolon")
+        list(APPEND test_includes
+            "${VEXGRAPH_SOURCE_ROOT}/suite/projects/semicolon"
+            "${VEXGRAPH_SOURCE_ROOT}/suite/projects/semicolon/src"
+            "${VEXGRAPH_SOURCE_ROOT}/suite/projects/semicolon/icon"
+            "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/determinant/src"
+            "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/language")
     endif()
     vexgraph_index_repository("tests_${test_name}" "tests/${test_name}" "" ${test_includes})
 endforeach()

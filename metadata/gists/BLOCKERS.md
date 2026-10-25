@@ -139,7 +139,7 @@ multi-page transactions, query/index support, or Headless integration.
 
 - Set an item's status to ⬜ (open) or ✅ (resolved) only with the associated decision or evidence. Dates/emoji in older
   conversations are not current proof. This document does not supersede
-  `../../PREFERENCES.md`, repo-local laws, the readiness Gist or `test-checklist.md`.
+  `preferences/PREFERENCES.md`, repo-local laws, the readiness Gist or `test-checklist.md`.
 - Priority means suggested dependency order, not permission to start every item.
 
 ### Coverage and limits
@@ -305,7 +305,7 @@ Source: `../drivers/language/README.md`, `language-preferences.md`.
 ## R1: hotcwap
 
 Source: `../host-behavior/hotcwap/hot`, `process/`, `kernel/`, `window/`;
-contracts: `hotcwap-preferences.md` and `../../PREFERENCES.md`.
+contracts: `hotcwap-preferences.md` and `preferences/PREFERENCES.md`.
 
 | Status | Type | Item | Detail |
 | :---: | :--- | :--- | :--- |
@@ -417,7 +417,7 @@ it where available. No claim of complete historical coverage is made.
 | Testing button 12 in writin-phase.ino | D12 wiring/debounce and serial advice; hardware follow-up. |
 | Find links to all repositories and projects in GitHub ecosystems | Rust/stable rows/bindings implemented later; persistence/GPU paths remain separate. Latest history partial. |
 | Roblox Studio Buddy Check-In | Integration/setup proposal, not an established Studio connection. |
-| Making `../../PREFERENCES.md` a one-file Gist | Canonical Gist publication/private lesson handling completed; local source now gist/PREFERENCES.md. Do not publish private lessons through this backlog. |
+| Making `preferences/PREFERENCES.md` a one-file Gist | Canonical Gist publication/private lesson handling completed; local source now gist/PREFERENCES.md. Do not publish private lessons through this backlog. |
 | Diagnosing Filter Gallery memory usage and real vs. private memory | Source/bus confirm later sampled GPU path; process-memory profiling remains open. |
 | Reviewing repository structure and separating relational engine | Per-repo IDE adapters done; standalone runtime/IDE appearance not thereby proved. |
 | Rust object model lessons | Research partly recovered; Rust type identity/borrowing does not replace canonical reflection/lifetime proof. |

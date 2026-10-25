@@ -75,7 +75,7 @@ jobs:
       - name: Security baseline (SECURITY.md compliance)
         run: |
           echo "=== Scanning for Accidental Secrets & Private Keys ==="
-          if git grep -E -i "BEGIN (RSA|EC|DSA|OPENSSH|PRIVATE) KEY" -- ':!_notes/' ':!_trash/'; then
+          if git grep -E -i "BEGIN (RSA|EC|DSA|OPENSSH|PRIVATE) KEY" -- ':(exclude)_notes/' ':(exclude)_trash/'; then
             echo "::error::Private keys detected in tracked files!"
             exit 1
           fi

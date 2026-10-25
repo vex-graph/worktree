@@ -10,7 +10,11 @@
 TARGET="${1:-panel_test}"
 
 set -e
-root="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+here="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+case "$here" in
+    */scripts|*/shell) root="$(CDPATH= cd -- "$here/../.." && pwd)" ;;
+    *)                 root="$(CDPATH= cd -- "$here/.." && pwd)" ;;
+esac
 
 case "$TARGET" in
     *.c) TARGET="$(basename "$TARGET")"; TARGET="${TARGET%.c}" ;;

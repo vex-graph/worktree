@@ -4,6 +4,8 @@
 # Talk to sibling agent sessions in this workspace over the OpenCode session
 # API. One tiny tool, no daemon, no state beyond the API itself:
 #
+# and honestly who really cares if i use opencode :sob: as if i killed someone loool
+#
 #   agents.sh whoami                 this session's id
 #   agents.sh name [<name>]          show, or set, this session's handle
 #   agents.sh peers                  list sessions (running first)
@@ -25,7 +27,10 @@
 set -euo pipefail
 
 here="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-root="$(CDPATH= cd -- "$here/.." && pwd)"
+case "$here" in
+    */scripts|*/shell) root="$(CDPATH= cd -- "$here/../.." && pwd)" ;;
+    *)                 root="$(CDPATH= cd -- "$here/.." && pwd)" ;;
+esac
 me="${OPENCODE_SESSION_ID:-}"
 bus="${AGENTS_BUS:-$root/_notes/agents/bus.md}"
 

@@ -3,7 +3,11 @@
 # Local-only workspace helper (tools/ is git-ignored, never published).
 # Prints branch, dirty count, ahead/behind vs upstream, and last commit.
 set -u
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+here="$(cd "$(dirname "$0")" && pwd)"
+case "$here" in
+    */scripts|*/shell) ROOT="$(cd "$here/../.." && pwd)" ;;
+    *)                 ROOT="$(cd "$here/.." && pwd)" ;;
+esac
 REPOS=(
   "$ROOT"
   "$ROOT"/suite/ecosystem/*

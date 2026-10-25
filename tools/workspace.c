@@ -1607,6 +1607,47 @@ static void setup_darkbase_headless(TargetList *tl) {
     }
 }
 
+// ── drivers/language (R3: lexical + syntax analyzer) ──────────────────
+static void setup_language(TargetList *tl) {
+    char *base = abspath("drivers/language");
+    Target *lib = target_new(tl, "language", T_LIB);
+    StrList c = {0};
+    glob_rec(base, ".c", &c);
+    strl_sort(&c);
+    (*lib).srcs = c;
+    strl_push(&(*lib).includes, base);
+    strl_push(&(*lib).includes, abspath(strf("%s/src", VEXSPOKE)));
+    strl_push(&(*lib).includes, abspath(strf("%s/src", REL_ENGINE)));
+    strl_push(&(*lib).deps, "vexspoke");
+    strl_push(&(*lib).deps, "relational_engine");
+}
+
+// ── superapp/semicolon (R6: terminal IDE & editor shell) ──────────────
+static void setup_semicolon(TargetList *tl) {
+    char *base = abspath("superapp/semicolon");
+    Target *app = target_new(tl, "semicolon", T_EXE);
+    strl_push(&(*app).srcs, strf("%s/src/main/tui-main.c", base));
+    strl_push(&(*app).srcs, strf("%s/src/editor/semicolon_syntax.c", base));
+    strl_push(&(*app).includes, base);
+    strl_push(&(*app).includes, strf("%s/src", base));
+    strl_push(&(*app).includes, strf("%s/icon", base));
+    strl_push(&(*app).includes, abspath("drivers/determinant/src"));
+    strl_push(&(*app).includes, abspath("drivers/language"));
+    strl_push(&(*app).includes, abspath(strf("%s/src", VEXSPOKE)));
+    strl_push(&(*app).includes, abspath(strf("%s/src", REL_ENGINE)));
+    strl_push(&(*app).deps, "determinant");
+    strl_push(&(*app).deps, "language");
+    strl_push(&(*app).deps, "vexspoke");
+    strl_push(&(*app).deps, "relational_engine");
+#ifdef __APPLE__
+    strl_push(&(*app).syslibs, "-lncurses");
+#else
+    strl_push(&(*app).syslibs, "-lncursesw");
+#endif
+    strl_push(&(*app).syslibs, "-lm");
+    add_exe_libs(app);
+}
+
 // Declare the workspace target graph in dependency-aware registration order.
 static void setup_targets(TargetList *tl) {
     if (g_only) {
@@ -1623,6 +1664,7 @@ static void setup_targets(TargetList *tl) {
     setup_relational_engine(tl);  // R2 storage/memory first (Vexspoke depends on it)
     setup_vexspoke(tl);        // libs first
     setup_determinant(tl);     // R3 terminal borrows R2, never the reverse
+    setup_language(tl);        // R3 language lexical analysis
     setup_hotcwap(tl);
     setup_graphvex(tl);
     setup_sesh(tl);
@@ -1633,6 +1675,7 @@ static void setup_targets(TargetList *tl) {
     setup_darkbase_headless(tl); // R4 service boundary over the R3 store
     setup_darling(tl);
     setup_apps(tl);            // tests/darling/*.c apps
+    setup_semicolon(tl);       // R6 terminal IDE & editor shell
     setup_graphvex_tests(tl);  // tests/graphvex mirrors graphvex/src
     setup_darling_tests(tl);   // tests/darling mirrors darling-framework/src
     setup_vexspoke_tests(tl);  // executables last
@@ -2990,15 +3033,35 @@ typedef struct {
     const char *label;
 } Runnable;
 
+// Extract current subsystem when called from inside a repository subdirectory.
+static const char *caller_subsystem(void) {
+    const char *caller = getenv("B_CALLER_DIR");
+    if (!caller || !*caller) return nullptr;
+    size_t rl = strlen(g_root);
+    if (strncmp(caller, g_root, rl) != 0) return nullptr;
+    const char *rel = caller + rl;
+    if (*rel == '/') rel++;
+    if (!*rel) return nullptr;
+    const char *last = strrchr(rel, '/');
+    const char *sub = last ? last + 1 : rel;
+    if (!strcmp(sub, "darling-framework")) return "darling";
+    return sub;
+}
+
 // Print runnable targets grouped by source directory and sorted by name.
 static void list_runnables(TargetList *tl) {
+    const char *sub = caller_subsystem();
     Runnable *rs = xmalloc((size_t)((*tl).count ? (*tl).count : 1) * sizeof *rs);
     int n = 0;
     for (int i = 0; i < (*tl).count; i++) {
         Target *target = &(*tl).items[i];
-        if (target_runnable(target))
-            rs[n++] = (Runnable){target_group(target), (*target).name,
-                                 target_label(target)};
+        if (!target_runnable(target)) continue;
+        char *grp = target_group(target);
+        if (sub && !strstr((*target).name, sub) && !strstr(grp, sub)) {
+            free(grp);
+            continue;
+        }
+        rs[n++] = (Runnable){grp, (*target).name, target_label(target)};
     }
 
     // sort by group, then name (insertion sort — n is small)
@@ -3013,9 +3076,13 @@ static void list_runnables(TargetList *tl) {
         rs[j + 1] = key;
     }
 
-    printf("b: %d runnable target(s) — run one with `b run <name>`", n);
-    if (n) printf(", or `b test <name>` for a test");
-    printf("\n");
+    if (sub) {
+        printf("b: %d runnable target(s) for '%s' (from current directory) — run with `b run <name>`\n", n, sub);
+    } else {
+        printf("b: %d runnable target(s) — run one with `b run <name>`", n);
+        if (n) printf(", or `b test <name>` for a test");
+        printf("\n");
+    }
     const char *cur = nullptr;
     for (int i = 0; i < n; i++) {
         if (!cur || strcmp(cur, rs[i].group)) {
@@ -3270,12 +3337,20 @@ int main(int argc, char **argv) {
             fflush(stdout);
         }
     }
+    Target *run_target = nullptr;
     if (!strcmp(command, "run") && rest.count == 0) {
+        const char *sub = caller_subsystem();
+        if (sub) {
+            Target *auto_target = resolve_runnable(&g_targets_ref, sub);
+            if (auto_target) {
+                run_target = auto_target;
+                goto do_run;
+            }
+        }
         list_runnables(&g_targets_ref);
         return 0;
     }
 
-    Target *run_target = nullptr;
     if (!strcmp(command, "run")) {
         const char *q = rest.items[0];
         run_target = resolve_runnable(&g_targets_ref, q);
@@ -3310,12 +3385,22 @@ int main(int argc, char **argv) {
         }
     }
 
+    if (!strcmp(command, "test") && rest.count == 0) {
+        const char *sub = caller_subsystem();
+        if (sub) {
+            strl_push(&rest, sub);
+            printf("b: auto-scoping tests to '%s' (from current directory)\n", sub);
+        }
+    }
+
     if (!strcmp(command, "build") || !strcmp(command, "run") || !strcmp(command, "test")) {
         if (!strcmp(command, "test")) {
             // the static proof gate runs before the suite: no test run passes
             // while a unit lacks an owner or a public function goes uninvoked.
-            int rc = ratchet(nullptr, false, false, false, false, false);
-            if (rc) return rc;
+            if (rest.count == 0 || (rest.count > 0 && strstr(rest.items[0], "vexspoke"))) {
+                int rc = ratchet(nullptr, false, false, false, false, false);
+                if (rc) return rc;
+            }
         }
         build_all();
         if (!strcmp(command, "build")) {
@@ -3323,6 +3408,7 @@ int main(int argc, char **argv) {
             return 0;
         }
         if (!strcmp(command, "run")) {
+        do_run:;
             Target *t = run_target;
             if ((*t).kind == T_APP) {
                 char *app = strf("%s/apps/%s.app", g_out, (*t).name);

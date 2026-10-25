@@ -60,6 +60,17 @@ NOT_A_LAW = {
 INJECTED_LIMIT = 32 * 1024
 
 
+def full_doc(root: Path) -> Path:
+    for candidate in (
+        root / "metadata" / "gists" / "preferences" / "PREFERENCES.md",
+        root / "metadata" / "gists" / "preferences" / "preferences.md",
+        root / "PREFERENCES.md",
+    ):
+        if candidate.is_file():
+            return candidate
+    return root / "metadata" / "gists" / "preferences" / "PREFERENCES.md"
+
+
 def published(root: Path) -> list[tuple[str, Path]]:
     """(Gist filename, local path) for every file the constitution publishes."""
     working = root / "metadata" / "gists" / "preferences"
@@ -68,7 +79,7 @@ def published(root: Path) -> list[tuple[str, Path]]:
         ("gist.md", working / "gist.md"),
         ("overview-template.c", working / "overview-template.c"),
         ("main-template.c", working / "main-template.c"),
-        ("preferences-full-documentation.md", root / "PREFERENCES.md"),
+        ("preferences-full-documentation.md", full_doc(root)),
     ]
 
 
@@ -92,10 +103,10 @@ def compressed(root: Path) -> Path:
 
 
 def full(root: Path) -> Path:
-    path = root / "PREFERENCES.md"
+    path = full_doc(root)
     if not path.is_file():
         raise SystemExit(
-            "prefs: PREFERENCES.md is absent (Git-ignored); "
+            "prefs: PREFERENCES.md is absent; "
             "this command needs the full document")
     return path
 
@@ -420,7 +431,7 @@ def cmd_verify(root: Path) -> int:
 
 def cmd_check(root: Path) -> int:
     gist = read(compressed(root))
-    full_path = root / "PREFERENCES.md"
+    full_path = full_doc(root)
     doc_missing = not full_path.is_file()
     doc = [] if doc_missing else read(full_path)
     gist_laws = law_index(gist)
@@ -504,7 +515,7 @@ def main(argv: list[str]) -> int:
         return cmd_section(root, " ".join(rest), source)
     if command == "find" and rest:
         sources = [source] if everything or gist_only else [
-            path for path in (compressed(root), root / "PREFERENCES.md")
+            path for path in (compressed(root), full_doc(root))
             if path.is_file()]
         return cmd_find(root, " ".join(rest), sources)
     if command == "repo" and rest:

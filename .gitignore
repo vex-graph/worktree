@@ -52,7 +52,7 @@ resources/
 .antigravity/
 
 # Local constitution; published separately as a GitHub Gist (monolith + split tree).
-/PREFERENCES.md
+/metadata/gists/preferences/PREFERENCES.md
 # directories that go r1-r6
 suite/
 metadata/

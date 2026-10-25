@@ -11,14 +11,14 @@ outermost ring — the map. It is not law; it is the reading order.
 - **Ring 1 — the universal constitution, in two forms.** `metadata/gists/preferences/gist.md`
   is the compressed form: every law as titled sub-sections whose bullets are the
   clauses. It is small enough to carry whole and is what the plugin injects on every
-  request. `PREFERENCES.md` (workspace root) is the full documentation — rationale,
+  request. `metadata/gists/preferences/PREFERENCES.md` (workspace root) is the full documentation — rationale,
   examples, prose — and is **reference material only**: never read it whole, ask
-  `./tools/prefs` for the one law you need. `PREFERENCES.md` is the single source of
+  `./tools/prefs` for the one law you need. `metadata/gists/preferences/PREFERENCES.md` is the single source of
   truth; `metadata/gists/preferences.md` is a symlink to it, never edited, always
-  the root file. `PREFERENCES.md` is published as
+  the root file. `metadata/gists/preferences/PREFERENCES.md` is published as
   `preferences-full-documentation.md` in the Gist.
 - **Ring 2 — the repo preferences, which live *inside* the preference system.**
-  The constitution's reading table (`PREFERENCES.md`, the Per-Repo Preferences
+  The constitution's reading table (`metadata/gists/preferences/PREFERENCES.md`, the Per-Repo Preferences
   Extension Law section) is the canonical link list: one `<repo>-preferences.md`
   lawbook per repository, sitting at its own repo root. The rule of Ring 2 is that
   the constitution governs everywhere, and the owning lawbook adds what is
@@ -29,7 +29,7 @@ outermost ring — the map. It is not law; it is the reading order.
 1. **First session in this workspace:** read the compressed `gist.md` — it arrives
    injected — then `./tools/prefs list` to see the law map. Depth is on demand:
    `./tools/prefs law 6`, `./tools/prefs section 6.4`, `./tools/prefs find "…"`.
-   Opening all 738 lines of `PREFERENCES.md` spends context on laws that are not
+   Opening all 738 lines of `metadata/gists/preferences/PREFERENCES.md` spends context on laws that are not
    in play and is not the reading order.
 2. **Before working in a repository:** read *that* repo's lawbook next
    (`./tools/prefs repo <name>`) — it is mandatory chained reading, not optional
@@ -45,7 +45,7 @@ outermost ring — the map. It is not law; it is the reading order.
 | Thing | Path |
 | :-- | :-- |
 | Constitution (compressed, injected) | `metadata/gists/preferences/gist.md` |
-| Constitution (full documentation, reference) | `PREFERENCES.md` (workspace root, Git-ignored) |
+| Constitution (full documentation, reference) | `metadata/gists/preferences/PREFERENCES.md` (workspace root, Git-ignored) |
 | Constitution (human intro) | `metadata/gists/preferences/_introduction.md` |
 | Worked blueprint examples | `metadata/gists/preferences/overview-template.c`, `main-template.c` |
 | The law query command | `./tools/prefs` |

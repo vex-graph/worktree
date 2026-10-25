@@ -231,7 +231,7 @@ tracked and published.)
 
 ## Rules
 
-The workspace is governed by a constitution: **`PREFERENCES.md`** — read it in
+The workspace is governed by a constitution: **`metadata/gists/preferences/PREFERENCES.md`** — read it in
 full; repositories with local laws add their own `<repo>-preferences.md`.
 Locally it is one real, Git-ignored Gist-owned file, not a symlink or a
 tracked Vexspoke file. Its published canonical edition is:

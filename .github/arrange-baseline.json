@@ -1,7 +1,7 @@
 {
   "version": 1,
   "note": "Ratchet baseline: CI fails only when a file/rule count grows.",
-  "total": 61261,
+  "total": 61313,
   "counts": {
     "suite/ecosystem/api-haven/src/ai/ai_chat.c::Semantic Consistency Law (Control flow: header space)": 26,
     "suite/ecosystem/api-haven/src/ai/ai_chat.c::Semantic Consistency Law (Control flow: statement separation)": 34,
@@ -747,7 +747,7 @@
     "suite/ecosystem/vexspoke/src/struct/chunked_list.c::Semantic Consistency Law (Control flow: statement separation)": 224,
     "suite/ecosystem/vexspoke/src/struct/circle_array.c::Semantic Consistency Law (Control flow: body on the header line)": 12,
     "suite/ecosystem/vexspoke/src/struct/circle_array.c::Semantic Consistency Law (Control flow: single-statement braces)": 9,
-    "suite/ecosystem/vexspoke/src/struct/circle_array.c::Semantic Consistency Law (Control flow: statement separation)": 87,
+    "suite/ecosystem/vexspoke/src/struct/circle_array.c::Semantic Consistency Law (Control flow: statement separation)": 86,
     "suite/ecosystem/vexspoke/src/struct/collection.c::Semantic Consistency Law (Control flow: body on the header line)": 8,
     "suite/ecosystem/vexspoke/src/struct/collection.c::Semantic Consistency Law (Control flow: header space)": 4,
     "suite/ecosystem/vexspoke/src/struct/collection.c::Semantic Consistency Law (Control flow: statement separation)": 19,
@@ -781,7 +781,7 @@
     "suite/ecosystem/vexspoke/src/struct/sparseset.c::Semantic Consistency Law (Control flow: statement separation)": 52,
     "suite/ecosystem/vexspoke/src/struct/sphere_array.c::Semantic Consistency Law (Control flow: body on the header line)": 14,
     "suite/ecosystem/vexspoke/src/struct/sphere_array.c::Semantic Consistency Law (Control flow: single-statement braces)": 9,
-    "suite/ecosystem/vexspoke/src/struct/sphere_array.c::Semantic Consistency Law (Control flow: statement separation)": 100,
+    "suite/ecosystem/vexspoke/src/struct/sphere_array.c::Semantic Consistency Law (Control flow: statement separation)": 99,
     "suite/ecosystem/vexspoke/src/struct/stack.c::Semantic Consistency Law (Control flow: body on the header line)": 4,
     "suite/ecosystem/vexspoke/src/struct/stack.c::Semantic Consistency Law (Control flow: header space)": 4,
     "suite/ecosystem/vexspoke/src/struct/stack.c::Semantic Consistency Law (Control flow: statement separation)": 50,
@@ -1579,9 +1579,9 @@
     "tests/vexspoke/util/random_test.c::Semantic Consistency Law (Control flow: body on the header line)": 2,
     "tests/vexspoke/util/random_test.c::Semantic Consistency Law (Control flow: header space)": 3,
     "tests/vexspoke/util/random_test.c::Semantic Consistency Law (Control flow: statement separation)": 59,
-    "tools/workspace.c::Semantic Consistency Law (Control flow: body on the header line)": 179,
+    "tools/workspace.c::Semantic Consistency Law (Control flow: body on the header line)": 185,
     "tools/workspace.c::Semantic Consistency Law (Control flow: header space)": 47,
     "tools/workspace.c::Semantic Consistency Law (Control flow: single-statement braces)": 2,
-    "tools/workspace.c::Semantic Consistency Law (Control flow: statement separation)": 1456
+    "tools/workspace.c::Semantic Consistency Law (Control flow: statement separation)": 1504
   }
 }
