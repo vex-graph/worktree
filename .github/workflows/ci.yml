@@ -195,15 +195,16 @@ jobs:
           python3 tools/readiness.py
 
   # ───────────────────────────────────────────────────────────────────────────
-  # Job 3: Semicolon TUI build and memory-sanitized proof (macOS & Linux)
+  # Job 3: Semicolon TUI build, bedrock & ecosystem proof (macOS & Linux matrix)
   #
-  # Windows is intentionally absent from the *build* matrix: tools/b is
-  # macOS/Linux today (POSIX fork/waitpid, -arch arm64, .so suffix). The
-  # tools-windows job above proves the Python tooling there; the build job is
-  # added after the port lands, never faked with a compile-only placeholder.
+  # Multi-architecture matrix:
+  # - macOS Apple Silicon (ARM64)
+  # - macOS Intel (x86_64 non-silicon)
+  # - Linux x86_64 (ubuntu-latest)
+  # - Linux ARM64 (ubuntu-24.04-arm)
   # ───────────────────────────────────────────────────────────────────────────
   semicolon-tui:
-    name: Semicolon TUI & Bedrock (${{ matrix.os }})
+    name: Ecosystem & Bedrock (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
     needs: audit
     strategy:
@@ -211,11 +212,17 @@ jobs:
       matrix:
         include:
           - os: macos-14
-            platform: darwin
-            compiler: /opt/homebrew/opt/llvm/bin/clang
+            platform: darwin-arm64
+            os_family: darwin
+          - os: macos-13
+            platform: darwin-x86_64
+            os_family: darwin
           - os: ubuntu-latest
-            platform: linux
-            compiler: clang
+            platform: linux-x86_64
+            os_family: linux
+          - os: ubuntu-24.04-arm
+            platform: linux-arm64
+            os_family: linux
 
     steps:
       - name: Checkout Workspace Root
@@ -227,14 +234,28 @@ jobs:
           python-version: "3.12"
 
       - name: Install System Dependencies (Linux)
-        if: matrix.platform == 'linux'
+        if: matrix.os_family == 'linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y clang libncurses-dev
 
       - name: Install LLVM (macOS)
-        if: matrix.platform == 'darwin'
+        if: matrix.os_family == 'darwin'
         run: brew install llvm
+
+      - name: Configure Compiler Toolchain
+        shell: bash
+        run: |
+          if [ "${{ matrix.os_family }}" = "darwin" ]; then
+            llvm_bin="$(brew --prefix llvm 2>/dev/null)/bin/clang"
+            if [ -x "$llvm_bin" ]; then
+              echo "COMPILER=$llvm_bin" >> "$GITHUB_ENV"
+            else
+              echo "COMPILER=clang" >> "$GITHUB_ENV"
+            fi
+          else
+            echo "COMPILER=clang" >> "$GITHUB_ENV"
+          fi
 
       - name: Clone declared repositories
         shell: bash
@@ -250,20 +271,29 @@ jobs:
       - name: Verify Workspace Build Graph (${{ matrix.platform }})
         shell: bash
         run: |
-          export CC="${{ matrix.compiler }}"
+          export CC="$COMPILER"
           export B_HOME="${RUNNER_TEMP:-/tmp}/vexgraph_b"
           ./tools/b targets
 
       - name: Build Semicolon TUI Binary
         shell: bash
         run: |
-          python3 suite/projects/semicolon/build.py --compiler ${{ matrix.compiler }} --output suite/projects/semicolon/.build/semicolon-tui
+          python3 suite/projects/semicolon/build.py --compiler "$COMPILER" --output suite/projects/semicolon/.build/semicolon-tui
 
       - name: Run Memory-Sanitized Tests (ASan / UBSan & PTY Proof)
         shell: bash
         run: |
-          export CC="${{ matrix.compiler }}"
+          export CC="$COMPILER"
           python3 tests/semicolon/editor/run.py
+
+      - name: Run Bedrock & Ecosystem Tests (${{ matrix.platform }})
+        shell: bash
+        run: |
+          export CC="$COMPILER"
+          export B_HOME="${RUNNER_TEMP:-/tmp}/vexgraph_b"
+          ./tools/b test hot_behavior_test
+          ./tools/b test two_dylib_swap_test
+          ./tools/b test console_test
 
       - name: Upload Semicolon Binary Artifact
         uses: actions/upload-artifact@v4
