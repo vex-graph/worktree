@@ -1324,6 +1324,8 @@ static void setup_hotcwap(TargetList *tl) {
     for (size_t i = 0; i < sizeof msrc / sizeof msrc[0]; i++)
         strl_push(&(*lib).srcs, strf("%s/%s", base, msrc[i]));
     apple_frameworks(&(*lib).syslibs);
+#else
+    strl_push(&(*lib).srcs, strf("%s/window/window.c", base));
 #endif
     strl_push(&(*lib).syslibs, "-lpthread");
 
