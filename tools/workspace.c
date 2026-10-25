@@ -1449,6 +1449,7 @@ static void setup_graphvex(TargetList *tl) {
     strl_push(&(*lib).includes, abspath(strf("%s/src", VEXSPOKE)));   // R3 borrows R2
 #ifdef __APPLE__
     strl_push(&(*lib).cflags, "-I/opt/homebrew/include");             // Vulkan headers
+    strl_push(&(*lib).cflags, "-I/usr/local/include");
 #endif
     strl_push(&(*lib).cflags, strf("-I%s/shader", g_out));           // embedded SPIR-V header
     strl_push(&(*lib).deps, "vexspoke");

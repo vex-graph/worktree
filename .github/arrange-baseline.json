@@ -1,7 +1,7 @@
 {
   "version": 1,
   "note": "Ratchet baseline: CI fails only when a file/rule count grows.",
-  "total": 61328,
+  "total": 61332,
   "counts": {
     "suite/ecosystem/api-haven/src/ai/ai_chat.c::Semantic Consistency Law (Control flow: header space)": 26,
     "suite/ecosystem/api-haven/src/ai/ai_chat.c::Semantic Consistency Law (Control flow: statement separation)": 34,
@@ -841,7 +841,7 @@
     "suite/personal/b/adapters/arduino.c::Semantic Consistency Law (Control flow: header space)": 14,
     "suite/personal/b/adapters/arduino.c::Semantic Consistency Law (Control flow: statement separation)": 127,
     "suite/personal/b/adapters/c.c::Semantic Consistency Law (Control flow: header space)": 4,
-    "suite/personal/b/adapters/c.c::Semantic Consistency Law (Control flow: statement separation)": 41,
+    "suite/personal/b/adapters/c.c::Semantic Consistency Law (Control flow: statement separation)": 44,
     "suite/personal/b/adapters/cargo.c::Semantic Consistency Law (Control flow: header space)": 5,
     "suite/personal/b/adapters/cargo.c::Semantic Consistency Law (Control flow: statement separation)": 36,
     "suite/personal/b/adapters/cmake.c::Semantic Consistency Law (Control flow: header space)": 1,
@@ -1582,6 +1582,6 @@
     "tools/workspace.c::Semantic Consistency Law (Control flow: body on the header line)": 185,
     "tools/workspace.c::Semantic Consistency Law (Control flow: header space)": 47,
     "tools/workspace.c::Semantic Consistency Law (Control flow: single-statement braces)": 4,
-    "tools/workspace.c::Semantic Consistency Law (Control flow: statement separation)": 1509
+    "tools/workspace.c::Semantic Consistency Law (Control flow: statement separation)": 1510
   }
 }
