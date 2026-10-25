@@ -401,7 +401,7 @@ if(foo)
 ### 38.3 Across platforms, by construction
 * macOS 14+ arm64, Windows 10+ x64 and arm64 all promise 16 from `malloc`; 16 is the platform fact, 32 is the shipped contract;
 * no caller infers alignment from the platform, the compiler default or a neighboring allocation — it reads `MEMORY_PAYLOAD_ALIGN`;
-* types wider than 64 bytes are outside the floor and outside the supported types.
+* a type needing more alignment than the floor has no direct allocation path here; it is owned, per the next sub-section.
 
 ### 38.4 Over-aligned types are owned, not smuggled
 * a type whose `_Alignof` exceeds the floor is never passed to `Memory_alloc` directly;
