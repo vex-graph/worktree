@@ -320,92 +320,92 @@ Do not hand-edit generated tables; add files/tests and use `sync` or `run`.
 
 | Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
 | :--- | :---: | ---: | :--- | :--- | :--- | :--- |
-| `tests/determinant/events/terminal_input_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/determinant/events/terminal_input_test.c` | ✅ | 1792940728 | bb7698ac082fc7b98ac11a526a9c7172b1aaadee40c449eae94f26a9d6df6474 | ['python3', 'tests/determinant/run.py']; macOS arm64 local lab; clang strict optimized C23 assertions and ASan/UBSan via tests/determinant/run.py; no live host terminal, no physical device or visual acceptance; Linux/Windows unproved | Determinant ui/ taxonomy: surface, image, scroll, panel, text, list, tree, field, code, markdown, button, events, theme and format owners after the directory move | passed |
 
 ### `tests/determinant/format`
 
 | Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
 | :--- | :---: | ---: | :--- | :--- | :--- | :--- |
-| `tests/determinant/format/terminal_color_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/determinant/format/terminal_color_test.c` | ✅ | 1792940728 | 158c169b74f2d757e64e80b3b4984aec10cb63311a1d1c2480af7de2987229cd | ['python3', 'tests/determinant/run.py']; macOS arm64 local lab; clang strict optimized C23 assertions and ASan/UBSan via tests/determinant/run.py; no live host terminal, no physical device or visual acceptance; Linux/Windows unproved | Determinant ui/ taxonomy: surface, image, scroll, panel, text, list, tree, field, code, markdown, button, events, theme and format owners after the directory move | passed |
 
 ### `tests/determinant/ui/button`
 
 | Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
 | :--- | :---: | ---: | :--- | :--- | :--- | :--- |
-| `tests/determinant/ui/button/terminal_button_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/determinant/ui/button/terminal_button_test.c` | ✅ | 1792940728 | 1006debfd05f355c8b8928c36e37f3a976d2e5e53d8e75ee29126f71b3e0bb5e | ['python3', 'tests/determinant/run.py']; macOS arm64 local lab; clang strict optimized C23 assertions and ASan/UBSan via tests/determinant/run.py; no live host terminal, no physical device or visual acceptance; Linux/Windows unproved | Determinant ui/ taxonomy: surface, image, scroll, panel, text, list, tree, field, code, markdown, button, events, theme and format owners after the directory move | passed |
 
 ### `tests/determinant/ui/code`
 
 | Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
 | :--- | :---: | ---: | :--- | :--- | :--- | :--- |
-| `tests/determinant/ui/code/terminal_code_view_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/determinant/ui/code/terminal_code_view_test.c` | ✅ | 1792940728 | 3f780a4408b13354dc94cfc0d45487ac85b285735b21fff09e775704dccba801 | ['python3', 'tests/determinant/run.py']; macOS arm64 local lab; clang strict optimized C23 assertions and ASan/UBSan via tests/determinant/run.py; no live host terminal, no physical device or visual acceptance; Linux/Windows unproved | Determinant ui/ taxonomy: surface, image, scroll, panel, text, list, tree, field, code, markdown, button, events, theme and format owners after the directory move | passed |
 
 ### `tests/determinant/ui/field`
 
 | Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
 | :--- | :---: | ---: | :--- | :--- | :--- | :--- |
-| `tests/determinant/ui/field/terminal_input_line_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/determinant/ui/field/terminal_input_line_test.c` | ✅ | 1792940728 | e67d0b6d330c526a0614cb665aef741b551b6e608fbb7c0543639fcb0db202e2 | ['python3', 'tests/determinant/run.py']; macOS arm64 local lab; clang strict optimized C23 assertions and ASan/UBSan via tests/determinant/run.py; no live host terminal, no physical device or visual acceptance; Linux/Windows unproved | Determinant ui/ taxonomy: surface, image, scroll, panel, text, list, tree, field, code, markdown, button, events, theme and format owners after the directory move | passed |
 
 ### `tests/determinant/ui/image`
 
 | Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
 | :--- | :---: | ---: | :--- | :--- | :--- | :--- |
-| `tests/determinant/ui/image/terminal_image_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/determinant/ui/image/terminal_image_test.c` | ✅ | 1792940728 | 0b2ada1f50906113358055dff5d14585f78b12d0c65e37e034cff8d8e9a36541 | ['python3', 'tests/determinant/run.py']; macOS arm64 local lab; clang strict optimized C23 assertions and ASan/UBSan via tests/determinant/run.py; no live host terminal, no physical device or visual acceptance; Linux/Windows unproved | Determinant ui/ taxonomy: surface, image, scroll, panel, text, list, tree, field, code, markdown, button, events, theme and format owners after the directory move | passed |
 
 ### `tests/determinant/ui/list`
 
 | Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
 | :--- | :---: | ---: | :--- | :--- | :--- | :--- |
-| `tests/determinant/ui/list/terminal_list_view_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/determinant/ui/list/terminal_list_view_test.c` | ✅ | 1792940728 | 151d4840f23dd4e4fad5da18ff2466027df223b7fcc6482051359d4b76bf0f68 | ['python3', 'tests/determinant/run.py']; macOS arm64 local lab; clang strict optimized C23 assertions and ASan/UBSan via tests/determinant/run.py; no live host terminal, no physical device or visual acceptance; Linux/Windows unproved | Determinant ui/ taxonomy: surface, image, scroll, panel, text, list, tree, field, code, markdown, button, events, theme and format owners after the directory move | passed |
 
 ### `tests/determinant/ui/markdown`
 
 | Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
 | :--- | :---: | ---: | :--- | :--- | :--- | :--- |
-| `tests/determinant/ui/markdown/terminal_markdown_view_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/determinant/ui/markdown/terminal_markdown_view_test.c` | ✅ | 1792940728 | fdc6a8f317d440141c500c2828ff79b67ae6394acb91914b69678e7931f9ef19 | ['python3', 'tests/determinant/run.py']; macOS arm64 local lab; clang strict optimized C23 assertions and ASan/UBSan via tests/determinant/run.py; no live host terminal, no physical device or visual acceptance; Linux/Windows unproved | Determinant ui/ taxonomy: surface, image, scroll, panel, text, list, tree, field, code, markdown, button, events, theme and format owners after the directory move | passed |
 
 ### `tests/determinant/ui/panel`
 
 | Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
 | :--- | :---: | ---: | :--- | :--- | :--- | :--- |
-| `tests/determinant/ui/panel/terminal_anchor_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
-| `tests/determinant/ui/panel/terminal_frame_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
-| `tests/determinant/ui/panel/terminal_panel_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/determinant/ui/panel/terminal_anchor_test.c` | ✅ | 1792940728 | 51a1ccd56ac214fd59e89519d1d9fcd39de80eb52c1fdab984cc6cdcab7f0504 | ['python3', 'tests/determinant/run.py']; macOS arm64 local lab; clang strict optimized C23 assertions and ASan/UBSan via tests/determinant/run.py; no live host terminal, no physical device or visual acceptance; Linux/Windows unproved | Determinant ui/ taxonomy: surface, image, scroll, panel, text, list, tree, field, code, markdown, button, events, theme and format owners after the directory move | passed |
+| `tests/determinant/ui/panel/terminal_frame_test.c` | ✅ | 1792940728 | 0a32138aaf8bce1c4de73b7c484dd8321d5fd2851928de08f9df0120c276dd01 | ['python3', 'tests/determinant/run.py']; macOS arm64 local lab; clang strict optimized C23 assertions and ASan/UBSan via tests/determinant/run.py; no live host terminal, no physical device or visual acceptance; Linux/Windows unproved | Determinant ui/ taxonomy: surface, image, scroll, panel, text, list, tree, field, code, markdown, button, events, theme and format owners after the directory move | passed |
+| `tests/determinant/ui/panel/terminal_panel_test.c` | ✅ | 1792940728 | 4b89d121f7b530a4bee6208517590b8c42a15301b2f6c3489a9d6f3abbe9c180 | ['python3', 'tests/determinant/run.py']; macOS arm64 local lab; clang strict optimized C23 assertions and ASan/UBSan via tests/determinant/run.py; no live host terminal, no physical device or visual acceptance; Linux/Windows unproved | Determinant ui/ taxonomy: surface, image, scroll, panel, text, list, tree, field, code, markdown, button, events, theme and format owners after the directory move | passed |
 
 ### `tests/determinant/ui/scroll`
 
 | Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
 | :--- | :---: | ---: | :--- | :--- | :--- | :--- |
-| `tests/determinant/ui/scroll/terminal_scroll_glide_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/determinant/ui/scroll/terminal_scroll_glide_test.c` | ✅ | 1792940728 | 1a1432802a09cd2180a8811edbe1c0d516429e4dd7f1986f275d505383976bcb | ['python3', 'tests/determinant/run.py']; macOS arm64 local lab; clang strict optimized C23 assertions and ASan/UBSan via tests/determinant/run.py; no live host terminal, no physical device or visual acceptance; Linux/Windows unproved | Determinant ui/ taxonomy: surface, image, scroll, panel, text, list, tree, field, code, markdown, button, events, theme and format owners after the directory move | passed |
 
 ### `tests/determinant/ui/surface`
 
 | Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
 | :--- | :---: | ---: | :--- | :--- | :--- | :--- |
-| `tests/determinant/ui/surface/terminal_canvas_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
-| `tests/determinant/ui/surface/terminal_reload_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
-| `tests/determinant/ui/surface/terminal_surface_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
-| `tests/determinant/ui/surface/terminal_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/determinant/ui/surface/terminal_canvas_test.c` | ✅ | 1792940728 | 320138c1919c73ef597bcc049ccc28a8142ddb4aaf90a0c4e0cc9a07de40b46e | ['python3', 'tests/determinant/run.py']; macOS arm64 local lab; clang strict optimized C23 assertions and ASan/UBSan via tests/determinant/run.py; no live host terminal, no physical device or visual acceptance; Linux/Windows unproved | Determinant ui/ taxonomy: surface, image, scroll, panel, text, list, tree, field, code, markdown, button, events, theme and format owners after the directory move | passed |
+| `tests/determinant/ui/surface/terminal_reload_test.c` | ✅ | 1792940728 | 3eb156c226ba8ddd510dadd556320fb55d4ffbed49f489f620b2945d61c9cf29 | ['python3', 'tests/determinant/run.py']; macOS arm64 local lab; clang strict optimized C23 assertions and ASan/UBSan via tests/determinant/run.py; no live host terminal, no physical device or visual acceptance; Linux/Windows unproved | Determinant ui/ taxonomy: surface, image, scroll, panel, text, list, tree, field, code, markdown, button, events, theme and format owners after the directory move | passed |
+| `tests/determinant/ui/surface/terminal_surface_test.c` | ✅ | 1792940728 | 2725072257a4717d3629026c925498ebb0ff0f45204ef94a1532bc783b5046b1 | ['python3', 'tests/determinant/run.py']; macOS arm64 local lab; clang strict optimized C23 assertions and ASan/UBSan via tests/determinant/run.py; no live host terminal, no physical device or visual acceptance; Linux/Windows unproved | Determinant ui/ taxonomy: surface, image, scroll, panel, text, list, tree, field, code, markdown, button, events, theme and format owners after the directory move | passed |
+| `tests/determinant/ui/surface/terminal_test.c` | ✅ | 1792940728 | d02f9c710ec51afed67da2104268da49fd58a7de215201d32400852dc2062666 | ['python3', 'tests/determinant/run.py']; macOS arm64 local lab; clang strict optimized C23 assertions and ASan/UBSan via tests/determinant/run.py; no live host terminal, no physical device or visual acceptance; Linux/Windows unproved | Determinant ui/ taxonomy: surface, image, scroll, panel, text, list, tree, field, code, markdown, button, events, theme and format owners after the directory move | passed |
 
 ### `tests/determinant/ui/text`
 
 | Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
 | :--- | :---: | ---: | :--- | :--- | :--- | :--- |
-| `tests/determinant/ui/text/terminal_status_bar_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
-| `tests/determinant/ui/text/terminal_text_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
-| `tests/determinant/ui/text/terminal_text_view_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/determinant/ui/text/terminal_status_bar_test.c` | ✅ | 1792940728 | 2a74be839cf2d2654aeb345fb137e5d2bc87b79b11c83fd07c7d86aad55373b5 | ['python3', 'tests/determinant/run.py']; macOS arm64 local lab; clang strict optimized C23 assertions and ASan/UBSan via tests/determinant/run.py; no live host terminal, no physical device or visual acceptance; Linux/Windows unproved | Determinant ui/ taxonomy: surface, image, scroll, panel, text, list, tree, field, code, markdown, button, events, theme and format owners after the directory move | passed |
+| `tests/determinant/ui/text/terminal_text_test.c` | ✅ | 1792940728 | ebd13ab8d77783bb8eca6e1fef299794d856d39820fcc3f311fbca51ab5ce50e | ['python3', 'tests/determinant/run.py']; macOS arm64 local lab; clang strict optimized C23 assertions and ASan/UBSan via tests/determinant/run.py; no live host terminal, no physical device or visual acceptance; Linux/Windows unproved | Determinant ui/ taxonomy: surface, image, scroll, panel, text, list, tree, field, code, markdown, button, events, theme and format owners after the directory move | passed |
+| `tests/determinant/ui/text/terminal_text_view_test.c` | ✅ | 1792940728 | 586448659aaeed555aa96be059e386853b9d29ac17a80d6e7e814a39ad0ed527 | ['python3', 'tests/determinant/run.py']; macOS arm64 local lab; clang strict optimized C23 assertions and ASan/UBSan via tests/determinant/run.py; no live host terminal, no physical device or visual acceptance; Linux/Windows unproved | Determinant ui/ taxonomy: surface, image, scroll, panel, text, list, tree, field, code, markdown, button, events, theme and format owners after the directory move | passed |
 
 ### `tests/determinant/ui/theme`
 
 | Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
 | :--- | :---: | ---: | :--- | :--- | :--- | :--- |
-| `tests/determinant/ui/theme/terminal_appearance_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/determinant/ui/theme/terminal_appearance_test.c` | ✅ | 1792940728 | ac4c81f6a1a4157c7f45ad39249b7d2b69c86a82d6670450f2e98a927e095cc9 | ['python3', 'tests/determinant/run.py']; macOS arm64 local lab; clang strict optimized C23 assertions and ASan/UBSan via tests/determinant/run.py; no live host terminal, no physical device or visual acceptance; Linux/Windows unproved | Determinant ui/ taxonomy: surface, image, scroll, panel, text, list, tree, field, code, markdown, button, events, theme and format owners after the directory move | passed |
 
 ### `tests/determinant/ui/tree`
 
 | Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
 | :--- | :---: | ---: | :--- | :--- | :--- | :--- |
-| `tests/determinant/ui/tree/terminal_tree_view_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/determinant/ui/tree/terminal_tree_view_test.c` | ✅ | 1792940728 | 84de68d0927f3f977fab3244dc87e4a6288bfaeda882bd6295507a5a952079fe | ['python3', 'tests/determinant/run.py']; macOS arm64 local lab; clang strict optimized C23 assertions and ASan/UBSan via tests/determinant/run.py; no live host terminal, no physical device or visual acceptance; Linux/Windows unproved | Determinant ui/ taxonomy: surface, image, scroll, panel, text, list, tree, field, code, markdown, button, events, theme and format owners after the directory move | passed |
 
 ### `tests/func`
 
