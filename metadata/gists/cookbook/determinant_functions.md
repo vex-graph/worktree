@@ -147,7 +147,7 @@ int main(void)
 ## TerminalButton class (terminal_button.c)
 
 ```c
-#include "terminal/terminal_button.h"
+#include "ui/button/terminal_button.h"
 
 int main(void)
 {
@@ -186,7 +186,7 @@ or module callbacks are omitted because this API has no matching constructors
 or setters. The gap list names those public calls explicitly.
 
 ```c
-#include "terminal/terminal.h"
+#include "ui/surface/terminal.h"
 
 int main(void)
 {
@@ -226,7 +226,7 @@ resources, but the class exposes no constructor or setters for supplying them.
 ## TerminalFrame class (terminal_frame.c)
 
 ```c
-#include "terminal/terminal_frame.h"
+#include "ui/panel/terminal_frame.h"
 
 int main(void)
 {
@@ -277,7 +277,7 @@ int main(void)
 ## TerminalAppearance class (terminal_appearance.c)
 
 ```c
-#include "terminal/terminal_appearance.h"
+#include "ui/theme/terminal_appearance.h"
 
 int main(void)
 {
@@ -310,7 +310,7 @@ int main(void)
 ## TerminalTextView class (terminal_text_view.c)
 
 ```c
-#include "terminal/terminal_text_view.h"
+#include "ui/text/terminal_text_view.h"
 
 int main(void)
 {
@@ -346,7 +346,7 @@ int main(void)
 ## TerminalListView class (terminal_list_view.c)
 
 ```c
-#include "terminal/terminal_list_view.h"
+#include "ui/list/terminal_list_view.h"
 
 int main(void)
 {
@@ -385,7 +385,7 @@ int main(void)
 ## TerminalInputLine class (terminal_input_line.c)
 
 ```c
-#include "terminal/terminal_input_line.h"
+#include "ui/field/terminal_input_line.h"
 
 int main(void)
 {
@@ -426,7 +426,7 @@ int main(void)
 ## TerminalStatusBar class (terminal_status_bar.c)
 
 ```c
-#include "terminal/terminal_status_bar.h"
+#include "ui/text/terminal_status_bar.h"
 
 int main(void)
 {
@@ -456,7 +456,7 @@ int main(void)
 ## TerminalImage class (terminal_image.c)
 
 ```c
-#include "terminal/terminal_image.h"
+#include "ui/image/terminal_image.h"
 
 int main(void)
 {
@@ -535,7 +535,7 @@ int main(void)
 ## TerminalProjection class (terminal_projection.h)
 
 ```c
-#include "terminal/terminal_projection.h"
+#include "ui/surface/terminal_projection.h"
 
 int main(void)
 {
@@ -548,7 +548,7 @@ int main(void)
 ## TerminalCanvas class (terminal_canvas.c)
 
 ```c
-#include "terminal/terminal_canvas.h"
+#include "ui/surface/terminal_canvas.h"
 
 int main(void)
 {
