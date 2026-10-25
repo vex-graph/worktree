@@ -837,9 +837,12 @@ static void add_exe_libs(Target *t) {
 static void add_vulkan_libs(Target *t) {
 #ifdef __APPLE__
     strl_push(&(*t).includes, "/opt/homebrew/include");
+    strl_push(&(*t).includes, "/usr/local/include");
     strl_push(&(*t).syslibs, "-L/opt/homebrew/lib");
+    strl_push(&(*t).syslibs, "-L/usr/local/lib");
     strl_push(&(*t).syslibs, "-lvulkan");
     strl_push(&(*t).syslibs, "-Wl,-rpath,/opt/homebrew/lib");
+    strl_push(&(*t).syslibs, "-Wl,-rpath,/usr/local/lib");
 #else
     strl_push(&(*t).syslibs, "-lvulkan");
 #endif
@@ -3179,6 +3182,7 @@ static Target *synth_target(TargetList *tl, const char *src) {
     strl_push(&(*t).includes, dir);                                  // local headers
 #ifdef __APPLE__
     strl_push(&(*t).cflags, "-I/opt/homebrew/include");              // Vulkan headers
+    strl_push(&(*t).cflags, "-I/usr/local/include");
 #endif
     strl_push(&(*t).deps, "*");                                      // link + include everything
     add_exe_libs(t);

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "note": "Ratchet baseline: CI fails only when a file/rule count grows.",
-  "total": 61313,
+  "total": 61317,
   "counts": {
     "suite/ecosystem/api-haven/src/ai/ai_chat.c::Semantic Consistency Law (Control flow: header space)": 26,
     "suite/ecosystem/api-haven/src/ai/ai_chat.c::Semantic Consistency Law (Control flow: statement separation)": 34,
@@ -1582,6 +1582,6 @@
     "tools/workspace.c::Semantic Consistency Law (Control flow: body on the header line)": 185,
     "tools/workspace.c::Semantic Consistency Law (Control flow: header space)": 47,
     "tools/workspace.c::Semantic Consistency Law (Control flow: single-statement braces)": 2,
-    "tools/workspace.c::Semantic Consistency Law (Control flow: statement separation)": 1504
+    "tools/workspace.c::Semantic Consistency Law (Control flow: statement separation)": 1508
   }
 }
