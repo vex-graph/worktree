@@ -237,11 +237,11 @@ jobs:
         if: matrix.os_family == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang libncurses-dev
+          sudo apt-get install -y clang libncurses-dev glslang-tools libvulkan-dev
 
-      - name: Install LLVM (macOS)
+      - name: Install LLVM & Shader Dependencies (macOS)
         if: matrix.os_family == 'darwin'
-        run: brew install llvm
+        run: brew install llvm glslang
 
       - name: Configure Compiler Toolchain
         shell: bash
@@ -267,6 +267,21 @@ jobs:
           else
             python3 tools/ci_repos.py clone
           fi
+
+      - name: Cache Rust registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-registry-${{ runner.os }}-${{ hashFiles('suite/ecosystem/relational-engine/rust/Cargo.lock') }}
+          restore-keys: |
+            cargo-registry-${{ runner.os }}-
+
+      - name: Fetch Rust Dependencies for C ABI Scratchpad
+        shell: bash
+        run: |
+          cargo fetch --locked --manifest-path suite/ecosystem/relational-engine/rust/Cargo.toml
 
       - name: Verify Workspace Build Graph (${{ matrix.platform }})
         shell: bash
