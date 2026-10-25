@@ -1,10 +1,8 @@
 {
   "version": 1,
   "note": "Ratchet baseline: CI fails only when a file/rule count grows.",
-  "total": 78,
+  "total": 74,
   "counts": {
-    "suite/ecosystem/determinant/src/ui/panel/terminal_frame.c::Semantic Consistency Law (Reference form)": 2,
-    "suite/ecosystem/determinant/src/ui/tree/terminal_tree_view.c::Semantic Consistency Law (Cast and pointer spelling)": 2,
     "suite/ecosystem/graphvex/src/ui/element.c::Semantic Consistency Law (Reference form)": 21,
     "suite/ecosystem/vexspoke/src/lang/vec3/vec3_int_float.c::Semantic Consistency Law (Access depth)": 18,
     "suite/ecosystem/vexspoke/src/lang/vec3/vec3_long_double.c::Semantic Consistency Law (Access depth)": 18,
