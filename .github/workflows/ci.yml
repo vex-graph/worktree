@@ -241,7 +241,7 @@ jobs:
 
       - name: Install LLVM & Shader Dependencies (macOS)
         if: matrix.os_family == 'darwin'
-        run: brew install llvm glslang vulkan-headers molten-vk
+        run: brew install llvm glslang vulkan-headers vulkan-loader molten-vk
 
       - name: Configure Compiler Toolchain
         shell: bash

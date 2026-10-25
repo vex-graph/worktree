@@ -1,7 +1,7 @@
 {
   "version": 1,
   "note": "Ratchet baseline: CI fails only when a file/rule count grows.",
-  "total": 61414,
+  "total": 61334,
   "counts": {
     "suite/ecosystem/api-haven/src/ai/ai_chat.c::Semantic Consistency Law (Control flow: header space)": 26,
     "suite/ecosystem/api-haven/src/ai/ai_chat.c::Semantic Consistency Law (Control flow: statement separation)": 34,
@@ -274,8 +274,8 @@
     "suite/ecosystem/hotcwap/window/traffic_light_cocoa.m::Semantic Consistency Law (Control flow: header space)": 15,
     "suite/ecosystem/hotcwap/window/traffic_light_cocoa.m::Semantic Consistency Law (Control flow: statement separation)": 30,
     "suite/ecosystem/hotcwap/window/window.c::Semantic Consistency Law (Control flow: body on the header line)": 6,
-    "suite/ecosystem/hotcwap/window/window.c::Semantic Consistency Law (Control flow: header space)": 2,
-    "suite/ecosystem/hotcwap/window/window.c::Semantic Consistency Law (Control flow: statement separation)": 142,
+    "suite/ecosystem/hotcwap/window/window.c::Semantic Consistency Law (Control flow: header space)": 8,
+    "suite/ecosystem/hotcwap/window/window.c::Semantic Consistency Law (Control flow: statement separation)": 157,
     "suite/ecosystem/hotcwap/window/window_cocoa.m::Semantic Consistency Law (Control flow: body on the header line)": 3,
     "suite/ecosystem/hotcwap/window/window_cocoa.m::Semantic Consistency Law (Control flow: header space)": 198,
     "suite/ecosystem/hotcwap/window/window_cocoa.m::Semantic Consistency Law (Control flow: single-statement braces)": 5,
@@ -1327,8 +1327,6 @@
     "tests/relational-engine/nio/growable_mapped_file_abi_test.c::Semantic Consistency Law (Control flow: statement separation)": 148,
     "tests/relational-engine/nio/mem_exhaustion_test.c::Semantic Consistency Law (Control flow: header space)": 8,
     "tests/relational-engine/nio/mem_exhaustion_test.c::Semantic Consistency Law (Control flow: statement separation)": 179,
-    "tests/relational-engine/nio/mem_test.c::Semantic Consistency Law (Control flow: header space)": 3,
-    "tests/relational-engine/nio/mem_test.c::Semantic Consistency Law (Control flow: statement separation)": 98,
     "tests/relational-engine/nio/relational_memory_test.c::Semantic Consistency Law (Control flow: statement separation)": 41,
     "tests/relational-engine/nio/transient_lifetime_test.c::Semantic Consistency Law (Control flow: header space)": 8,
     "tests/relational-engine/nio/transient_lifetime_test.c::Semantic Consistency Law (Control flow: statement separation)": 57,
