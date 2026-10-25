@@ -303,7 +303,7 @@ Do not hand-edit generated tables; add files/tests and use `sync` or `run`.
 
 | Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
 | :--- | :---: | ---: | :--- | :--- | :--- | :--- |
-| `tests/determinant/run.py` | ✅ | 1792744061 | 4f87848c00e0e638fd9dd3200409ae9e26f3cb158103fd39acb4fbd24d662bc8 | ['python3', 'tests/determinant/run.py']; macOS arm64; clang strict C23 -Wall -Wextra -Werror with assertions active plus ASan/UBSan via tests/determinant/run.py; all mirrored Determinant owners compiled per mode; no host terminal, downloads or visual acceptance | TerminalScrollGlide per-axis scroll motion: defaults and configured construction, invalid ease/epsilon rejection with preserved state, impulse/target/position/halt/clamp, frame-by-frame easing and snap, saturated SIZE_MAX conversion, safe null defaults, projections, and a settled hot-loop guard. The runner also proves the intended unsupported-arity rejection for TerminalScrollGlide(1) and now compiles 27 terminal owners in both modes. | passed |
+| `tests/determinant/run.py` | ❌ | 1792744061 | 4f87848c00e0e638fd9dd3200409ae9e26f3cb158103fd39acb4fbd24d662bc8 | ['python3', 'tests/determinant/run.py']; macOS arm64; clang strict C23 -Wall -Wextra -Werror with assertions active plus ASan/UBSan via tests/determinant/run.py; all mirrored Determinant owners compiled per mode; no host terminal, downloads or visual acceptance | TerminalScrollGlide per-axis scroll motion: defaults and configured construction, invalid ease/epsilon rejection with preserved state, impulse/target/position/halt/clamp, frame-by-frame easing and snap, saturated SIZE_MAX conversion, safe null defaults, projections, and a settled hot-loop guard. The runner also proves the intended unsupported-arity rejection for TerminalScrollGlide(1) and now compiles 27 terminal owners in both modes. | stale — content changed; rerun required |
 
 ### `tests/determinant/cli`
 
@@ -316,31 +316,96 @@ Do not hand-edit generated tables; add files/tests and use `sync` or `run`.
 | `tests/determinant/cli/output_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
 | `tests/determinant/cli/scanner_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
 
-### `tests/determinant/terminal`
+### `tests/determinant/events`
 
 | Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
 | :--- | :---: | ---: | :--- | :--- | :--- | :--- |
-| `tests/determinant/terminal/terminal_anchor_test.c` | ✅ | 1792249302 | 79c2e476ee0f29d4f475a3ab6ecd61d7a15bc396aa823e0be74192941306adb4 | ['sh', '-c', 'for t in terminal_surface_test terminal_anchor_test terminal_panel_test; do ./cmake-build-debug/bin/$t &#124;&#124; exit; done']; macOS arm64; C23 debug owner executables, assertions active; borrowed grids only, no live host terminal, no physical device or visual acceptance | Determinant last-paint presenter (TerminalSurface), placement vocabulary (TerminalAnchor) and layered panel (TerminalPanel): delta scanning with gap tolerance and atomic adoption, band/pin/fill placement validated against semicolon's measured 103x23 IDE example, total ordered layer paint, reserve flow, reentrant refusal, stale-id rejection and cold growth | passed |
-| `tests/determinant/terminal/terminal_appearance_test.c` | ✅ | 1792055425 | fcb1e3a72a58a7aa61f0e7170c5ff89ee2b850b424d218479e3245c8854fc0e0 | ['sh', '-c', 'for t in terminal_button_test terminal_canvas_test terminal_frame_test terminal_input_line_test terminal_status_bar_test terminal_image_test terminal_text_view_test terminal_list_view_test terminal_appearance_test terminal_test; do ./cmake-build-debug/bin/$t &#124;&#124; exit; done']; macOS arm64; C23 debug owner executables; no live host terminal or visual acceptance | Determinant terminal owner suite after return-by-value projection and per-file cookbook audit | passed |
-| `tests/determinant/terminal/terminal_button_test.c` | ✅ | 1792055425 | 08c79dc0d3b7a92301bbe1f4ac03a6cf3eb0cbd202303f5df33e3c0f97dc0fd0 | ['sh', '-c', 'for t in terminal_button_test terminal_canvas_test terminal_frame_test terminal_input_line_test terminal_status_bar_test terminal_image_test terminal_text_view_test terminal_list_view_test terminal_appearance_test terminal_test; do ./cmake-build-debug/bin/$t &#124;&#124; exit; done']; macOS arm64; C23 debug owner executables; no live host terminal or visual acceptance | Determinant terminal owner suite after return-by-value projection and per-file cookbook audit | passed |
-| `tests/determinant/terminal/terminal_canvas_test.c` | ✅ | 1792055425 | 3d5f81bd81d5af2df77b2320673539df9aba22d9ee70fc487d14594f7dfd6c5f | ['sh', '-c', 'for t in terminal_button_test terminal_canvas_test terminal_frame_test terminal_input_line_test terminal_status_bar_test terminal_image_test terminal_text_view_test terminal_list_view_test terminal_appearance_test terminal_test; do ./cmake-build-debug/bin/$t &#124;&#124; exit; done']; macOS arm64; C23 debug owner executables; no live host terminal or visual acceptance | Determinant terminal owner suite after return-by-value projection and per-file cookbook audit | passed |
-| `tests/determinant/terminal/terminal_code_view_test.c` | ✅ | 1792552904 | 2b3b7f728398f356b67fc3c1aa9d7bc41d6f06526c247bc2d1b7ef64a25845be | ['python3', 'tests/determinant/run.py']; macOS arm64; strict optimized C23 assertions and ASan/UBSan via tests/determinant/run.py; no lexer, Semicolon integration, physical terminal or visual acceptance | TerminalCodeView caller-supplied C23-style byte spans, bold/colored pens, source-anchored hint labels, cell clipping/scroll, getters and rejection preservation | passed |
-| `tests/determinant/terminal/terminal_color_test.c` | ✅ | 1792386373 | f2de9a005fef54e344c432651aab675e03bf9c2d5739e51ba9bbd7b7f4660844 | ['python3', 'tests/determinant/run.py']; macOS arm64; clang strict C23 -Wall -Wextra -Werror with assertions active, plus an ASan/UBSan pass, both via tests/determinant/run.py; pure arithmetic, no terminal, no device, no allocation | Determinant TerminalColor, and specifically the alpha composite TerminalColor_over that makes a fade possible: channel order, the unset sentinel vs opaque black (one bit apart and NOT the same thing), the two exact ends (a clear layer shows what is behind it, an opaque one passes through bit-for-bit), the half step and its rounding, per-channel independence, monotone travel across all 256 alphas, a real fade always coming out opaque, a re-composite being a fixed point, and the same translucent value landing lighter on a light backdrop than a dark one | passed |
-| `tests/determinant/terminal/terminal_frame_test.c` | ✅ | 1792055425 | bc29511306bdd6906172f87d97d5109a0c1da6a823fabc3973a64454949a6610 | ['sh', '-c', 'for t in terminal_button_test terminal_canvas_test terminal_frame_test terminal_input_line_test terminal_status_bar_test terminal_image_test terminal_text_view_test terminal_list_view_test terminal_appearance_test terminal_test; do ./cmake-build-debug/bin/$t &#124;&#124; exit; done']; macOS arm64; C23 debug owner executables; no live host terminal or visual acceptance | Determinant terminal owner suite after return-by-value projection and per-file cookbook audit | passed |
-| `tests/determinant/terminal/terminal_image_test.c` | ✅ | 1792055425 | ac2cce8d4a13aab8ff0bdf6c4cec990eb880c880213410afe604e057f3dab98c | ['sh', '-c', 'for t in terminal_button_test terminal_canvas_test terminal_frame_test terminal_input_line_test terminal_status_bar_test terminal_image_test terminal_text_view_test terminal_list_view_test terminal_appearance_test terminal_test; do ./cmake-build-debug/bin/$t &#124;&#124; exit; done']; macOS arm64; C23 debug owner executables; no live host terminal or visual acceptance | Determinant terminal owner suite after return-by-value projection and per-file cookbook audit | passed |
-| `tests/determinant/terminal/terminal_input_line_test.c` | ✅ | 1792055425 | 760cc0be9e348b10c0f315683fc065e4e60d260d2a4fc0f005a4807429cebac1 | ['sh', '-c', 'for t in terminal_button_test terminal_canvas_test terminal_frame_test terminal_input_line_test terminal_status_bar_test terminal_image_test terminal_text_view_test terminal_list_view_test terminal_appearance_test terminal_test; do ./cmake-build-debug/bin/$t &#124;&#124; exit; done']; macOS arm64; C23 debug owner executables; no live host terminal or visual acceptance | Determinant terminal owner suite after return-by-value projection and per-file cookbook audit | passed |
-| `tests/determinant/terminal/terminal_input_test.c` | ✅ | 1792341768 | e9d5fdebabc630861f014af4a18f7d98c498a6b44a89da1177a7b8835e3b7fb7 | ['python3', 'tests/determinant/run.py']; macOS arm64; clang strict C23/assertions and ASan/UBSan via tests/determinant/run.py; literal byte strings only - no terminal, no pty | Determinant TerminalInput including the horizontal wheel pair (66 left / 67 right, in both SGR and X10 packing) alongside press, release, vertical wheel, motion, drag, all modifiers, byte-at-a-time feeding, field-overflow and zero-coordinate refusals, and recovery from truncated or poisoned sequences | passed |
-| `tests/determinant/terminal/terminal_list_view_test.c` | ✅ | 1792055425 | 37e6db231044e3bd405fe3c598db8ecdeb41d8413ae80cf193c794843d4ebf48 | ['sh', '-c', 'for t in terminal_button_test terminal_canvas_test terminal_frame_test terminal_input_line_test terminal_status_bar_test terminal_image_test terminal_text_view_test terminal_list_view_test terminal_appearance_test terminal_test; do ./cmake-build-debug/bin/$t &#124;&#124; exit; done']; macOS arm64; C23 debug owner executables; no live host terminal or visual acceptance | Determinant terminal owner suite after return-by-value projection and per-file cookbook audit | passed |
-| `tests/determinant/terminal/terminal_markdown_view_test.c` | ✅ | 1792599201 | ead616d3eae8c8b5e4ec5eb85a6829d7bfefa30a9537be86f39faa954f15e8d9 | ['python3', 'tests/determinant/run.py']; macOS arm64; determinant registered strict C23 and ASan/UBSan owners; current Markdown implementation and fixtures | Markdown renderer owner suite after table and callout behavior updates | passed |
-| `tests/determinant/terminal/terminal_panel_test.c` | ✅ | 1792251172 | 780be56c8fc1c75ef8c5d7786350a1973e025099603fe389ad1c06b5afa041ae | ['python3', 'tests/determinant/run.py']; macOS arm64; clang strict C23/assertions and ASan/UBSan via tests/determinant/run.py; no live host terminal, no physical device or visual acceptance | Determinant component tree: TerminalText (addressable leaf: pen/style/colour, brackets, alignment, cell measurement with wide glyphs, parent-pen inheritance, clipping) and the rewritten TerminalPanel (FLEX reserve flow and LAYERED stacking, child identity with generation staleness, add/remove/detach ownership and re-parenting, total repaint with no dirty tracking, pen inheritance and background fill, cold hit-testing, self-add and cyclic-paint refusal, recursive teardown), both grounded in semicolon's measured 103x23 IDE example including a nested panel painting through the chain | passed |
-| `tests/determinant/terminal/terminal_reload_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
-| `tests/determinant/terminal/terminal_scroll_glide_test.c` | ✅ | 1792744061 | e8b29f0137a8afdd0d0ed75ca72fa616972f29b9e21f044a8a6b6ea7fa5f05c0 | ['python3', 'tests/determinant/run.py']; macOS arm64; clang strict C23 -Wall -Wextra -Werror with assertions active plus ASan/UBSan via tests/determinant/run.py; all mirrored Determinant owners compiled per mode; no host terminal, downloads or visual acceptance | TerminalScrollGlide per-axis scroll motion: defaults and configured construction, invalid ease/epsilon rejection with preserved state, impulse/target/position/halt/clamp, frame-by-frame easing and snap, saturated SIZE_MAX conversion, safe null defaults, projections, and a settled hot-loop guard. The runner also proves the intended unsupported-arity rejection for TerminalScrollGlide(1) and now compiles 27 terminal owners in both modes. | passed |
-| `tests/determinant/terminal/terminal_status_bar_test.c` | ✅ | 1792055425 | e5cc53e001abe64aba679f1cdf80a817a31d79167f147664e77ff42b0e4928e9 | ['sh', '-c', 'for t in terminal_button_test terminal_canvas_test terminal_frame_test terminal_input_line_test terminal_status_bar_test terminal_image_test terminal_text_view_test terminal_list_view_test terminal_appearance_test terminal_test; do ./cmake-build-debug/bin/$t &#124;&#124; exit; done']; macOS arm64; C23 debug owner executables; no live host terminal or visual acceptance | Determinant terminal owner suite after return-by-value projection and per-file cookbook audit | passed |
-| `tests/determinant/terminal/terminal_surface_test.c` | ✅ | 1792377851 | 96461fadc124962f8280e760185dd341c8123fd00c43b9f2ed570a0848656265 | ['python3', 'tests/determinant/run.py']; macOS arm64; clang strict C23/assertions and ASan/UBSan via tests/determinant/run.py; borrowed grids only, no device | TerminalSurface as a transaction: BEGIN arrives exactly once before the runs and END exactly once after with no out-of-order phase, a frame that changes nothing opens no transaction at all, a sink that refuses part-way still closes it, and the bracket cannot be swapped while the transaction is open | passed |
-| `tests/determinant/terminal/terminal_test.c` | ✅ | 1792055425 | 646a2a0ee595fd9effd0aad03b496e26694ff0c32e8ac340502020f0c87366c4 | ['sh', '-c', 'for t in terminal_button_test terminal_canvas_test terminal_frame_test terminal_input_line_test terminal_status_bar_test terminal_image_test terminal_text_view_test terminal_list_view_test terminal_appearance_test terminal_test; do ./cmake-build-debug/bin/$t &#124;&#124; exit; done']; macOS arm64; C23 debug owner executables; no live host terminal or visual acceptance | Determinant terminal owner suite after return-by-value projection and per-file cookbook audit | passed |
-| `tests/determinant/terminal/terminal_text_test.c` | ✅ | 1792251172 | 8c059aec57c4d29c7c027d49a68dc02ffae7dc6dce2c2f8f06ab720ceecf7580 | ['python3', 'tests/determinant/run.py']; macOS arm64; clang strict C23/assertions and ASan/UBSan via tests/determinant/run.py; no live host terminal, no physical device or visual acceptance | Determinant component tree: TerminalText (addressable leaf: pen/style/colour, brackets, alignment, cell measurement with wide glyphs, parent-pen inheritance, clipping) and the rewritten TerminalPanel (FLEX reserve flow and LAYERED stacking, child identity with generation staleness, add/remove/detach ownership and re-parenting, total repaint with no dirty tracking, pen inheritance and background fill, cold hit-testing, self-add and cyclic-paint refusal, recursive teardown), both grounded in semicolon's measured 103x23 IDE example including a nested panel painting through the chain | passed |
-| `tests/determinant/terminal/terminal_text_view_test.c` | ✅ | 1792055425 | b34a194ee58b6e701d09559fdf994598c4bb2a0b4316d7fec6555ff1f0ee15a4 | ['sh', '-c', 'for t in terminal_button_test terminal_canvas_test terminal_frame_test terminal_input_line_test terminal_status_bar_test terminal_image_test terminal_text_view_test terminal_list_view_test terminal_appearance_test terminal_test; do ./cmake-build-debug/bin/$t &#124;&#124; exit; done']; macOS arm64; C23 debug owner executables; no live host terminal or visual acceptance | Determinant terminal owner suite after return-by-value projection and per-file cookbook audit | passed |
-| `tests/determinant/terminal/terminal_tree_view_test.c` | ✅ | 1792389547 | 2be3a3248b99cfa3b642dfe2fff8d3b4d6961ee7b8b2da9cf8a83539adbd5d92 | ['python3', 'tests/determinant/run.py']; macOS arm64; clang strict C23 -Wall -Wextra -Werror, assertions active, plus ASan/UBSan, both via tests/determinant/run.py; headless - the class owns structure, folding, selection and the viewport and no drawing at all | Determinant TerminalTreeView, the scrollable/collapsible tree behind a file browser: the pre-order layout verified from the VISIBLE ROWS (each node's subtreeCount is re-derived by walking the displayed rows, so the array is checked against the screen rather than itself), a declared folder arrives collapsed while a leaf that gains a child is promoted and opened, reveal opens a path, folding removes rows but never reorders them (subsequence check across a 200-round deterministic fold fuzz), selection folded out of sight stays selected, click offsets resolve through the scroll position and past the last row resolve to nothing, every scroll route clamps (including a fold under the viewport), subtree removal drops the selection with it and never reuses an id, growth across two doublings keeps the layout, and clear keeps the storage while rewinding every offset. Stated gap: allocation failure is not injectable, so a refused growth is counted but not reached | passed |
+| `tests/determinant/events/terminal_input_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+
+### `tests/determinant/format`
+
+| Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
+| :--- | :---: | ---: | :--- | :--- | :--- | :--- |
+| `tests/determinant/format/terminal_color_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+
+### `tests/determinant/ui/button`
+
+| Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
+| :--- | :---: | ---: | :--- | :--- | :--- | :--- |
+| `tests/determinant/ui/button/terminal_button_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+
+### `tests/determinant/ui/code`
+
+| Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
+| :--- | :---: | ---: | :--- | :--- | :--- | :--- |
+| `tests/determinant/ui/code/terminal_code_view_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+
+### `tests/determinant/ui/field`
+
+| Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
+| :--- | :---: | ---: | :--- | :--- | :--- | :--- |
+| `tests/determinant/ui/field/terminal_input_line_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+
+### `tests/determinant/ui/image`
+
+| Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
+| :--- | :---: | ---: | :--- | :--- | :--- | :--- |
+| `tests/determinant/ui/image/terminal_image_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+
+### `tests/determinant/ui/list`
+
+| Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
+| :--- | :---: | ---: | :--- | :--- | :--- | :--- |
+| `tests/determinant/ui/list/terminal_list_view_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+
+### `tests/determinant/ui/markdown`
+
+| Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
+| :--- | :---: | ---: | :--- | :--- | :--- | :--- |
+| `tests/determinant/ui/markdown/terminal_markdown_view_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+
+### `tests/determinant/ui/panel`
+
+| Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
+| :--- | :---: | ---: | :--- | :--- | :--- | :--- |
+| `tests/determinant/ui/panel/terminal_anchor_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/determinant/ui/panel/terminal_frame_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/determinant/ui/panel/terminal_panel_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+
+### `tests/determinant/ui/scroll`
+
+| Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
+| :--- | :---: | ---: | :--- | :--- | :--- | :--- |
+| `tests/determinant/ui/scroll/terminal_scroll_glide_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+
+### `tests/determinant/ui/surface`
+
+| Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
+| :--- | :---: | ---: | :--- | :--- | :--- | :--- |
+| `tests/determinant/ui/surface/terminal_canvas_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/determinant/ui/surface/terminal_reload_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/determinant/ui/surface/terminal_surface_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/determinant/ui/surface/terminal_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+
+### `tests/determinant/ui/text`
+
+| Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
+| :--- | :---: | ---: | :--- | :--- | :--- | :--- |
+| `tests/determinant/ui/text/terminal_status_bar_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/determinant/ui/text/terminal_text_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/determinant/ui/text/terminal_text_view_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+
+### `tests/determinant/ui/theme`
+
+| Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
+| :--- | :---: | ---: | :--- | :--- | :--- | :--- |
+| `tests/determinant/ui/theme/terminal_appearance_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+
+### `tests/determinant/ui/tree`
+
+| Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
+| :--- | :---: | ---: | :--- | :--- | :--- | :--- |
+| `tests/determinant/ui/tree/terminal_tree_view_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
 
 ### `tests/func`
 
@@ -627,7 +692,7 @@ Do not hand-edit generated tables; add files/tests and use `sync` or `run`.
 | `tests/primeagen/cli/main_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
 | `tests/primeagen/cli/preview_test.py` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
 | `tests/primeagen/cli/screen_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
-| `tests/primeagen/cli/tui_test.py` | ✅ | 1792677171 | 5b3891b6d507e993887faf477ea4ed89a0e57e54b5ca2ab3af0e4ee95f4c12a2 | ['python3', '-B', 'tests/primeagen/cli/tui_test.py']; macOS arm64; strict C23 and ASan/UBSan; headless ncurses; appearance/physical terminal acceptance unproved | Primeagen explorer rendering, selection, folding, scroll and hidden-tree behavior | passed |
+| `tests/primeagen/cli/tui_test.py` | ❌ | 1792677171 | 5b3891b6d507e993887faf477ea4ed89a0e57e54b5ca2ab3af0e4ee95f4c12a2 | ['python3', '-B', 'tests/primeagen/cli/tui_test.py']; macOS arm64; strict C23 and ASan/UBSan; headless ncurses; appearance/physical terminal acceptance unproved | Primeagen explorer rendering, selection, folding, scroll and hidden-tree behavior | stale — content changed; rerun required |
 | `tests/primeagen/cli/update_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
 | `tests/primeagen/cli/update_test.py` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
 | `tests/primeagen/cli/view_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
