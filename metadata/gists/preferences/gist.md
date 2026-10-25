@@ -384,3 +384,32 @@ if(foo)
 * OS and driver resources (mappings, IOSurface, Vulkan/Metal handles, dylib images) belong to the tier that acquired them and are released there;
 * they are never routed through a second general allocator and never counted as heap blocks;
 * third-party library internals are outside this law; the seams we own are not.
+
+## 38. Universal Alignment Law (32-Byte Payload Floor)
+
+### 38.1 One floor, constructed
+* `Memory_alloc`, `MemoryArena_alloc` and `Transient_alloc` return 32-byte aligned payloads on every supported platform;
+* the floor is built, not declared: each backing region is over-allocated by one unit and its base rounded forward, and every slot size and bump stride is a multiple of 32;
+* the engine takes no alignment from `aligned_alloc`, `posix_memalign` or a platform attribute — it does the arithmetic itself;
+* nothing outside the engine may produce an ecosystem block, so nothing outside it may choose an alignment for one.
+
+### 38.2 Release validates the floor
+* every free and every metadata read rejects `(u & 31) != 0` before the negative header read;
+* alignment is a provenance gate, not a comment: an address that is not a block cannot be made to look like one by guessing 32 bytes behind it;
+* rounding never rewrites the length: `Memory_length` reports the requested bytes, and waste is bounded at 31 bytes per block.
+
+### 38.3 Across platforms, by construction
+* macOS 14+ arm64, Windows 10+ x64 and arm64 all promise 16 from `malloc`; 16 is the platform fact, 32 is the shipped contract;
+* no caller infers alignment from the platform, the compiler default or a neighboring allocation — it reads `MEMORY_PAYLOAD_ALIGN`;
+* types wider than 64 bytes are outside the floor and outside the supported types.
+
+### 38.4 Over-aligned types are owned, not smuggled
+* a type whose `_Alignof` exceeds the floor is never passed to `Memory_alloc` directly;
+* it lives inside a 32-aligned owner or inside a typed owner whose geometry is chosen at construction (`RowPool`/`RowChunk` take a caller-selected power-of-two alignment);
+* a typed owner handing rows across a tier or the C/Rust seam requests at least the floor; narrower row geometry is private scratch and never crosses a seam;
+* a generic allocation site carries a compile-time admission check (`_Alignof(T) <= MEMORY_PAYLOAD_ALIGN`).
+
+### 38.5 Proof
+* `tests/relational-engine/nio/mem_test.c` proves slab, bump and transient payloads, an `_Alignof == 32` type, and a payload allocated after a 16-byte one;
+* `after == before + MEMORY_HEADER_SIZE + 32` is the regression: 16-byte rounding leaves the second payload at 16 (mod 32);
+* an alignment law not proven by arithmetic on addresses is a law about intentions.
