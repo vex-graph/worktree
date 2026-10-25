@@ -750,10 +750,17 @@ static void base_cflags(StrList *out) {
     strl_push(out, "-Wall");
     strl_push(out, "-Wextra");
     strl_push(out, "-Werror");
+    strl_push(out, "-Wno-unused-but-set-variable");
 #ifdef __APPLE__
+#if defined(__arm64__) || defined(__aarch64__)
     strl_push(out, "-arch");
     strl_push(out, "arm64");
     strl_push(out, "-mmacosx-version-min=14.0");
+#elif defined(__x86_64__)
+    strl_push(out, "-arch");
+    strl_push(out, "x86_64");
+    strl_push(out, "-mmacosx-version-min=13.0");
+#endif
 #endif
     if (g_coverage) {
         // clang source-based coverage: every function/region gets counters.
@@ -2165,7 +2172,17 @@ static void link_target(Target *t) {
             if (g_units[i].t == t) strl_push(&c, g_units[i].obj);
         StrList libs = {0};
         collect_link_libs(t, &libs, 0);
+#if defined(__linux__)
+        if (libs.count > 0) {
+            strl_push(&c, "-Wl,--start-group");
+        }
+#endif
         strl_extend(&c, &libs);
+#if defined(__linux__)
+        if (libs.count > 0) {
+            strl_push(&c, "-Wl,--end-group");
+        }
+#endif
         strl_extend(&c, &(*t).syslibs);
         strl_push(&c, "-o");
         strl_push(&c, (*t).out_path);
