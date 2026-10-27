@@ -1,26 +1,23 @@
 # vexgraph — the worktree
 
-A **thin wrapper repo**. It holds the many independent vexgraph repositories
-side by side and nothing else — like a folder of small repos, not a monorepo.
-Each nested directory is its own checkout with its own remote: commit and push
-*inside each of those*, never here. Everything private (notes, the local app
-harness, assets) is git-ignored, so this repo stays tiny.
+A **workspace repository**. It contains independent repositories under `suite/`,
+workspace-owned build and policy tools under `tools/`, shared test/evidence
+material under `tests/` and `metadata/`, and root CI/IDE integration. It is not a
+single product-code monorepo: each nested repository retains its own source
+ownership and is committed independently. Check `git status` before assuming a
+nested path is a separate checkout.
 
 ## Current State
 
-**Implemented:** the wrapper structure, the `b`-driven build entry (`tools/b` →
-`suite/personal/b/b run exec tools/workspace.c`), the workspace build graph, the shared
-`tests/` suite, the lint and layout ratchets, the readiness scoreboard and the
-per-repository CI caller generator, and this documentation. **Proven:** macOS builds and the scoped
-test suites recorded in `metadata/gists/test-checklist.md`; the nested repositories range
-from implemented slices to source-free blueprints. **No sibling repository has an
-installed CI caller or baseline yet**, and the Windows *build* waits on the
-`tools/b` port even though the Python tooling already runs there.
-**The R5 applications and R6
-superapps are unfinished** — shells, scaffolds or designs, not shipped products.
-Semicolon's working R6 terminal shell is a dogfooding surface for editing this
-workspace and trying its registered `b` workflows, not proof that the intended
-full-stack IDE already exists.
+The root workspace coordinates independent projects. `tools/b` launches the
+workspace-owned target graph in `tools/workspace.c`, while the standalone `b`
+project supplies the generic compiler/runtime adapters. Root CI also owns
+workspace-wide documentation and tooling checks. Test evidence is recorded per
+executable owner in `metadata/gists/test-checklist.md`; consult that ledger and
+the readiness report for current results rather than relying on counts copied
+into this README. Product readiness varies by repository. Read each repository's
+own README and lawbook before treating a planned integration or roadmap item as
+implemented.
 
 ## Build: `b`
 
@@ -52,10 +49,14 @@ workspace engine that builds the whole ecosystem graph (libs, shaders, tests,
 apps); `tools/b` is a thin forwarding launcher for it.
 
 ```sh
-./tools/b build            # build everything (libs, tests, apps)
-./tools/b test [substr]    # build + run every *_test
-./tools/b run <name>       # run a target (an app launches as a real .app)
-./tools/b targets | watch | cc | doctor | clean
+./tools/b build            # compile all targets, or named targets and deps
+./tools/b test [substr]    # run all tests, or matching tests
+./tools/b run [name]       # list runnable targets, or launch a matching target
+./tools/b targets          # list every target, including libraries
+./tools/b check            # owner and public-surface coverage gates
+./tools/b coverage [substr]# instrumented tests and per-function execution gates
+./tools/b ide              # export IDE build metadata
+./tools/b watch | cc | doctor | clean
 ```
 
 Drop a `_main/<name>.c` containing a `main()` and `./tools/b run <name>` builds,
@@ -114,15 +115,11 @@ python3 tools/readiness.py [--markdown|--json|--execute]          # scoreboard
 python3 tools/ci_repos.py list|clone|check|baselines|callers      # manifest wiring
 ```
 
-`tools/platforms.json` is the single manifest: every repository, its tier, the
-platforms it declares support for and the platforms its own documentation claims
-as proven. `readiness.py` composes that manifest with the checklist ledger and
-the linter; a skip, a compile-only job or an unproven platform is never counted
-as a pass. `ci_repos.py` validates the manifest, clones missing checkouts (dry
-run by default), records each repository's repo-relative ratchet baseline, and
-installs the reusable-workflow caller. It refuses to install a caller into a
-repository that has no lawbook or baseline, because that caller would be red on
-arrival.
+`tools/platforms.json` declares repository platforms. `readiness.py` composes
+those declarations with the checklist and lint state; consult its output for
+current readiness. `ci_repos.py` validates repository wiring and can prepare
+checkouts, baselines and reusable-workflow callers. Its command details are
+available through `python3 tools/ci_repos.py --help`.
 
 The root workflow (`.github/workflows/ci.yml`) clones every declared repository,
 runs the tooling tests, then runs preference integrity, the checklist check, the
@@ -143,33 +140,18 @@ repository's own baselines, checks its lawbook exists, audits secrets, and
 accepts optional trusted build/test commands. The lint job of that reusable
 workflow runs on both Ubuntu and Windows.
 
-**Declared proof is not observed proof.** Today macOS is proven for 14 of 24
-repositories; Linux and Windows are proven for none. No sibling repository has a
-checked-in baseline or caller yet, and eight have no `<repo>-preferences.md`.
-The Windows **build** is deliberately absent until `tools/b` is ported off
-macOS-only flags and POSIX calls; a compile-only placeholder would be a false
-green. Windows tooling coverage is real but narrower than a build: it runs the
-Python tools, the checklist and both ratchets on a Windows runner. Linux is
-exercised by the Semicolon job and the weekly scoreboard. The ratchets record
-899 lint entries and 60,804 layout findings. Both baselines are generated from
-clean `origin/main` checkouts of every declared repository, not from a live
-working tree: the audit job clones `main`, so a tree snapshot would either hide
-debt that is already published or, once the working tree retires findings,
-report the published state as new debt. A live tree can therefore show new
-findings in files a session has not pushed yet, and the snapshot has to be
-regenerated immediately before the root commit that carries it. New debt is
-blocked while old debt is retired gradually. `--write` is opt-in and has not
-been run across the workspace.
+CI coverage and platform support change over time. The workflow files under
+`.github/workflows/` are authoritative for configured jobs; the readiness
+scoreboard and checklist report observed evidence. A configured job or declared
+platform is not, by itself, proof that a product runs there. The root workspace
+does not claim a platform result beyond what those records currently show.
 
 ## Architecture and implementation status
 
-R2 has two cooperating repositories: **Vexspoke** owns CPU computation, math,
-algorithms, synchronization and behavior; **Relational Engine** owns memory
-allocation/storage, stable row chunks, variable bindings and native C search over
-Rust-owned spans. Native IO/NIO has migrated to RE and default production builds
-link that implementation; Vexspoke contains no copies. Native C allocation semantics
-are preserved, not rewritten into Rust; broader collection migration is staged. R1 owns
-storage residency/lifetimes; GPU shaders and dispatch remain Graphvex R3.
+Tier ownership is governed by the Vertical Integration Law and the owning
+repositories' lawbooks. The table below records observed Semicolon composition
+at the time represented by its own README; it is not a full integration map for
+the ecosystem.
 
 ### Vertically integrated across vexgraph's stack
 
@@ -181,7 +163,7 @@ does not own compilers, drivers, or lower-tier implementations.
 
 | Layer | Semicolon today | Intended seam, not current integration |
 | :--- | :--- | :--- |
-| R1 Hotcwap | No direct runtime host integration in the terminal shell. | Supervised hot module and application lifetime. |
+| R1 Lifetime | No direct runtime host integration in the terminal shell. | Supervised application and OS lifetime. |
 | R2 Relational Engine + Vexspoke | Its build directly links engine native Memory and Vexspoke CPU helpers. | Broader resident storage/computation contracts remain separately proved. |
 | R3 Determinant + Language | Determinant's terminal-cell panel, input and Markdown toolkit plus Language's C23 lexer and conservative `C23Highlights` pass are linked into the shell. SemicolonSyntax supplies live `.c`/`.h` colors for keywords, types, functions, variables, macros, literals, brackets, and distinct regular/doc comments. | Semantic classification, inlays, Language project/index services and Graphvex GUI remain future integration. |
 | R4 interfaces | No Darling, Sesh, or Harness integration in this terminal path. | GUI widgets, sessions, and agent interface through their public seams. |
@@ -206,11 +188,12 @@ superapp products. See the
 |---|---|---|
 | `suite/personal/b` | standalone build-system CLI; workspace graph under `tools/` | `vex-graph/b` |
 | `suite/personal/func` | standalone compile-time opcode orchestrator | `vex-graph/func` |
-| `suite/ecosystem/hotcwap` | R1 kernel host · windows | `vexgraph-ecosystem/hotcwap` |
+| `suite/ecosystem/lifetime` | R1 kernel host · windows · OS lifetime | [vexgraph-ecosystem/lifetime](https://github.com/vexgraph-ecosystem/lifetime) |
+| `suite/personal/hotcwap` | R1 host supervisor · hot reload | [vexgraph-ecosystem/hotcwap](https://github.com/vexgraph-ecosystem/hotcwap) |
 | `suite/ecosystem/relational-engine` | R2 memory/storage · native C search | `vexgraph-ecosystem/relational-engine` |
 | `suite/ecosystem/vexspoke` | R2 CPU computation · behavior; legacy storage ABI retained | `vexgraph-ecosystem/vexspoke` |
 | `suite/ecosystem/graphvex` | R3 GPU driver (rect-first, no swapchain) | `vexgraph-ecosystem/graphvex` |
-| `suite/ecosystem/api-haven` | R3 API / connectors | `vexgraph-ecosystem/api-haven` |
+| `suite/personal/api-haven` | personal API / connectors | [vexgraph-ecosystem/api-haven](https://github.com/vexgraph-ecosystem/api-haven) |
 | `suite/ecosystem/determinant` | R3 terminal rendering, widgets, CLI parsing and caller-fed input | `vexgraph-ecosystem/determinant` |
 | `suite/ecosystem/language` | R3 caller-fed lexer/project/index slice; parser and LSP unfinished | `vexgraph-ecosystem/language` |
 | `suite/ecosystem/darkbase-engine` | R3 native vex store · `Database` M1 + `.vexdb` persistence implemented | `vexgraph-ecosystem/darkbase-engine` |
@@ -218,23 +201,25 @@ superapp products. See the
 | `suite/ecosystem/sesh` | R4 interface · session relay partial implementation | `vexgraph-ecosystem/sesh` |
 | `suite/ecosystem/harness` | R4 interface · the user's own agent (partial local objects) | `vexgraph-ecosystem/harness` |
 | `suite/ecosystem/samplerate` | R3 driver · native audio engine (CoreAudio/WASAPI/ALSA) | `vexgraph-ecosystem/samplerate` |
-| `suite/projects/{drawling,impedance}` | R5 · unfinished apps | `vexgraph-ecosystem/*` |
+| `suite/projects/drawling` | R5 · unfinished drawing studio | [vexgraph-ecosystem/drawling](https://github.com/vexgraph-ecosystem/drawling) |
+| `suite/projects/impedance` | R5 · unfinished audio application | [vexgraph-ecosystem/impedance](https://github.com/vexgraph-ecosystem/impedance) |
 | `suite/personal/primeagen` | standalone personal R5 agent client; future Semicolon consumer seam | `vex-graph/primeagen` |
 | `suite/projects/semicolon` | R6 · working terminal dogfooding shell; GUI and cross-tier workflow composition unfinished | `vexgraph-ecosystem/semicolon` |
 | `suite/projects/anti` | R6 · unfinished superapp | `vexgraph-ecosystem/anti` |
-| `tests` | the shared test suite | `vexgraph-ecosystem/tests` |
+| `tests` | shared executable-owner evidence and test lawbook | [vexgraph-ecosystem/tests](https://github.com/vexgraph-ecosystem/tests) |
 | `suite/personal/vex-graph` | profile/meta | `vex-graph/vex-graph` |
 
-Local-only (git-ignored, never published): `_trash/` retired checkouts ·
-`_notes/` notes · `_main/` apps · `resources/` assets. (`tools/` helpers are
-tracked and published.)
+Some paths may be Git-ignored local material. Use `git status --ignored` and the
+root `.gitignore` to determine what is local-only; do not infer that `resources/`
+or `_main/` exists or is ignored in every checkout.
 
 ## Rules
 
-The workspace is governed by a constitution: **`metadata/gists/preferences/PREFERENCES.md`** — read it in
-full; repositories with local laws add their own `<repo>-preferences.md`.
-Locally it is one real, Git-ignored Gist-owned file, not a symlink or a
-tracked Vexspoke file. Its published canonical edition is:
+The workspace constitution's compressed law list is
+[`metadata/gists/preferences/gist.md`](metadata/gists/preferences/gist.md).
+Use `./tools/prefs list` and read only the relevant law; do not load the full
+documentation wholesale. Repositories can add their own `<repo>-preferences.md`.
+The published canonical edition is:
 
 **https://gist.github.com/vex-graph/4132a6c45cb6d3797c3e8eff2e94035a**
 
@@ -244,14 +229,9 @@ order** (the Git Workflow Law).
 
 ## Scope and Limitations
 
-**Scope:** a thin wrapper that nests the independent repositories and builds them
-together through `b`; it owns no product code. **Deliberately not covered:**
-feature implementation (each repo owns its own) and visual acceptance (the
-user's). **Known limits and gaps:** no monorepo semantics — each nested repo is
-committed and pushed independently; nothing here proves any application runtime,
-and the readiness Gist plus `metadata/gists/test-checklist.md` are the evidence of record.
-CI observes lint debt, the evidence ledger, lawbook presence, the Semicolon
-macOS/Linux job and the Python tooling on Windows; it does not prove the other
-repositories' runtimes, and the Windows ecosystem build is unported. The
-readiness table reports declared proof separately from observed CI so the two
-cannot be confused.
+**Scope:** workspace-level build orchestration, CI/tooling integration,
+preferences, readiness and shared evidence. Feature implementation remains with
+the owning repository. **Known limits:** root documentation and CI do not imply
+that every nested repository is integrated, portable or product-ready. Use the
+owning source, README, lawbook, current readiness report and test checklist for
+those claims. Visual acceptance remains the user's assessment.

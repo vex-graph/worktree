@@ -869,7 +869,7 @@ static void setup_vexspoke(TargetList *tl) {
     // Memory_*/File_* symbols, so reject it loudly instead.
     for (int i = 0; i < c.count; i++) {
         const char *s = c.items[i];
-        if (strstr(s, "/src/nio/") || strstr(s, "/src/io/"))
+        if (strstr(s, "/src/nio/") || strstr(s, "/src/io/") || strstr(s, "/src/relational/"))
             die("duplicate storage source left in Vexspoke: %s", s);
     }
     (*v).srcs = c;
@@ -889,11 +889,9 @@ static void setup_vexspoke(TargetList *tl) {
 
 // ── host-behavior/relational-engine (R2 storage/memory owner) ──────────────
 // Production native C Memory/MemoryArena/Transient, File/Cache/VexHome/
-// log/transport, and the type-id algebra, promoted from Vexspoke. Only
-// src/nio + src/io + src/type are production; the C relational/reflection
-// collections have one owner, Vexspoke (consumers put Vexspoke src first).
-// Engine storage is the Rust variable/struct layer plus this ABI; the
-// duplicated reference copies were deleted rather than left to drift.
+// log/transport, the type-id algebra, and the relational symbol table/spotlight
+// collections (src/relational), owned by relational-engine. Vexspoke owns R2
+// CPU computation/behavior.
 static void add_gen(const char *src, const char *out, Cmd cmd);   // the generator seam below
 
 // The R2 mapping's C ABI — reached from C through ONE thin extern-C surface,
@@ -947,6 +945,7 @@ static void setup_relational_engine(TargetList *tl) {
     StrList c = {0};
     glob_rec(abspath(strf("%s/src/nio", REL_ENGINE)), ".c", &c);
     glob_rec(abspath(strf("%s/src/io", REL_ENGINE)), ".c", &c);
+    glob_rec(abspath(strf("%s/src/relational", REL_ENGINE)), ".c", &c);
     glob_rec(abspath(strf("%s/src/type", REL_ENGINE)), ".c", &c);  // type algebra
 #ifdef __APPLE__
     glob_rec(abspath(strf("%s/src/io", REL_ENGINE)), ".m", &c);  // clipboard_mac.m (ARC)
@@ -961,11 +960,16 @@ static void setup_relational_engine(TargetList *tl) {
     if (!g_release) strl_push(&(*e).pub_defs, "DEBUG_BORROW_CHECK=1");
 }
 
-// Native storage owner tests: tests/relational-engine/{nio,io}. The Rust ABI
+// Native storage owner tests: tests/relational-engine/{nio,io,type,relational}. The Rust ABI
 // handshake (relational_memory_test.c) needs rust/include + the Rust static
 // library, so it stays owned by tests/relational-engine/rust/run.py, not here.
 static void setup_relational_engine_tests(TargetList *tl) {
-    const char *dirs[] = { "tests/relational-engine/nio", "tests/relational-engine/io", "tests/relational-engine/type" };
+    const char *dirs[] = {
+        "tests/relational-engine/nio",
+        "tests/relational-engine/io",
+        "tests/relational-engine/type",
+        "tests/relational-engine/relational"
+    };
     StrList srcs = {0};
     for (size_t d = 0; d < sizeof dirs / sizeof dirs[0]; d++)
         glob_rec(abspath(dirs[d]), ".c", &srcs);
@@ -1018,7 +1022,7 @@ static void setup_darling(TargetList *tl) {
     strl_sort(&c);
     (*lib).srcs = c;
     strl_push(&(*lib).includes, strf("%s/src", base));
-    strl_push(&(*lib).deps, "hotcwap");   // R1: the OS window
+    strl_push(&(*lib).deps, "lifetime");   // R1: the OS window
     strl_push(&(*lib).deps, "graphvex");  // R3: Element + the renderer
 }
 
@@ -1190,7 +1194,7 @@ static void setup_sesh(TargetList *tl) {
     strl_push(&(*t).includes, src);
     strl_push(&(*t).includes, abspath("interfaces/sesh"));
     strl_push(&(*t).includes, abspath(strf("%s/src", VEXSPOKE)));
-    strl_push(&(*t).includes, abspath("drivers/api-haven/src"));
+    strl_push(&(*t).includes, abspath("personal/api-haven/src"));
     strl_push(&(*t).deps, "vexspoke");
 }
 
@@ -1215,9 +1219,9 @@ static void setup_impedance(TargetList *tl) {
     }
 }
 
-// ── drivers/api-haven ────────────────────────────────────────────────
+// ── personal/api-haven ────────────────────────────────────────────────
 static void setup_apihaven(TargetList *tl) {
-    char *base = abspath("drivers/api-haven");
+    char *base = abspath("personal/api-haven");
     const char *libs[] = {
         "src/api/client.c", "src/api/auth.c", "src/api/rest.c",
         "src/api/haven_ws_fanout.c", "src/com/discord/discord.c",
@@ -1297,21 +1301,20 @@ static void setup_harness(TargetList *tl) {
     }
 }
 
-// ── host-behavior/hotcwap (R1: kernel host + hotload machinery) ─────────────
-static void setup_hotcwap(TargetList *tl) {
-    char *base = abspath("host-behavior/hotcwap");
-    Target *lib = target_new(tl, "hotcwap", T_LIB);
+// ── host-behavior/lifetime (R1: kernel host + OS lifetime) ───────────────────
+static void setup_lifetime(TargetList *tl) {
+    char *base = abspath("host-behavior/lifetime");
+    char *src = strf("%s/src", base);
+    Target *lib = target_new(tl, "lifetime", T_LIB);
     const char *csrc[] = {
         "kernel/application.c", "kernel/process.c", "kernel/console.c",
         "kernel/commandline.c", "kernel/commandline_ncurses.c",
-        "kernel/kernel.c", "spoke/lifetime.c", "hot/hot.c",
-        "hot/hot_trampoline.c", "hot/hot_retire.c", "hot/manifest.c",
-        "hot/ledger.c", "hot/throwable.c", "window/window_event.c",
+        "kernel/kernel.c", "spoke/lifetime.c", "window/window_event.c",
         "permission/permission.c", "capability/capability.c",
     };
     for (size_t i = 0; i < sizeof csrc / sizeof csrc[0]; i++)
-        strl_push(&(*lib).srcs, strf("%s/%s", base, csrc[i]));
-    strl_push(&(*lib).includes, base);
+        strl_push(&(*lib).srcs, strf("%s/%s", src, csrc[i]));
+    strl_push(&(*lib).includes, src);
     strl_push(&(*lib).deps, "vexspoke");
     // CommandLine owns the TTY through ncurses (the terminal analog of AppKit in
     // window_cocoa.m); the backend is one translation unit behind CommandLineIo.
@@ -1322,23 +1325,67 @@ static void setup_hotcwap(TargetList *tl) {
         "permission/objc/permission_cocoa.m",
     };
     for (size_t i = 0; i < sizeof msrc / sizeof msrc[0]; i++)
-        strl_push(&(*lib).srcs, strf("%s/%s", base, msrc[i]));
+        strl_push(&(*lib).srcs, strf("%s/%s", src, msrc[i]));
     apple_frameworks(&(*lib).syslibs);
 #else
-    strl_push(&(*lib).srcs, strf("%s/window/window.c", base));
+    strl_push(&(*lib).srcs, strf("%s/window/window.c", src));
 #endif
     strl_push(&(*lib).syslibs, "-lpthread");
+
+    char *tdir = strf("%s/tests/lifetime", g_root);
+    StrList ts = {0};
+    glob_rec(tdir, "_test.c", &ts);
+    strl_sort(&ts);
+    for (int i = 0; i < ts.count; i++) {
+        const char *bn = strrchr(ts.items[i], '/');
+        bn = bn ? bn + 1 : ts.items[i];
+        char *name = xstrdup(bn);
+        name[strlen(name) - 2] = 0;
+        Target *t = target_new(tl, name, T_EXE);
+        (*t).is_test = true;
+        strl_push(&(*t).srcs, ts.items[i]);
+        strl_push(&(*t).includes, src);
+        strl_push(&(*t).includes, abspath("tests"));   // test_support.h
+        strl_push(&(*t).defs, "UNDEBUG");
+        if (!strcmp(name, "spoke_test")) {
+            strl_push(&(*t).srcs, strf("%s/spoke/lifetime.c", src));
+            strl_push(&(*t).deps, "vexspoke");
+        } else {
+            strl_push(&(*t).deps, "lifetime");
+        }
+        strl_push(&(*t).syslibs, "-lncurses");
+        add_exe_libs(t);
+    }
+}
+
+// ── personal/hotcwap (hot-swap processing engine) ───────────────────────────
+static void setup_hotcwap(TargetList *tl) {
+    char *base = abspath("personal/hotcwap");
+    char *lifetime_src = abspath("host-behavior/lifetime/src");
+    Target *lib = target_new(tl, "hotcwap", T_LIB);
+    const char *csrc[] = {
+        "hot/hot.c", "hot/hot_trampoline.c", "hot/hot_retire.c",
+        "hot/manifest.c", "hot/ledger.c", "hot/throwable.c",
+    };
+    for (size_t i = 0; i < sizeof csrc / sizeof csrc[0]; i++)
+        strl_push(&(*lib).srcs, strf("%s/%s", base, csrc[i]));
+    strl_push(&(*lib).includes, base);
+    strl_push(&(*lib).includes, lifetime_src);
+    strl_push(&(*lib).deps, "lifetime");
+    strl_push(&(*lib).deps, "vexspoke");
 
     // hotload modules: the same source twice, once with a foreign schema magic
     Target *mod = target_new(tl, "hot_behavior", T_MOD);
     strl_push(&(*mod).srcs, strf("%s/hot/hot_behavior.c", base));
     strl_push(&(*mod).includes, base);
+    strl_push(&(*mod).includes, lifetime_src);
     strl_push(&(*mod).includes, abspath(strf("%s/src", VEXSPOKE)));
     char *modpath = xstrdup((*mod).out_path);  // copying: tl_push below may realloc
 
     Target *bad = target_new(tl, "hot_behavior_bad", T_MOD);
     strl_push(&(*bad).srcs, strf("%s/hot/hot_behavior.c", base));
     strl_push(&(*bad).includes, base);
+    strl_push(&(*bad).includes, lifetime_src);
     strl_push(&(*bad).includes, abspath(strf("%s/src", VEXSPOKE)));
     strl_push(&(*bad).defs, "HOT_BEHAVIOR_SCHEMA_MAGIC=0xBADC0DE5u");
     (*bad).out_path = strf("%s/modules_bad/hot_behavior.so", g_out);
@@ -1363,16 +1410,11 @@ static void setup_hotcwap(TargetList *tl) {
         (*t).is_test = true;
         strl_push(&(*t).srcs, ts.items[i]);
         strl_push(&(*t).includes, base);
+        strl_push(&(*t).includes, lifetime_src);
         strl_push(&(*t).includes, abspath("tests"));   // test_support.h
         strl_push(&(*t).defs, "UNDEBUG");
-        if (!strcmp(name, "spoke_test")) {
-            strl_push(&(*t).srcs, strf("%s/spoke/lifetime.c", base));
-            strl_push(&(*t).deps, "vexspoke");
-        } else {
-            strl_push(&(*t).deps, "hotcwap");
-        }
-        // libhotcwap now owns the TTY (CommandLine), so every consumer resolves
-        // ncurses symbols (the default backend is linked, not weak).
+        strl_push(&(*t).deps, "hotcwap");
+        strl_push(&(*t).deps, "lifetime");
         strl_push(&(*t).syslibs, "-lncurses");
         add_exe_libs(t);
         for (size_t k = 0; k < sizeof needs_mod / sizeof needs_mod[0]; k++)
@@ -1678,6 +1720,7 @@ static void setup_targets(TargetList *tl) {
     setup_vexspoke(tl);        // libs first
     setup_determinant(tl);     // R3 terminal borrows R2, never the reverse
     setup_language(tl);        // R3 language lexical analysis
+    setup_lifetime(tl);        // R1 kernel host + OS lifetime
     setup_hotcwap(tl);
     setup_graphvex(tl);
     setup_sesh(tl);
@@ -2452,6 +2495,8 @@ static const char *unit_rel(const char *unit) {
     }
     const char *pre = VEX_SRC_REL "/";
     if (!strncmp(p, pre, strlen(pre))) p += strlen(pre);
+    const char *eco_pre = "suite/ecosystem/vexspoke/";
+    if (!strncmp(p, eco_pre, strlen(eco_pre))) p += strlen(eco_pre);
     return p;
 }
 

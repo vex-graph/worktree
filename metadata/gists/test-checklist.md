@@ -109,8 +109,8 @@ Do not hand-edit generated tables; add files/tests and use `sync` or `run`.
 | `tests/b/sql_test.py` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
 | `tests/b/swift_test.py` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
 | `tests/b/typescript_test.py` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
-| `tests/b/util_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
-| `tests/b/util_test.py` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/b/util_test.c` | ✅ | 1793066650 | 84fadd575767e904154ce5cc92419a9abae3008d23fd186e14e6e525386e68a6 | ['python3', '-B', 'tests/b/util_test.py']; Command-only evidence; no broader readiness claim | shared command helper boundaries, exit-status propagation, arg forwarding, and ASan/UBSan | passed |
+| `tests/b/util_test.py` | ✅ | 1793066650 | 2e80c51ece881567113571be5cf7a42ec4091f5e227ee99fd727d38d18e91c95 | ['python3', '-B', 'tests/b/util_test.py']; Command-only evidence; no broader readiness claim | shared command helper boundaries, exit-status propagation, arg forwarding, and ASan/UBSan | passed |
 | `tests/b/workspace_test.py` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
 
 ### `tests/b/adapters`
@@ -517,12 +517,6 @@ Do not hand-edit generated tables; add files/tests and use `sync` or `run`.
 | `tests/harness/space/support_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
 | `tests/harness/space/task_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
 
-### `tests/hotcwap/capability`
-
-| Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
-| :--- | :---: | ---: | :--- | :--- | :--- | :--- |
-| `tests/hotcwap/capability/capability_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
-
 ### `tests/hotcwap/hot`
 
 | Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
@@ -545,39 +539,6 @@ Do not hand-edit generated tables; add files/tests and use `sync` or `run`.
 | `tests/hotcwap/hot/two_dylib_swap_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
 | `tests/hotcwap/hot/uninstall_guard_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
 | `tests/hotcwap/hot/wrong_binary_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
-
-### `tests/hotcwap/kernel`
-
-| Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
-| :--- | :---: | ---: | :--- | :--- | :--- | :--- |
-| `tests/hotcwap/kernel/application_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
-| `tests/hotcwap/kernel/commandline_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
-| `tests/hotcwap/kernel/console_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
-| `tests/hotcwap/kernel/kernel_function_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
-| `tests/hotcwap/kernel/kernel_lifecycle_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
-| `tests/hotcwap/kernel/process_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
-
-### `tests/hotcwap/permission`
-
-| Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
-| :--- | :---: | ---: | :--- | :--- | :--- | :--- |
-| `tests/hotcwap/permission/permission_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
-
-### `tests/hotcwap/spoke`
-
-| Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
-| :--- | :---: | ---: | :--- | :--- | :--- | :--- |
-| `tests/hotcwap/spoke/spoke_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
-
-### `tests/hotcwap/window`
-
-| Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
-| :--- | :---: | ---: | :--- | :--- | :--- | :--- |
-| `tests/hotcwap/window/bridge_seam_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
-| `tests/hotcwap/window/present_surface_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
-| `tests/hotcwap/window/traffic_light_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
-| `tests/hotcwap/window/window_event_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
-| `tests/hotcwap/window/window_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
 
 ### `tests/language`
 
@@ -682,6 +643,45 @@ Do not hand-edit generated tables; add files/tests and use `sync` or `run`.
 | Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
 | :--- | :---: | ---: | :--- | :--- | :--- | :--- |
 | `tests/language/token/token_test.c` | ✅ | 1792558284 | 6f09989108f1fb454d3eeb7339e7d433f126c29d9964d420f2cc4f987e95e261 | ['python3', 'tests/language/run.py']; macOS arm64; strict C23 -Wall -Wextra -Werror; ASan/UBSan; offline value/adapter layer only; no parser, preprocessor or host integration | Language value owners plus delegated C23 adapter owners: construction/accessor/role/span/diagnostic/diff proof, lexer and inlay strict/ASan owners, and eight constructor-arity negatives | passed |
+
+### `tests/lifetime/capability`
+
+| Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
+| :--- | :---: | ---: | :--- | :--- | :--- | :--- |
+| `tests/lifetime/capability/capability_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+
+### `tests/lifetime/kernel`
+
+| Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
+| :--- | :---: | ---: | :--- | :--- | :--- | :--- |
+| `tests/lifetime/kernel/application_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/lifetime/kernel/commandline_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/lifetime/kernel/console_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/lifetime/kernel/kernel_function_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/lifetime/kernel/kernel_lifecycle_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/lifetime/kernel/process_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+
+### `tests/lifetime/permission`
+
+| Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
+| :--- | :---: | ---: | :--- | :--- | :--- | :--- |
+| `tests/lifetime/permission/permission_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+
+### `tests/lifetime/spoke`
+
+| Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
+| :--- | :---: | ---: | :--- | :--- | :--- | :--- |
+| `tests/lifetime/spoke/spoke_test.c` | ✅ | 1793063239 | c5559f2db0ad32b53f9bc289c3a855dbca83f25bb595317212288d01ebf329e0 | ['./tools/b', 'run', 'spoke_test']; lifetime spoke | Lifetime R0 memory substrate, arenas, and relational accessors | passed |
+
+### `tests/lifetime/window`
+
+| Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
+| :--- | :---: | ---: | :--- | :--- | :--- | :--- |
+| `tests/lifetime/window/bridge_seam_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/lifetime/window/present_surface_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/lifetime/window/traffic_light_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/lifetime/window/window_event_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `tests/lifetime/window/window_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
 
 ### `tests/primeagen`
 
@@ -811,6 +811,20 @@ Do not hand-edit generated tables; add files/tests and use `sync` or `run`.
 | `tests/relational-engine/nio/mem_test.c` | ✅ | 1792944965 | 6ed3bd33ed7f3c160e0e3c8609f56a3366d1a6d2a94a1587b02e5c1087f0b48e | ['python3', '-B', 'tests/relational-engine/native_run.py', '--owner', 'mem_test']; macOS arm64; strict+release+sanitized (ASan/UBSan); Universal Alignment Law proof: slab/bump/transient 32-byte payloads, _Alignof==32 type, block after a 16-byte payload, HEADER_SIZE+32 stride; file is arrange-clean | 32-byte payload floor constructed by the allocator on every supported platform; slab, bump and transient regions plus over-aligned and adjacent-block cases | passed |
 | `tests/relational-engine/nio/relational_memory_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
 | `tests/relational-engine/nio/transient_lifetime_test.c` | ✅ | 1792059834 | 42054833b99d8dfe8f4909ea7bb040b80cd71a5188f8243d2fad939cfcf350d4 | ['python3', '-B', 'tests/relational-engine/native_run.py']; macOS arm64; strict+release+sanitized (ASan/UBSan) modes; io/clipboard owners SKIP without RE_TEST_SYSTEM_CLIPBOARD=1; TSan mode not run | Engine native Memory owners for the final 32-byte header: id+BE6C, hash veto, u64 length and the object/primitive redirect; slab+bump exhaustion, realloc preservation, refusal counting, hash tamper rejection, transient lifetime | passed |
+
+### `tests/relational-engine/relational`
+
+| Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
+| :--- | :---: | ---: | :--- | :--- | :--- | :--- |
+| `tests/relational-engine/relational/cell_test.c` | ✅ | 1793027375 | c2d36123010cddb7c7d976fbb57bb96f659dd3375e1eb20ae2cf5c22875b5ecc | ['./tools/b', 'run', 'cell_test']; relational-engine cell | Cell 32-byte header identity and value | passed |
+| `tests/relational-engine/relational/class_relational_test.c` | ✅ | 1793027376 | fcd16c0d100831511a377d81a1ca33978005593f6a8e5b6cf7cfb790a8c6dcea | ['./tools/b', 'run', 'class_relational_test']; relational-engine relational | Direct-return symbol getter in relational spotlight/search | passed |
+| `tests/relational-engine/relational/shelf_test.c` | ✅ | 1793027377 | 683c32dbc22181b0b1d23a6215938a4ec24a89c0d5b24c115d2495bc2f82422d | ['./tools/b', 'run', 'shelf_test']; relational-engine shelf | Shelf node pool, cell reference, and graph edge index | passed |
+| `tests/relational-engine/relational/symbol_table_test.c` | ✅ | 1793027366 | ea61f4a4b24fe4651581df820ff5d5418499d34649247218efce73da912c31d7 | ['./tools/b', 'run', 'symbol_table_test']; relational-engine symbol table | SymbolTable name/pointer registry | passed |
+| `tests/relational-engine/relational/variable_hash_map_test.c` | ✅ | 1793027378 | a2a43c83f3cc8c12efd0da6d02f44825021e84d8e2c319bc9fdbe0d927e5501b | ['./tools/b', 'run', 'variable_hash_map_test']; relational-engine variable_hash_map | VariableHashMap collision chaining and 3000-key volume | passed |
+| `tests/relational-engine/relational/variable_mini_map_test.c` | ✅ | 1793027378 | ff6677bbf82f88275442942e1fa0353697a7bc8b92f990f49b529d058a64586f | ['./tools/b', 'run', 'variable_mini_map_test']; relational-engine variable_mini_map | VariableMiniMap scoped map getter API and SegmentIndex | passed |
+| `tests/relational-engine/relational/variable_pool_test.c` | ✅ | 1793027379 | 62ee345c1926e37a0947d30753f9dd625bf265d5389245caf82ec2c9005b0a57 | ['./tools/b', 'run', 'variable_pool_test']; relational-engine variable_pool | StringPool interning, deduplication, and slot stability | passed |
+| `tests/relational-engine/relational/variable_slot_test.c` | ✅ | 1793027380 | dadb6d61d9a85adc73e12b59bc0c02342c90108dc2662f05839e7c54d48eb397 | ['./tools/b', 'run', 'variable_slot_test']; relational-engine variable_slot | VariableSlot 24-byte name grammar and 32-byte slot ABI | passed |
+| `tests/relational-engine/relational/variable_strict_test.c` | ✅ | 1793027381 | 895fb1e643940ff8353ef3d5e623adef6a181f7996a86c18ea82a6c4878bdda9 | ['./tools/b', 'run', 'variable_strict_test']; relational-engine variable_strict | SymbolTable strict character validation and CAS operations | passed |
 
 ### `tests/relational-engine/rust`
 
@@ -976,7 +990,7 @@ Do not hand-edit generated tables; add files/tests and use `sync` or `run`.
 | `tests/tools/harness_ide_test.py` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
 | `tests/tools/linter_test.py` | ✅ | 1792852172 | d0934f7ea3769f9522b0f1f1d725a19a0c9f2ccc938357605e12516742234d2e | ['python3', '-B', 'tests/tools/linter_test.py']; Fixture-based; throwaway .c files; no build; lint rules, fixers, ratchet baseline | Linter and ratchet baseline: 17 unit tests pass | passed |
 | `tests/tools/migration_contract_test.py` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
-| `tests/tools/opencode_preferences_test.ts` | ✅ | 1792886375 | 6d4238467ce4a89173e7952164b70fb35d5e37ee6fdbe41a85ac43e62a5ea097 | ['bun', 'test', 'tests/tools/opencode_preferences_test.ts']; Preferences plugin assembly + tools/prefs CLI on macOS arm64; no other platform claimed | Injected block is compressed constitution (37 laws, incl. Relational Memory) + proof/repo title index under 32 KB; on-demand law/section/test/repo slices by Title; fallback and loud-missing paths; setup-once hook | passed |
+| `tests/tools/opencode_preferences_test.ts` | ❌ | 1792886375 | 6d4238467ce4a89173e7952164b70fb35d5e37ee6fdbe41a85ac43e62a5ea097 | ['bun', 'test', 'tests/tools/opencode_preferences_test.ts']; Preferences plugin assembly + tools/prefs CLI on macOS arm64; no other platform claimed | Injected block is compressed constitution (37 laws, incl. Relational Memory) + proof/repo title index under 32 KB; on-demand law/section/test/repo slices by Title; fallback and loud-missing paths; setup-once hook | stale — content changed; rerun required |
 | `tests/tools/per_repo_ide_test.py` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
 | `tests/tools/prefs_test.py` | ✅ | 1792851803 | 00992eef91f8568f9a807a38d3c4b43fa2ed9b4ee57f418372f54c9e885b30e0 | ['python3', '-B', 'tests/tools/prefs_test.py']; Throwaway trees; no network, no gh; compressed-only check, full-document parity, publish/verify refusal | Preferences CLI: 7 unit tests pass | passed |
 | `tests/tools/readiness_test.py` | ❌ | 1792851324 | 2775bec43a570c903c51636cfaa8bf52a3eb23c8f6e3f2211e38641f7c90272b | ['python3', '-B', 'tests/tools/readiness_test.py']; Fixture git checkouts; no build or network; attribution, ledger green/stale, lint+layout debt, platform declaration, text/markdown/JSON | Readiness scoreboard: 10 unit tests pass | stale — content changed; rerun required |
@@ -1171,20 +1185,6 @@ Do not hand-edit generated tables; add files/tests and use `sync` or `run`.
 | `tests/vexspoke/regex/run.py` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
 | `tests/vexspoke/regex/span_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
 | `tests/vexspoke/regex/vm_test.c` | ✅ | 1792031936 | 7dbdacbe585e777e0af067bc25ca2cd491877c1b9c1719d3272a159f6b30f1be | ['ctest', '--test-dir', 'cmake-build-debug', '--output-on-failure', '-R', '^(kd_tree_test&#124;octree_test&#124;compute_test&#124;datetime_test&#124;sha1_test&#124;vm_test)$']; macOS arm64; C23 CMake debug targets; offline deterministic owner tests; no live network or visual checks | Vexspoke value constructor macros in geometry, compute, time, SHA-1, and regex VM owners | passed |
-
-### `tests/vexspoke/relational`
-
-| Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
-| :--- | :---: | ---: | :--- | :--- | :--- | :--- |
-| `tests/vexspoke/relational/cell_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
-| `tests/vexspoke/relational/class_relational_test.c` | ✅ | 1792053060 | fcd16c0d100831511a377d81a1ca33978005593f6a8e5b6cf7cfb790a8c6dcea | ['./cmake-build-debug/bin/class_relational_test']; Command-only evidence; no broader readiness claim | Direct-return symbol getter in relational spotlight/search integration | passed |
-| `tests/vexspoke/relational/shelf_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
-| `tests/vexspoke/relational/symbol_table_test.c` | ✅ | 1792053060 | ea61f4a4b24fe4651581df820ff5d5418499d34649247218efce73da912c31d7 | ['./cmake-build-debug/bin/symbol_table_test']; Command-only evidence; no broader readiness claim | Borrowed direct-return symbol name getter, invalid ids, rename and pointer registry cases | passed |
-| `tests/vexspoke/relational/variable_hash_map_test.c` | ✅ | 1792053059 | a2a43c83f3cc8c12efd0da6d02f44825021e84d8e2c319bc9fdbe0d927e5501b | ['./cmake-build-debug/bin/variable_hash_map_test']; Command-only evidence; no broader readiness claim | Direct-return map getter API, collision chain, 3000-key volume, and public lookup callers | passed |
-| `tests/vexspoke/relational/variable_mini_map_test.c` | ✅ | 1792053059 | ff6677bbf82f88275442942e1fa0353697a7bc8b92f990f49b529d058a64586f | ['./cmake-build-debug/bin/variable_mini_map_test']; Command-only evidence; no broader readiness claim | Direct-return scoped map getter API, bucket coverage, and SegmentIndex integration | passed |
-| `tests/vexspoke/relational/variable_pool_test.c` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
-| `tests/vexspoke/relational/variable_slot_test.c` | ✅ | 1792852623 | dadb6d61d9a85adc73e12b59bc0c02342c90108dc2662f05839e7c54d48eb397 | ['./cmake-build-debug/bin/variable_slot_test']; macOS arm64; C23; debug build; direct owner binary from cmake-build-debug; no live network | Output-first VariableSlot_getName callers | passed |
-| `tests/vexspoke/relational/variable_strict_test.c` | ✅ | 1792053060 | 895fb1e643940ff8353ef3d5e623adef6a181f7996a86c18ea82a6c4878bdda9 | ['./cmake-build-debug/bin/variable_strict_test']; Command-only evidence; no broader readiness claim | Borrowed direct-return dotted symbol name and strict relational behavior | passed |
 
 ### `tests/vexspoke/search`
 

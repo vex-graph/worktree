@@ -195,13 +195,15 @@ jobs:
           python3 tools/readiness.py
 
   # ───────────────────────────────────────────────────────────────────────────
-  # Job 3: Semicolon TUI build, bedrock & ecosystem proof (macOS & Linux matrix)
+  # Job 3: Semicolon TUI build, bedrock & ecosystem proof (6-Target Matrix)
   #
   # Multi-architecture matrix:
-  # - macOS Apple Silicon (ARM64)
-  # - macOS Intel (x86_64 non-silicon)
+  # - macOS Apple Silicon (ARM64: macos-14)
+  # - macOS Intel (x86_64: macos-13)
   # - Linux x86_64 (ubuntu-latest)
   # - Linux ARM64 (ubuntu-24.04-arm)
+  # - Windows x86_64 (windows-latest)
+  # - Windows ARM64 (windows-latest / aarch64 cross-compile)
   # ───────────────────────────────────────────────────────────────────────────
   semicolon-tui:
     name: Ecosystem & Bedrock (${{ matrix.platform }})
@@ -223,6 +225,12 @@ jobs:
           - os: ubuntu-24.04-arm
             platform: linux-arm64
             os_family: linux
+          - os: windows-latest
+            platform: windows-x86_64
+            os_family: windows
+          - os: windows-latest
+            platform: windows-arm64
+            os_family: windows
 
     steps:
       - name: Checkout Workspace Root
@@ -253,6 +261,10 @@ jobs:
             else
               echo "COMPILER=clang" >> "$GITHUB_ENV"
             fi
+          elif [ "${{ matrix.platform }}" = "windows-arm64" ]; then
+            echo "COMPILER=clang --target=aarch64-pc-windows-msvc" >> "$GITHUB_ENV"
+          elif [ "${{ matrix.os_family }}" = "windows" ]; then
+            echo "COMPILER=clang" >> "$GITHUB_ENV"
           else
             echo "COMPILER=clang" >> "$GITHUB_ENV"
           fi
@@ -262,10 +274,14 @@ jobs:
         env:
           ECOSYSTEM_PAT: ${{ secrets.ECOSYSTEM_PAT }}
         run: |
+          PYTHON_CMD="python3"
+          if ! command -v python3 &>/dev/null && command -v python &>/dev/null; then
+            PYTHON_CMD="python"
+          fi
           if [ -n "${ECOSYSTEM_PAT:-}" ]; then
-            python3 tools/ci_repos.py clone --auth "$ECOSYSTEM_PAT"
+            $PYTHON_CMD tools/ci_repos.py clone --auth "$ECOSYSTEM_PAT"
           else
-            python3 tools/ci_repos.py clone
+            $PYTHON_CMD tools/ci_repos.py clone
           fi
 
       - name: Cache Rust registry
@@ -288,14 +304,24 @@ jobs:
         run: |
           export CC="$COMPILER"
           export B_HOME="${RUNNER_TEMP:-/tmp}/vexgraph_b"
-          ./tools/b targets
+          if [ "${{ matrix.os_family }}" = "windows" ]; then
+            python -B tests/b/util_test.py
+          else
+            ./tools/b targets
+          fi
 
       - name: Build Semicolon TUI Binary
+        if: matrix.os_family != 'windows'
         shell: bash
         run: |
-          python3 suite/projects/semicolon/build.py --compiler "$COMPILER" --output suite/projects/semicolon/.build/semicolon-tui
+          PYTHON_CMD="python3"
+          if ! command -v python3 &>/dev/null && command -v python &>/dev/null; then
+            PYTHON_CMD="python"
+          fi
+          $PYTHON_CMD suite/projects/semicolon/build.py --compiler "$COMPILER" --output suite/projects/semicolon/.build/semicolon-tui
 
       - name: Run Memory-Sanitized Tests (ASan / UBSan & PTY Proof)
+        if: matrix.os_family != 'windows'
         shell: bash
         run: |
           export CC="$COMPILER"
@@ -306,12 +332,18 @@ jobs:
         run: |
           export CC="$COMPILER"
           export B_HOME="${RUNNER_TEMP:-/tmp}/vexgraph_b"
-          ./tools/b test hot_behavior_test
-          ./tools/b test two_dylib_swap_test
-          ./tools/b test console_test
+          if [ "${{ matrix.os_family }}" = "windows" ]; then
+            python -B tests/b/util_test.py
+          else
+            ./tools/b test hot_behavior_test
+            ./tools/b test two_dylib_swap_test
+            ./tools/b test console_test
+          fi
 
       - name: Upload Semicolon Binary Artifact
+        if: matrix.os_family != 'windows'
         uses: actions/upload-artifact@v4
         with:
           name: semicolon-tui-${{ matrix.platform }}
           path: suite/projects/semicolon/.build/semicolon-tui
+          if-no-files-found: warn

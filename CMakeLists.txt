@@ -177,9 +177,10 @@ set(r2_cpu "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/vexspoke/src")
 set(r2_storage "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/relational-engine/src")
 vexgraph_index_repository(vexspoke host-behavior/vexspoke/src vexspoke)
 vexgraph_index_repository(relational_engine host-behavior/relational-engine/src relational_engine)
-vexgraph_index_repository(hotcwap host-behavior/hotcwap hotcwap)
+vexgraph_index_repository(lifetime host-behavior/lifetime/src lifetime)
+vexgraph_index_repository(hotcwap personal/hotcwap hotcwap)
 vexgraph_index_repository(graphvex drivers/graphvex/src graphvex)
-vexgraph_index_repository(api_haven drivers/api-haven/src api_haven)
+vexgraph_index_repository(api_haven personal/api-haven/src api_haven)
 vexgraph_index_repository(determinant drivers/determinant/src determinant "${r2_cpu}" "${r2_storage}")
 vexgraph_index_repository(darling interfaces/darling-framework/src darling)
 vexgraph_index_repository(sesh interfaces/sesh/src sesh)
@@ -195,8 +196,8 @@ vexgraph_index_repository(language drivers/language "" "${r2_cpu}" "${r2_storage
 vexgraph_index_repository(func personal/func/src "")
 vexgraph_index_repository(primeagen personal/primeagen ""
     "${r2_cpu}" "${r2_storage}"
-    "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/hotcwap"
-    "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/api-haven/src")
+    "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/lifetime"
+    "${VEXGRAPH_SOURCE_ROOT}/suite/personal/api-haven/src")
 vexgraph_index_repository(tools tools "")
 vexgraph_index_repository(notes _notes "")
 foreach(application drawling)
@@ -226,24 +227,28 @@ foreach(subsystem IN LISTS test_subsystems)
         "${VEXGRAPH_SOURCE_ROOT}/tests"
         "${subsystem}"
         "${r2_cpu}" "${r2_storage}")
-    if(test_name STREQUAL "hotcwap")
-        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/hotcwap")
+    if(test_name STREQUAL "lifetime")
+        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/lifetime/src")
+    elseif(test_name STREQUAL "hotcwap")
+        list(APPEND test_includes
+            "${VEXGRAPH_SOURCE_ROOT}/suite/personal/hotcwap"
+            "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/lifetime/src")
     elseif(test_name STREQUAL "graphvex")
         list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/graphvex/src")
     elseif(test_name STREQUAL "determinant")
         list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/determinant/src")
     elseif(test_name STREQUAL "darling")
         list(APPEND test_includes
-            "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/hotcwap"
+            "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/lifetime/src"
             "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/graphvex/src"
             "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/darling-framework/src")
     elseif(test_name STREQUAL "api-haven")
-        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/api-haven/src")
+        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/suite/personal/api-haven/src")
     elseif(test_name STREQUAL "sesh")
         list(APPEND test_includes
             "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/sesh/src"
             "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/sesh"
-            "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/api-haven/src")
+            "${VEXGRAPH_SOURCE_ROOT}/suite/personal/api-haven/src")
     elseif(test_name STREQUAL "darkbase-engine")
         list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/darkbase-engine/src")
     elseif(test_name STREQUAL "harness")
@@ -255,8 +260,8 @@ foreach(subsystem IN LISTS test_subsystems)
     elseif(test_name STREQUAL "primeagen")
         list(APPEND test_includes
             "${VEXGRAPH_SOURCE_ROOT}/suite/personal/primeagen"
-            "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/hotcwap"
-            "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/api-haven/src"
+            "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/lifetime/src"
+            "${VEXGRAPH_SOURCE_ROOT}/suite/personal/api-haven/src"
             "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/harness/src")
     elseif(test_name STREQUAL "b")
         list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/suite/personal/b")

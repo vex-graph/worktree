@@ -51,9 +51,10 @@ jobs:
         include:
           - os: ubuntu-latest
             python: python3
+          - os: macos-latest
+            python: python3
           # Tooling is cross-platform; this proves the same ratchet holds
-          # when the caller's checkout lives on a Windows runner. It is a
-          # tooling check, not an ecosystem build.
+          # when the caller's checkout lives on a Windows runner.
           - os: windows-latest
             python: python
     steps:

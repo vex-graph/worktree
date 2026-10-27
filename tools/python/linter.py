@@ -350,14 +350,17 @@ class Linter:
         inc = m.group(1)
 
         tiers = (
+            ("suite/ecosystem/lifetime/",
+             ["darling/", "api/", "hot/"],
+             "lifetime (R0 host)"),
+            ("suite/ecosystem/relational-engine/",
+             ["darling/", "hotcwap/", "window/", "hot/", "api/"],
+             "relational-engine (R1 storage)"),
             ("suite/ecosystem/vexspoke/",
              ["darling/", "hotcwap/", "window/", "hot/", "api/",
               "vulkan/vk_iosurface.h", "vulkan/vk_scene.h",
               "vulkan/vk_view.h", "vulkan/sdf_gpu.h"],
              "vexspoke (R2 CPU)"),
-            ("suite/ecosystem/hotcwap/",
-             ["darling/", "api/"],
-             "hotcwap (R1 host)"),
             ("suite/ecosystem/darling-framework/",
              ["api/"],
              "darling-framework (R4)"),

@@ -266,9 +266,14 @@ if(foo)
 ## 25. Platform Support Floor Law
 
 ### 25.1 Minimum baseline
-* macOS Apple Silicon arm64 / macOS 14+;
-* Windows 10+;
-* `-mcpu=apple-m1` baseline.
+* Six canonical platform targets:
+  1. `darwin-arm64` (macOS Apple Silicon / macOS 14+; `-mcpu=apple-m1` baseline);
+  2. `darwin-x86_64` (macOS Intel / macOS 13+);
+  3. `linux-x86_64` (Linux x86_64 / glibc 2.35+);
+  4. `linux-arm64` (Linux ARM64 / glibc 2.35+);
+  5. `windows-x86_64` (Windows 10+ x86_64);
+  6. `windows-arm64` (Windows 11+ ARM64).
+* Apple Silicon `-mcpu=apple-m1` is the Apple ARM baseline, never an exclusion of other platforms.
 
 ## 26. Capability Gating Law
 

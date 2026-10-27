@@ -20,9 +20,9 @@
       ],
       "remote": "https://github.com/vex-graph/worktree.git"
     },
-    "suite/ecosystem/hotcwap": {
-      "tier": "R1",
-      "subsystem": "hotcwap",
+    "suite/ecosystem/lifetime": {
+      "tier": "R0",
+      "subsystem": "lifetime",
       "support": [
         "macos",
         "linux",
@@ -31,7 +31,7 @@
       "proven": [
         "macos"
       ],
-      "remote": "https://github.com/vexgraph-ecosystem/hotcwap.git"
+      "remote": "https://github.com/vexgraph-ecosystem/lifetime.git"
     },
     "suite/ecosystem/vexspoke": {
       "tier": "R2",
@@ -47,7 +47,7 @@
       "remote": "https://github.com/vexgraph-ecosystem/vexspoke.git"
     },
     "suite/ecosystem/relational-engine": {
-      "tier": "R2",
+      "tier": "R1",
       "subsystem": "relational-engine",
       "support": [
         "macos",
@@ -71,19 +71,6 @@
         "macos"
       ],
       "remote": "https://github.com/vexgraph-ecosystem/graphvex.git"
-    },
-    "suite/ecosystem/api-haven": {
-      "tier": "R3",
-      "subsystem": "api-haven",
-      "support": [
-        "macos",
-        "linux",
-        "windows"
-      ],
-      "proven": [
-        "macos"
-      ],
-      "remote": "https://github.com/vexgraph-ecosystem/api-haven.git"
     },
     "suite/ecosystem/determinant": {
       "tier": "R3",
@@ -285,11 +272,39 @@
       ],
       "remote": "https://github.com/vex-graph/darkbase.git"
     },
+    "suite/personal/hotcwap": {
+      "tier": "R1",
+      "subsystem": "hotcwap",
+      "support": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "proven": [
+        "macos"
+      ],
+      "remote": "https://github.com/vexgraph-ecosystem/hotcwap.git"
+    },
+    "suite/personal/api-haven": {
+      "tier": "tooling",
+      "subsystem": "api-haven",
+      "support": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "proven": [
+        "macos"
+      ],
+      "remote": "https://github.com/vexgraph-ecosystem/api-haven.git"
+    },
     "suite/personal/vex-graph": {
       "tier": "meta",
       "subsystem": null,
       "support": [
-        "macos"
+        "macos",
+        "linux",
+        "windows"
       ],
       "proven": [],
       "remote": "https://github.com/vexgraph-dev/vexgraph-dev.git"
