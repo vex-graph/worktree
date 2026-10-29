@@ -2990,6 +2990,131 @@ static void ide_strings(const StrList *items) {
     printf("]");
 }
 
+// A target kind as a graph token; the serialized graph never sees enum order.
+static const char *kind_token(TKind kind) {
+    switch (kind) {
+        case T_LIB: return "lib";
+        case T_MOD: return "mod";
+        case T_EXE: return "exe";
+        case T_APP: return "app";
+        case T_EXT: return "ext";
+    }
+    return "exe";
+}
+
+// Print dependency names, expanding the "*" sentinel to every library and module.
+// A builder that knows no project convention receives explicit edges only.
+static void ide_deps(const StrList *deps) {
+    printf("[");
+    bool first = true;
+    for (int i = 0; i < (*deps).count; i++) {
+        const char *name = (*deps).items[i];
+        if (!strcmp(name, "*")) {
+            for (int k = 0; k < g_targets_ref.count; k++) {
+                Target *c = &g_targets_ref.items[k];
+                if ((*c).kind != T_LIB && (*c).kind != T_MOD) continue;
+                if ((*c).is_test) continue;
+                char *escaped = json_escape((*c).name);
+                printf("%s\"%s\"", first ? "" : ",", escaped);
+                free(escaped);
+                first = false;
+            }
+            continue;
+        }
+        char *escaped = json_escape(name);
+        printf("%s\"%s\"", first ? "" : ",", escaped);
+        free(escaped);
+        first = false;
+    }
+    printf("]");
+}
+
+// Print a link plan: dependencies named as targets, plus flags naming no target.
+// A builder that knows no repository still receives the exact link line.
+static void ide_links(const StrList *libraries) {
+    printf("{\"targets\":[");
+    bool first = true;
+    for (int i = 0; i < (*libraries).count; i++) {
+        const char *item = (*libraries).items[i];
+        const char *owner = nullptr;
+        for (int k = 0; k < g_targets_ref.count; k++) {
+            Target *c = &g_targets_ref.items[k];
+            if (strcmp((*c).out_path, item) == 0) { owner = (*c).name; break; }
+        }
+        if (owner == nullptr) continue;
+        char *name = json_escape(owner);
+        printf("%s\"%s\"", first ? "" : ",", name);
+        free(name);
+        first = false;
+    }
+    printf("],\"flags\":[");
+    first = true;
+    for (int i = 0; i < (*libraries).count; i++) {
+        const char *item = (*libraries).items[i];
+        bool owned = false;
+        for (int k = 0; k < g_targets_ref.count && !owned; k++)
+            if (strcmp((g_targets_ref.items[k]).out_path, item) == 0) owned = true;
+        if (owned) continue;
+        char *flag = json_escape(item);
+        printf("%s\"%s\"", first ? "" : ",", flag);
+        free(flag);
+        first = false;
+    }
+    printf("]}");
+}
+
+// Print one graph record: identity, kind, sources, flags, link inputs, deps.
+// `with_libraries` carries the link line (target libraries and system libraries);
+// `with_output` carries the artifact path of a target an external tool produces.
+static void ide_record(Target *t, bool with_libraries, bool with_output) {
+    StrList includes = {0}, definitions = {0}, options = {0}, libraries = {0};
+    collect_pub(t, &includes, &definitions, 0);
+    strl_extend(&definitions, &(*t).defs);
+    base_cflags(&options);
+    strl_extend(&options, &(*t).cflags);
+    if (with_libraries) {
+        collect_link_libs(t, &libraries, 0);
+        // CMake treats each framework pair as one link item, not -lFoundation.
+        const StrList *systemLibraries = &(*t).syslibs;
+        for (int k = 0; k < (*systemLibraries).count; k++) {
+            if (!strcmp((*systemLibraries).items[k], "-framework") && k + 1 < (*systemLibraries).count) {
+                strl_pushf(&libraries, "-framework %s", (*systemLibraries).items[++k]);
+            } else {
+                strl_push(&libraries, (*systemLibraries).items[k]);
+            }
+        }
+    }
+    char *name = json_escape((*t).name);
+    printf("{\"name\":\"%s\",\"kind\":\"%s\",\"sources\":", name, kind_token((*t).kind));
+    free(name);
+    ide_strings(&(*t).srcs);
+    printf(",\"includes\":"); ide_strings(&includes);
+    printf(",\"definitions\":"); ide_strings(&definitions);
+    printf(",\"options\":"); ide_strings(&options);
+    if (with_libraries) {
+        printf(",\"libraries\":"); ide_strings(&libraries);
+        printf(",\"links\":"); ide_links(&libraries);
+    }
+    printf(",\"deps\":"); ide_deps(&(*t).deps);
+    if (with_output) {
+        char *out = json_escape((*t).out_path);
+        printf(",\"output\":\"%s\"", out);
+        free(out);
+        // The generator command travels with the record, so a builder that knows
+        // no cargo, no Rust and no repository can still produce the artifact.
+        printf(",\"generator\":");
+        bool found = false;
+        for (int i = 0; i < g_genCount; i++) {
+            if (strcmp(g_gens[i].out, (*t).out_path) != 0) continue;
+            ide_strings(&g_gens[i].cmd);
+            found = true;
+            break;
+        }
+        if (!found) printf("[]");
+    }
+    printf("}");
+}
+
 // Emit build-derived target, test, and source-index metadata as JSON.
 static void export_ide_graph(void) {
     printf("{\"byproducts\":[");
@@ -3006,50 +3131,19 @@ static void export_ide_graph(void) {
     for (int i = 0; i < g_targets_ref.count; i++) {
         Target *t = &g_targets_ref.items[i];
         if (!(*t).is_test) continue;
-        StrList includes = {0}, definitions = {0}, options = {0}, libraries = {0};
-        collect_pub(t, &includes, &definitions, 0);
-        strl_extend(&definitions, &(*t).defs);
-        base_cflags(&options);
-        strl_extend(&options, &(*t).cflags);
-        collect_link_libs(t, &libraries, 0);
-        // CMake treats each framework pair as one link item, not -lFoundation.
-        const StrList *systemLibraries = &(*t).syslibs;
-        for (int k = 0; k < (*systemLibraries).count; k++) {
-            if (!strcmp((*systemLibraries).items[k], "-framework") && k + 1 < (*systemLibraries).count) {
-                strl_pushf(&libraries, "-framework %s", (*systemLibraries).items[++k]);
-            } else {
-                strl_push(&libraries, (*systemLibraries).items[k]);
-            }
-        }
-        char *name = json_escape((*t).name);
-        printf("%s{\"name\":\"%s\",\"sources\":", count++ ? "," : "", name);
-        free(name);
-        ide_strings(&(*t).srcs);
-        printf(",\"includes\":"); ide_strings(&includes);
-        printf(",\"definitions\":"); ide_strings(&definitions);
-        printf(",\"options\":"); ide_strings(&options);
-        printf(",\"libraries\":"); ide_strings(&libraries);
-        printf("}");
+        if (count++) printf(",");
+        ide_record(t, true, false);
     }
     printf("],\"index\":[");
     count = 0;
     for (int i = 0; i < g_targets_ref.count; i++) {
         Target *t = &g_targets_ref.items[i];
         if ((*t).is_test) continue;
-        if ((*t).srcs.count == 0) continue;
-        StrList includes = {0}, definitions = {0}, options = {0};
-        collect_pub(t, &includes, &definitions, 0);
-        strl_extend(&definitions, &(*t).defs);
-        base_cflags(&options);
-        strl_extend(&options, &(*t).cflags);
-        char *name = json_escape((*t).name);
-        printf("%s{\"name\":\"%s\",\"sources\":", count++ ? "," : "", name);
-        free(name);
-        ide_strings(&(*t).srcs);
-        printf(",\"includes\":"); ide_strings(&includes);
-        printf(",\"definitions\":"); ide_strings(&definitions);
-        printf(",\"options\":"); ide_strings(&options);
-        printf("}");
+        // An external artifact owns no sources here; it is an index record so the
+        // graph can name it as a dependency instead of rebuilding it.
+        if ((*t).srcs.count == 0 && (*t).kind != T_EXT) continue;
+        if (count++) printf(",");
+        ide_record(t, true, (*t).kind == T_EXT);
     }
     printf("]}\n");
 }
