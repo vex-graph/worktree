@@ -47,7 +47,7 @@ ROOT = _find_root(Path(__file__).resolve().parent)
 REPORT = Path("metadata/gists/test-checklist.md")
 PLATFORMS = Path("tools/platforms.json")
 SOURCE_SUFFIXES = {".c", ".h", ".m", ".mm", ".cc", ".cpp", ".cxx", ".rs"}
-SUBSYSTEM_DIRS = ("suite/ecosystem", "suite/projects", "suite/personal")
+SUBSYSTEM_DIRS = ("vexgraph-ecosystem", "vexgraph-hobby-projects")
 WORKTREE = "(worktree)"
 
 
@@ -66,7 +66,7 @@ ARRANGE = load_module("arrange", _tools_py / "arrange.py" if (_tools_py / "arran
 
 def repo_dirs(root):
     """Every checked-out repository the scoreboard covers, plus the worktree."""
-    found = [root, root / "tests"]
+    found = [root, root / "vexgraph-ecosystem" / "tests"]
     for base in SUBSYSTEM_DIRS:
         directory = root / base
         if not directory.is_dir():
@@ -99,8 +99,8 @@ def owner_of_path(path, claims_by_subsystem):
     it. Tooling tests and workspace files belong to the worktree.
     """
     parts = path.split("/")
-    if len(parts) > 1 and parts[0] == "suite":
-        return "/".join(parts[:3])
+    if len(parts) > 2 and parts[0] in SUBSYSTEM_DIRS:
+        return "/".join(parts[:2])
     if parts[0] == "tests" and len(parts) > 1:
         subsystem = parts[1]
         if subsystem == "tools":
@@ -163,7 +163,7 @@ def ledger_counts(root, key, claims_by_subsystem):
 def test_units(root, claims_by_subsystem):
     """Executable test units per owner, from the shared tests checkout."""
     counts = Counter()
-    for name in git_files(root / "tests"):
+    for name in git_files(root / "vexgraph-ecosystem" / "tests"):
         if not CHECKLIST.is_executable_test(name):
             continue
         parts = Path(name).parts

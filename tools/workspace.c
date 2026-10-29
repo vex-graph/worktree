@@ -49,7 +49,7 @@
  * behavior while following the Semantic Consistency Law (Reference form).
  * The reorganized workspace resolves R1/R2 from host-behavior, R3 from drivers,
  * R4 from interfaces, R5 from interactables and R6 from superapp, with this coordinator in
- * tools/workspace.c. The generic b checkout owns no vexgraph-ecosystem-gitrepo graph.
+ * tools/workspace.c. The generic b checkout owns no ecosystem target graph.
  */
 ;;OVERVIEW
 /* MODULE: workspace compatibility graph. PUBLIC ENTRY: main.
@@ -794,26 +794,65 @@ static void base_lflags(StrList *out) {
 // the vexspoke module (v0.1 proof; later this becomes per-repo declarations)
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Resolve current suite paths while keeping the target declarations readable
-// in their original tier vocabulary.
+// The workspace has two checkout roots: the org's repositories and the
+// personal ones. A target is still declared in tier vocabulary
+// (host-behavior/, drivers/, interfaces/, interactables/, superapp/, personal/);
+// abspath() strips that vocabulary and picks the root by repository.
+static const char *ECO_ROOT = "vexgraph-ecosystem";
+static const char *HOB_ROOT = "vexgraph-hobby-projects";
+
+// Repositories in the personal root: standalone parts and optional +1
+// dependencies for the ecosystem, never required by an ecosystem tier.
+static const char *PERSONAL_REPOS[] = {
+    "b", "func", "primeagen", "hotcwap", "api-haven", "harness",
+};
+
+// Repositories whose checkout nests inside a sibling directory.
+static const struct { const char *repo; const char *path; } NESTED_REPOS[] = {
+    {"darkbase-engine", "darkbase/darkbase-engine"},
+    {"darkbase-headless", "darkbase/darkbase-headless"},
+};
+
+static bool repo_named(const char *repo, size_t length, const char *name) {
+    return strlen(name) == length && !strncmp(repo, name, length);
+}
+
+// Resolve a tier-vocabulary path against its checkout root. Paths that already
+// name a root pass through; `tests/` is shared infrastructure and lives with the
+// ecosystem checkouts.
 static char *abspath(const char *rel) {
-    const char *mapped = rel;
-    static const struct { const char *from; const char *to; } prefixes[] = {
-        {"host-behavior/", "suite/ecosystem/"},
-        {"drivers/", "suite/ecosystem/"},
-        {"interfaces/", "suite/ecosystem/"},
-        {"interactables/", "suite/projects/"},
-        {"superapp/", "suite/projects/"},
-        {"personal/", "suite/personal/"},
+    if (!strncmp(rel, ECO_ROOT, strlen(ECO_ROOT)) || !strncmp(rel, HOB_ROOT, strlen(HOB_ROOT)))
+        return strf("%s/%s", g_root, rel);
+
+    const char *rest = rel;
+    static const char *tiers[] = {
+        "host-behavior/", "drivers/", "interfaces/",
+        "interactables/", "superapp/", "personal/",
     };
-    for (size_t i = 0; i < sizeof prefixes / sizeof prefixes[0]; i++) {
-        size_t length = strlen(prefixes[i].from);
-        if (!strncmp(rel, prefixes[i].from, length)) {
-            mapped = strf("%s%s", prefixes[i].to, rel + length);
+    for (size_t i = 0; i < sizeof tiers / sizeof tiers[0]; i++) {
+        size_t length = strlen(tiers[i]);
+        if (!strncmp(rel, tiers[i], length)) {
+            rest = rel + length;
             break;
         }
     }
-    return strf("%s/%s", g_root, mapped);
+
+    if (!strcmp(rest, "tests") || !strncmp(rest, "tests/", 6))
+        return strf("%s/%s/%s", g_root, ECO_ROOT, rest);
+
+    const char *slash = strchr(rest, '/');
+    size_t repo_length = slash ? (size_t)(slash - rest) : strlen(rest);
+    const char *tail = slash ? slash : "";
+
+    for (size_t i = 0; i < sizeof NESTED_REPOS / sizeof NESTED_REPOS[0]; i++)
+        if (repo_named(rest, repo_length, NESTED_REPOS[i].repo))
+            return strf("%s/%s/%s%s", g_root, ECO_ROOT, NESTED_REPOS[i].path, tail);
+
+    for (size_t i = 0; i < sizeof PERSONAL_REPOS / sizeof PERSONAL_REPOS[0]; i++)
+        if (repo_named(rest, repo_length, PERSONAL_REPOS[i]))
+            return strf("%s/%s/%s", g_root, HOB_ROOT, rest);
+
+    return strf("%s/%s/%s", g_root, ECO_ROOT, rest);
 }
 
 // Register a selected target and initialize its configuration-specific output path.
@@ -1028,7 +1067,7 @@ static void setup_darling(TargetList *tl) {
 
 // ── graphvex tests (tests/graphvex mirrors src/) ────────────────────────────
 static void setup_graphvex_tests(TargetList *tl) {
-    char *tdir = strf("%s/tests/graphvex", g_root);
+    char *tdir = strf("%s/vexgraph-ecosystem/tests/graphvex", g_root);
     StrList ts = {0};
     glob_rec(tdir, "_test.c", &ts);
     strl_sort(&ts);
@@ -1076,7 +1115,7 @@ static void setup_graphvex_tests(TargetList *tl) {
 
 // Register Vexspoke owner tests and the standalone touch-ID probe.
 static void setup_vexspoke_tests(TargetList *tl) {
-    char *tests = strf("%s/tests/vexspoke", g_root);
+    char *tests = strf("%s/vexgraph-ecosystem/tests/vexspoke", g_root);
     StrList srcs = {0};
     glob_rec(tests, ".c", &srcs);
     strl_sort(&srcs);
@@ -1247,7 +1286,7 @@ static void setup_apihaven(TargetList *tl) {
     strl_push(&(*mcp).deps, "vexspoke");
     add_exe_libs(mcp);
 
-    char *tdir = strf("%s/tests/api-haven", g_root);
+    char *tdir = strf("%s/vexgraph-ecosystem/tests/api-haven", g_root);
     StrList ts = {0};
     glob_rec(tdir, "_test.c", &ts);
     strl_sort(&ts);
@@ -1280,7 +1319,7 @@ static void setup_harness(TargetList *tl) {
     strl_push(&(*lib).includes, strf("%s/src", base));
     strl_push(&(*lib).deps, "vexspoke");
 
-    char *tdir = strf("%s/tests/harness", g_root);
+    char *tdir = strf("%s/vexgraph-ecosystem/tests/harness", g_root);
     StrList ts = {0};
     glob_rec(tdir, "_test.c", &ts);
     strl_sort(&ts);
@@ -1332,7 +1371,7 @@ static void setup_lifetime(TargetList *tl) {
 #endif
     strl_push(&(*lib).syslibs, "-lpthread");
 
-    char *tdir = strf("%s/tests/lifetime", g_root);
+    char *tdir = strf("%s/vexgraph-ecosystem/tests/lifetime", g_root);
     StrList ts = {0};
     glob_rec(tdir, "_test.c", &ts);
     strl_sort(&ts);
@@ -1397,7 +1436,7 @@ static void setup_hotcwap(TargetList *tl) {
         "hot_behavior_test",
     };
 
-    char *tdir = strf("%s/tests/hotcwap", g_root);
+    char *tdir = strf("%s/vexgraph-ecosystem/tests/hotcwap", g_root);
     StrList ts = {0};
     glob_rec(tdir, "_test.c", &ts);
     strl_sort(&ts);
@@ -1537,7 +1576,7 @@ static void setup_graphvex(TargetList *tl) {
         char *hdr = strf("%s/shader/quad_spv.h", g_out);
         Cmd g = {0};
         strl_push(&g, "python3");
-        strl_push(&g, strf("%s/tools/spv_header.py", g_root));
+        strl_push(&g, strf("%s/tools/python/spv_header.py", g_root));
         strl_push(&g, strf("%s/shader/quad.vert.spv", g_out));
         strl_push(&g, strf("%s/shader/quad.frag.spv", g_out));
         strl_push(&g, hdr);
@@ -1546,9 +1585,9 @@ static void setup_graphvex(TargetList *tl) {
 }
 
 // ── darling tests (tests/darling — the battle suite lives in tests/, never in
-//    an vexgraph-ecosystem-gitrepo repo) ──────────────────────────────────────────────────────
+//    an ecosystem repository) ────────────────────────────────────────────────────────────────────────────
 static void setup_darling_tests(TargetList *tl) {
-    char *tdir = strf("%s/tests/darling", g_root);
+    char *tdir = strf("%s/vexgraph-ecosystem/tests/darling", g_root);
     StrList ts = {0};
     glob_rec(tdir, "_test.c", &ts);
     strl_sort(&ts);
@@ -1594,7 +1633,7 @@ static void setup_darkbase(TargetList *tl) {
     strl_push(&(*lib).deps, "relational_mapping");  // the cargo-built Rust static library
     strl_push(&(*lib).deps, "vexspoke");            // oop/type.h, reflection
 
-    char *tdir = strf("%s/tests/darkbase-engine", g_root);
+    char *tdir = strf("%s/vexgraph-ecosystem/tests/darkbase-engine", g_root);
     StrList ts = {0};
     glob_rec(tdir, "_test.c", &ts);
     strl_sort(&ts);
@@ -1617,7 +1656,7 @@ static void setup_darkbase(TargetList *tl) {
     }
 }
 
-// ── interfaces/darkbase-headless (R4: darkbase service boundary) ───────────
+// ── interfaces/darkbase-headless (R4: darkbase-main service boundary) ───────────
 // Source and test targets appear independently as their mirrored units land.
 static void setup_darkbase_headless(TargetList *tl) {
     char *base = abspath("interfaces/darkbase-headless");
@@ -1638,7 +1677,7 @@ static void setup_darkbase_headless(TargetList *tl) {
     strl_push(&(*lib).deps, "vexspoke");
     strl_push(&(*lib).deps, "relational_engine");
 
-    char *tdir = strf("%s/tests/darkbase-headless", g_root);
+    char *tdir = strf("%s/vexgraph-ecosystem/tests/darkbase-headless", g_root);
     StrList ts = {0};
     glob_rec(tdir, "_test.c", &ts);
     strl_sort(&ts);
@@ -2495,7 +2534,7 @@ static const char *unit_rel(const char *unit) {
     }
     const char *pre = VEX_SRC_REL "/";
     if (!strncmp(p, pre, strlen(pre))) p += strlen(pre);
-    const char *eco_pre = "suite/ecosystem/vexspoke/";
+    const char *eco_pre = "vexgraph-ecosystem/vexspoke/";
     if (!strncmp(p, eco_pre, strlen(eco_pre))) p += strlen(eco_pre);
     return p;
 }
@@ -2514,7 +2553,7 @@ static char *own_header(const char *unit) {
 static char *owner_test_for(const char *unit, const StrList *eu, const StrList *eo) {
     const char *rel = unit_rel(unit);
     for (int i = 0; i < (*eu).count; i++)
-        if (!strcmp((*eu).items[i], rel)) return strf("%s/tests/%s", g_root, (*eo).items[i]);
+        if (!strcmp((*eu).items[i], rel)) return strf("%s/vexgraph-ecosystem/tests/%s", g_root, (*eo).items[i]);
     if (strncmp(rel, "src/", 4)) return nullptr;
     char *tmp = xstrdup(rel + 4);
     char *slash = strrchr(tmp, '/');
@@ -3214,7 +3253,7 @@ static char *find_source_for(const char *name) {
     // a bare stem: search the runnable roots, tests/ first
     const char *base = strrchr(direct, '/');
     base = base ? base + 1 : direct;
-    const char *roots[] = {"tests", "suite/ecosystem", "suite/projects", "suite/personal"};
+    const char *roots[] = {"tests", ECO_ROOT, HOB_ROOT};
     for (size_t i = 0; i < sizeof roots / sizeof roots[0]; i++) {
         StrList hits = {0};
         match_sources(abspath(roots[i]), base, &hits);

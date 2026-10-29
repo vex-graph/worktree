@@ -6,7 +6,7 @@ root=$(CDPATH= cd -- "$here/.." && pwd)
 export B_CALLER_DIR="${B_CALLER_DIR:-$PWD}"
 export B_HOME="${B_HOME:-$HOME/Library/Application Support/vexgraph/b}"
 cd "$root"
-binary="$root/suite/personal/b/b"
+binary="$root/vexgraph-hobby-projects/b/b"
 
 run_tooling_test() {
     case "$1" in

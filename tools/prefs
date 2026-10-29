@@ -236,7 +236,17 @@ def cmd_find(root: Path, needle: str, sources: list[Path], limit: int = 40) -> i
 
 
 def repo_lawbooks(root: Path) -> list[Path]:
-    return sorted(path for path in (root / "suite").rglob("*-preferences.md"))
+    books: list[Path] = []
+    for top in ("vexgraph-ecosystem", "vexgraph-hobby-projects"):
+        base = root / top
+        if not base.is_dir():
+            continue
+        for path in base.rglob("*-preferences.md"):
+            parts = path.relative_to(base).parts
+            if parts and parts[0] == "tests":
+                continue  # the proof lawbook is not a repo lawbook
+            books.append(path)
+    return sorted(books)
 
 
 LINK = re.compile(r"`(\.\./[^`\s]*)`")
@@ -316,7 +326,7 @@ def cmd_repo(root: Path, name: str, key: str | None, path_only: bool) -> int:
 
 
 def test_lawbook(root: Path) -> Path:
-    return root / "tests" / "test-preferences.md"
+    return root / "vexgraph-ecosystem" / "tests" / "test-preferences.md"
 
 
 def cmd_test(root: Path, key: str | None) -> int:
@@ -363,7 +373,7 @@ def prompt_text(root: Path) -> str:
         "Laws are cited by Title, never by number; numbers are slice addresses inside "
         "one file only.",
         "## Universal constitution (compressed)\n\n" + compressed(root).read_text(encoding="utf-8").rstrip("\n"),
-        "## Proof lawbook index — `tests/test-preferences.md`\n\n"
+        "## Proof lawbook index — `vexgraph-ecosystem/tests/test-preferences.md`\n\n"
         "Read the owning law before writing a test: `./tools/prefs test \"<law>\"`.\n\n"
         + "\n".join(("  " if level == 3 else "") + "- " + title for _, level, title in doc_headings(read(test_lawbook(root)))),
         "## Repository lawbook index\n\n"
@@ -480,7 +490,7 @@ def cmd_check(root: Path) -> int:
     dead = [(book, token) for book in books for token in dead_lawbook_links(book)]
     print(f"lawbooks: {len(books)} repo lawbooks, {len(dead)} dead links")
     if not books:
-        problems.append("no repo lawbooks found under suite/")
+        problems.append("no repo lawbooks found under the workspace roots")
     # Dead links in repo lawbooks are reported but not fatal: the lawbook repair
     # (prefs-command-center) is in progress and lands in the nested repos. Keeping
     # them fatal would block the whole gate on documentation-only churn.

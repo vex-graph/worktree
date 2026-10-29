@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tools/repos.sh — one-pane cross-repo status for the active vexgraph repos.
+# tools/repos.sh — one-pane cross-repo status for the active vexgraph-ecosystem repos.
 # Local-only workspace helper (tools/ is git-ignored, never published).
 # Prints branch, dirty count, ahead/behind vs upstream, and last commit.
 set -u
@@ -10,10 +10,9 @@ case "$here" in
 esac
 REPOS=(
   "$ROOT"
-  "$ROOT"/suite/ecosystem/*
-  "$ROOT"/suite/projects/*
-  "$ROOT"/suite/personal/*
-  "$ROOT/tests"
+  "$ROOT"/vexgraph-ecosystem/*
+  "$ROOT"/vexgraph-hobby-projects/*
+  "$ROOT/vexgraph-ecosystem/tests"
 )
 printf "%-40s %-10s %-6s %-6s %-6s %s\n" REPO BRANCH DIRTY AHEAD BEHIND LAST
 for d in "${REPOS[@]}"; do
