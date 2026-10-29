@@ -7,15 +7,11 @@
 # Commit and push inside each of those checkouts — never here.
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Nested independent repositories
-personal/b/
-ecosystem/
-personal/
-projects/
-tests/
+# Nested independent repositories — one root per ownership class.
+# Both roots hold checkouts with their own remotes; never tracked here.
+vexgraph-ecosystem/
+vexgraph-hobby-projects/
 _notes/
-_main/
-_trash/
 
 # Build output
 cmake-build-*/
@@ -35,9 +31,11 @@ __pycache__/
 *.pyc
 
 # b build state + generated artefacts
-.b/
-personal/b/b.json
-personal/b/compile_commands.json
+# The serialized target graph is the build's source of truth, so it is tracked;
+# objects, signatures and outputs stay machine-local.
+.b/*
+!.b/graph.json
+!.b/README.md
 /b.json
 run/hello
 
@@ -52,6 +50,5 @@ resources/
 
 
 # Workspace-local metadata is ignored here; keep it available in the worktree.
-vexgraph/
 metadata/
 

@@ -2980,14 +2980,58 @@ static void gen_compile_commands(void) {
 
 // Machine-readable IDE seam. CMake consumes test and all non-test index records
 // instead of inventing include roots, definitions or archive link ordering.
+// Replace workspace-absolute prefixes with repo-relative ones and build state
+// with `.b/`. The serialized graph must be identical on any machine checkout.
+static char *graph_scrub(const char *text) {
+    size_t rootLength = strlen(g_root), stateLength = strlen(g_state);
+    size_t size = strlen(text) + 1;
+    char *out = xmalloc(size);
+    size_t used = 0;
+    const char *p = text;
+    while (*p) {
+        if (!strncmp(p, g_root, rootLength) && p[rootLength] == '/') {
+            p += rootLength + 1;
+            continue;
+        }
+        if (!strncmp(p, g_state, stateLength) && p[stateLength] == '/') {
+            memcpy(out + used, ".b/", 3);
+            used += 3;
+            p += stateLength + 1;
+            continue;
+        }
+        out[used++] = *p++;
+    }
+    out[used] = 0;
+    return out;
+}
+
 static void ide_strings(const StrList *items) {
     printf("[");
     for (int i = 0; i < (*items).count; i++) {
-        char *escaped = json_escape((*items).items[i]);
+        char *scrubbed = graph_scrub((*items).items[i]);
+        char *escaped = json_escape(scrubbed);
         printf("%s\"%s\"", i ? "," : "", escaped);
         free(escaped);
+        free(scrubbed);
     }
     printf("]");
+}
+
+// A file list one entry per line: source edits then diff line by line.
+static void ide_files(const StrList *items) {
+    if ((*items).count == 0) {
+        printf("[]");
+        return;
+    }
+    printf("[");
+    for (int i = 0; i < (*items).count; i++) {
+        char *scrubbed = graph_scrub((*items).items[i]);
+        char *escaped = json_escape(scrubbed);
+        printf("%s\n    \"%s\"", i ? "," : "", escaped);
+        free(escaped);
+        free(scrubbed);
+    }
+    printf("\n   ]");
 }
 
 // A target kind as a graph token; the serialized graph never sees enum order.
@@ -3055,10 +3099,23 @@ static void ide_links(const StrList *libraries) {
         for (int k = 0; k < g_targets_ref.count && !owned; k++)
             if (strcmp((g_targets_ref.items[k]).out_path, item) == 0) owned = true;
         if (owned) continue;
-        char *flag = json_escape(item);
-        printf("%s\"%s\"", first ? "" : ",", flag);
-        free(flag);
-        first = false;
+        // A word carrying a pair ("-framework Foundation") becomes two words, so
+        // the builder receives argv tokens and never parses flag grammar.
+        char *scrubbed = graph_scrub(item);
+        char *word = scrubbed;
+        while (*word) {
+            while (*word == ' ') word++;
+            if (*word == 0) break;
+            char *end = strchr(word, ' ');
+            if (end != nullptr) *end = 0;
+            char *flag = json_escape(word);
+            printf("%s\"%s\"", first ? "" : ",", flag);
+            free(flag);
+            first = false;
+            if (end == nullptr) break;
+            word = end + 1;
+        }
+        free(scrubbed);
     }
     printf("]}");
 }
@@ -3066,7 +3123,7 @@ static void ide_links(const StrList *libraries) {
 // Print one graph record: identity, kind, sources, flags, link inputs, deps.
 // `with_libraries` carries the link line (target libraries and system libraries);
 // `with_output` carries the artifact path of a target an external tool produces.
-static void ide_record(Target *t, bool with_libraries, bool with_output) {
+static void ide_record(Target *t, bool with_libraries, bool with_generator) {
     StrList includes = {0}, definitions = {0}, options = {0}, libraries = {0};
     collect_pub(t, &includes, &definitions, 0);
     strl_extend(&definitions, &(*t).defs);
@@ -3074,32 +3131,26 @@ static void ide_record(Target *t, bool with_libraries, bool with_output) {
     strl_extend(&options, &(*t).cflags);
     if (with_libraries) {
         collect_link_libs(t, &libraries, 0);
-        // CMake treats each framework pair as one link item, not -lFoundation.
-        const StrList *systemLibraries = &(*t).syslibs;
-        for (int k = 0; k < (*systemLibraries).count; k++) {
-            if (!strcmp((*systemLibraries).items[k], "-framework") && k + 1 < (*systemLibraries).count) {
-                strl_pushf(&libraries, "-framework %s", (*systemLibraries).items[++k]);
-            } else {
-                strl_push(&libraries, (*systemLibraries).items[k]);
-            }
-        }
+        strl_extend(&libraries, &(*t).syslibs);
     }
     char *name = json_escape((*t).name);
     printf("{\"name\":\"%s\",\"kind\":\"%s\",\"sources\":", name, kind_token((*t).kind));
     free(name);
-    ide_strings(&(*t).srcs);
-    printf(",\"includes\":"); ide_strings(&includes);
+    ide_files(&(*t).srcs);
+    printf(",\"includes\":"); ide_files(&includes);
     printf(",\"definitions\":"); ide_strings(&definitions);
     printf(",\"options\":"); ide_strings(&options);
     if (with_libraries) {
-        printf(",\"libraries\":"); ide_strings(&libraries);
         printf(",\"links\":"); ide_links(&libraries);
     }
     printf(",\"deps\":"); ide_deps(&(*t).deps);
-    if (with_output) {
-        char *out = json_escape((*t).out_path);
-        printf(",\"output\":\"%s\"", out);
-        free(out);
+    // Every artifact path is declared; a builder invents no output layout.
+    char *out = graph_scrub((*t).out_path);
+    char *escaped = json_escape(out);
+    printf(",\"output\":\"%s\"", escaped);
+    free(escaped);
+    free(out);
+    if (with_generator) {
         // The generator command travels with the record, so a builder that knows
         // no cargo, no Rust and no repository can still produce the artifact.
         printf(",\"generator\":");
@@ -3122,19 +3173,23 @@ static void export_ide_graph(void) {
     for (int i = 0; i < g_targets_ref.count; i++) {
         Target *t = &g_targets_ref.items[i];
         if ((*t).kind != T_LIB && (*t).kind != T_MOD) continue;
-        char *path = json_escape((*t).out_path);
+        char *scrubbed = graph_scrub((*t).out_path);
+        char *path = json_escape(scrubbed);
         printf("%s\"%s\"", count++ ? "," : "", path);
         free(path);
+        free(scrubbed);
     }
-    printf("],\"tests\":[");
+    // One record per line: the graph is tracked, so a target's change must show
+    // as one changed line, not as one changed 442 KB line.
+    printf("],\n \"tests\":[");
     count = 0;
     for (int i = 0; i < g_targets_ref.count; i++) {
         Target *t = &g_targets_ref.items[i];
         if (!(*t).is_test) continue;
-        if (count++) printf(",");
+        printf("%s\n  ", count++ ? "," : "");
         ide_record(t, true, false);
     }
-    printf("],\"index\":[");
+    printf("\n ],\n \"targets\":[");
     count = 0;
     for (int i = 0; i < g_targets_ref.count; i++) {
         Target *t = &g_targets_ref.items[i];
@@ -3142,10 +3197,37 @@ static void export_ide_graph(void) {
         // An external artifact owns no sources here; it is an index record so the
         // graph can name it as a dependency instead of rebuilding it.
         if ((*t).srcs.count == 0 && (*t).kind != T_EXT) continue;
-        if (count++) printf(",");
+        printf("%s\n  ", count++ ? "," : "");
         ide_record(t, true, (*t).kind == T_EXT);
     }
-    printf("]}\n");
+    // Generated inputs travel with the graph: a builder that knows no shader
+    // toolchain still runs the exact argv, in registration order.
+    printf("\n ],\n \"generated\":[");
+    int emitted = 0;
+    for (int i = 0; i < g_genCount; i++) {
+        bool seen = false;
+        for (int j = 0; j < i && !seen; j++)
+            if (!strcmp(g_gens[j].out, g_gens[i].out)) seen = true;
+        if (seen) continue;
+        char *out = graph_scrub(g_gens[i].out);
+        char *escaped = json_escape(out);
+        printf("%s\n  {\"output\":\"%s\",\"sources\":[", emitted++ ? "," : "", escaped);
+        free(escaped);
+        free(out);
+        int sources = 0;
+        for (int j = i; j < g_genCount; j++) {
+            if (strcmp(g_gens[j].out, g_gens[i].out)) continue;
+            char *src = graph_scrub(g_gens[j].src);
+            char *text = json_escape(src);
+            printf("%s\"%s\"", sources++ ? "," : "", text);
+            free(text);
+            free(src);
+        }
+        printf("],\"generator\":");
+        ide_strings(&g_gens[i].cmd);
+        printf("}");
+    }
+    printf("\n ]\n}\n");
 }
 
 // Recompile this CLI when its source hash changes, then re-exec it.

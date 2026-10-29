@@ -11,25 +11,25 @@ binary="$root/vexgraph-hobby-projects/b/b"
 run_tooling_test() {
     case "$1" in
         opencode_preferences)
-            bun test "$root/tests/tools/opencode_preferences_test.ts"
+            bun test "$root/vexgraph-ecosystem/tests/tools/opencode_preferences_test.ts"
             ;;
         checklist_runner)
-            python3 -B "$root/tests/tools/test_checklist_test.py"
+            python3 -B "$root/vexgraph-ecosystem/tests/tools/test_checklist_test.py"
             ;;
         linter)
-            python3 -B "$root/tests/tools/linter_test.py"
+            python3 -B "$root/vexgraph-ecosystem/tests/tools/linter_test.py"
             ;;
         readiness)
-            python3 -B "$root/tests/tools/readiness_test.py"
+            python3 -B "$root/vexgraph-ecosystem/tests/tools/readiness_test.py"
             ;;
         ci_repos)
-            python3 -B "$root/tests/tools/ci_repos_test.py"
+            python3 -B "$root/vexgraph-ecosystem/tests/tools/ci_repos_test.py"
             ;;
         arrange)
-            python3 -B "$root/tests/tools/arrange_test.py"
+            python3 -B "$root/vexgraph-ecosystem/tests/tools/arrange_test.py"
             ;;
         prefs)
-            python3 -B "$root/tests/tools/prefs_test.py"
+            python3 -B "$root/vexgraph-ecosystem/tests/tools/prefs_test.py"
             ;;
         *)
             return 2
