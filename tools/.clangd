@@ -1,6 +1,0 @@
-# Use the root IDE adapter's real compile commands, not an older C fallback.
-If:
-  PathMatch: .*\.(c|h|m)
-CompileFlags:
-  CompilationDatabase: cmake-build-debug
-  Add: [-std=gnu23]
