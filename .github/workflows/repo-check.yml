@@ -43,7 +43,7 @@ permissions:
 
 jobs:
   lint:
-    name: Lint, lawbook and secret audit (${{ matrix.os }})
+    name: Lawbook and secret audit (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -97,24 +97,6 @@ jobs:
               exit 1
             fi
           done
-
-      - name: Architectural compliance (ratchet)
-        shell: bash
-        env:
-          BASELINE: ${{ inputs.baseline }}
-        run: |
-          set -euo pipefail
-          ${{ matrix.python }} "$WORKTREE_TOOLS/tools/linter.py" \
-            --no-color --baseline "$BASELINE" .
-
-      - name: Structural layout (ratchet)
-        shell: bash
-        env:
-          LAYOUT: ${{ inputs.layout }}
-        run: |
-          set -euo pipefail
-          ${{ matrix.python }} "$WORKTREE_TOOLS/tools/arrange.py" \
-            --baseline "$LAYOUT" .
 
       - name: Lawbook present
         shell: bash

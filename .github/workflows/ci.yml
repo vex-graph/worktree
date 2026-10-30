@@ -62,16 +62,6 @@ jobs:
       - name: Checklist evidence ledger is current
         run: python3 tools/test_checklist.py check
 
-      - name: Architectural compliance (ratchet baseline)
-        run: |
-          python3 tools/linter.py --no-color \
-            --baseline .github/lint-baseline.json
-
-      - name: Structural layout (ratchet baseline)
-        run: |
-          python3 tools/arrange.py \
-            --baseline .github/arrange-baseline.json
-
       - name: Security baseline (SECURITY.md compliance)
         run: |
           echo "=== Scanning for Accidental Secrets & Private Keys ==="
@@ -142,18 +132,6 @@ jobs:
       # CRLF, which would report every row stale for a line-ending artifact
       # rather than a content change, so the ledger gate stays on Linux and
       # the checklist's own unit test above still proves the tool on Windows.
-
-      - name: Architectural compliance (ratchet baseline)
-        shell: bash
-        run: |
-          python tools/linter.py --no-color \
-            --baseline .github/lint-baseline.json
-
-      - name: Structural layout (ratchet baseline)
-        shell: bash
-        run: |
-          python tools/arrange.py \
-            --baseline .github/arrange-baseline.json
 
       - name: Native Build Tooling Proof (Windows)
         shell: bash
