@@ -49,6 +49,16 @@ resources/
 .antigravity/
 
 
-# Workspace-local metadata is ignored here; keep it available in the worktree.
-metadata/
+# Workspace-local metadata is ignored here, EXCEPT for the constitution and test checklist:
+metadata/*
+!metadata/gists/
+metadata/gists/*
+!metadata/gists/test-checklist.md
+!metadata/gists/preferences/
+metadata/gists/preferences/*
+!metadata/gists/preferences/gist.md
+!metadata/gists/preferences/_introduction.md
+!metadata/gists/preferences/README.md
+!metadata/gists/preferences/overview-template.c
+!metadata/gists/preferences/main-template.c
 
