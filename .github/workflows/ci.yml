@@ -39,13 +39,13 @@ jobs:
           ECOSYSTEM_PAT: ${{ secrets.ECOSYSTEM_PAT }}
         run: |
           if [ -n "${ECOSYSTEM_PAT:-}" ]; then
-            python3 tools/ci_repos.py clone --auth "$ECOSYSTEM_PAT"
+            python3 tools/python/ci_repos.py clone --auth "$ECOSYSTEM_PAT"
           else
-            python3 tools/ci_repos.py clone
+            python3 tools/python/ci_repos.py clone
           fi
 
       - name: Require every checkout
-        run: python3 tools/ci_repos.py check --require-all
+        run: python3 tools/python/ci_repos.py check --require-all
 
       - name: Tooling tests
         run: |
@@ -105,14 +105,14 @@ jobs:
           ECOSYSTEM_PAT: ${{ secrets.ECOSYSTEM_PAT }}
         run: |
           if [ -n "${ECOSYSTEM_PAT:-}" ]; then
-            python tools/ci_repos.py clone --auth "$ECOSYSTEM_PAT"
+            python tools/python/ci_repos.py clone --auth "$ECOSYSTEM_PAT"
           else
-            python tools/ci_repos.py clone
+            python tools/python/ci_repos.py clone
           fi
 
       - name: Require every checkout
         shell: bash
-        run: python tools/ci_repos.py check --require-all
+        run: python tools/python/ci_repos.py check --require-all
 
       - name: Tooling tests
         shell: bash
@@ -162,10 +162,10 @@ jobs:
           python-version: "3.12"
 
       - name: Clone declared repositories
-        run: python3 tools/ci_repos.py clone
+        run: python3 tools/python/ci_repos.py clone
 
       - name: Require every checkout
-        run: python3 tools/ci_repos.py check --require-all
+        run: python3 tools/python/ci_repos.py check --require-all
 
       - name: Publish scoreboard
         run: |
@@ -257,9 +257,9 @@ jobs:
             PYTHON_CMD="python"
           fi
           if [ -n "${ECOSYSTEM_PAT:-}" ]; then
-            $PYTHON_CMD tools/ci_repos.py clone --auth "$ECOSYSTEM_PAT"
+            $PYTHON_CMD tools/python/ci_repos.py clone --auth "$ECOSYSTEM_PAT"
           else
-            $PYTHON_CMD tools/ci_repos.py clone
+            $PYTHON_CMD tools/python/ci_repos.py clone
           fi
 
       - name: Cache Rust registry
