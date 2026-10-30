@@ -744,6 +744,8 @@ static const char *c23_flag(void) {
     return "-std=gnu2x";
 }
 
+static char *abspath(const char *rel);
+
 // base flags: the Build & Naming Conventions Law + Platform Support Floor Law
 static void base_cflags(StrList *out) {
     strl_push(out, c23_flag());
