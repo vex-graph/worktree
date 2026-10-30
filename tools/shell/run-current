@@ -22,10 +22,10 @@ fi
 directory=$(CDPATH= cd -- "$(dirname -- "$file")" && pwd)
 file="$directory/$(basename -- "$file")"
 case "$file" in
-    "$root"/tests/*.c|"$root"/suite/projects/*.c)
+    "$root"/tests/*.c|"$root"/vexgraph-ecosystem/tests/*.c)
         exec "$root/tools/b" run "$file" "$@"
         ;;
     *)
-        exec "$root/suite/personal/b/b" run exec "$file" -- "$@"
+        exec "$root/vexgraph-hobby-projects/b/b" run exec "$file" -- "$@"
         ;;
 esac

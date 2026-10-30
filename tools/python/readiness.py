@@ -47,7 +47,13 @@ ROOT = _find_root(Path(__file__).resolve().parent)
 REPORT = Path("metadata/gists/test-checklist.md")
 PLATFORMS = Path("tools/platforms.json")
 SOURCE_SUFFIXES = {".c", ".h", ".m", ".mm", ".cc", ".cpp", ".cxx", ".rs"}
-SUBSYSTEM_DIRS = ("vexgraph-ecosystem", "vexgraph-hobby-projects")
+SUBSYSTEM_DIRS = (
+    "vexgraph-ecosystem",
+    "vexgraph-hobby-projects",
+    "suite/ecosystem",
+    "suite/personal",
+    "suite/projects",
+)
 WORKTREE = "(worktree)"
 
 
@@ -64,9 +70,19 @@ LINTER = load_module("linter", _tools_py / "linter.py" if (_tools_py / "linter.p
 ARRANGE = load_module("arrange", _tools_py / "arrange.py" if (_tools_py / "arrange.py").is_file() else ROOT / "tools/arrange.py")
 
 
+def tests_checkout(root):
+    for cand in (root / "vexgraph-ecosystem" / "tests", root / "tests"):
+        if (cand / ".git").exists():
+            return cand
+    return root / "vexgraph-ecosystem" / "tests"
+
+
 def repo_dirs(root):
     """Every checked-out repository the scoreboard covers, plus the worktree."""
-    found = [root, root / "vexgraph-ecosystem" / "tests"]
+    tc = tests_checkout(root)
+    found = [root]
+    if (tc / ".git").exists():
+        found.append(tc)
     for base in SUBSYSTEM_DIRS:
         directory = root / base
         if not directory.is_dir():
@@ -78,7 +94,10 @@ def repo_dirs(root):
 def repo_key(root, path):
     if path == root:
         return WORKTREE
-    return path.relative_to(root).as_posix()
+    rel = path.relative_to(root).as_posix()
+    if rel in ("vexgraph-ecosystem/tests", "tests"):
+        return "tests"
+    return rel
 
 
 def git_files(repo):
@@ -99,10 +118,17 @@ def owner_of_path(path, claims_by_subsystem):
     it. Tooling tests and workspace files belong to the worktree.
     """
     parts = path.split("/")
+    if len(parts) > 1 and parts[0] == "suite":
+        return "/".join(parts[:3])
     if len(parts) > 2 and parts[0] in SUBSYSTEM_DIRS:
         return "/".join(parts[:2])
     if parts[0] == "tests" and len(parts) > 1:
         subsystem = parts[1]
+        if subsystem == "tools":
+            return WORKTREE
+        return claims_by_subsystem.get(subsystem, "tests")
+    if len(parts) > 2 and parts[0] == "vexgraph-ecosystem" and parts[1] == "tests":
+        subsystem = parts[2]
         if subsystem == "tools":
             return WORKTREE
         return claims_by_subsystem.get(subsystem, "tests")
@@ -163,7 +189,7 @@ def ledger_counts(root, key, claims_by_subsystem):
 def test_units(root, claims_by_subsystem):
     """Executable test units per owner, from the shared tests checkout."""
     counts = Counter()
-    for name in git_files(root / "vexgraph-ecosystem" / "tests"):
+    for name in git_files(tests_checkout(root)):
         if not CHECKLIST.is_executable_test(name):
             continue
         parts = Path(name).parts
@@ -272,7 +298,7 @@ def build_report(root, execute=False, timeout=1800):
     }
     if execute:
         summary["build"] = run_command(["./tools/b", "build"], timeout)
-        summary["test"] = run_command(["./tools/b", "test"], timeout)
+        summary["test"] = run_command(["./tools/shell/test.sh"], timeout)
 
     return {"summary": summary, "rows": rows, "platforms": platforms}
 
@@ -353,7 +379,7 @@ def main(argv=None):
     parser.add_argument("--out", default=None,
                         help="write to a file instead of stdout ('-' = stdout)")
     parser.add_argument("--execute", action="store_true",
-                        help="also run ./tools/b build and ./tools/b test")
+                        help="also run ./tools/b build and ./tools/shell/test.sh")
     parser.add_argument("--timeout", type=float, default=1800,
                         help="seconds per executed command")
     args = parser.parse_args(argv)

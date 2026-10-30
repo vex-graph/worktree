@@ -27,8 +27,3 @@ for d in "${REPOS[@]}"; do
   printf "%-40s %-10s %-6s %-6s %-6s %s\n" "$name" "$br" "$dirty" "$ahead" "$behind" "$last"
 done
 
-
-
-
-
-# hello world!!! so yeah... 

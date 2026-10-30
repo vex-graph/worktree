@@ -1,69 +1,28 @@
 #!/bin/sh
-# Vexgraph entry point: generic b compiles/runs the project-owned graph.
+# tools/b — Vexgraph entry point: directly launches the 'b' build engine.
+#
+# This workspace uses generic b (from vex-graph/b) as its
+# build system and package coordinator. It does NOT delegate to tools/workspace.c.
+#
+# Commands (see vexgraph-hobby-projects/b/README.md):
+#   b workspace [<dir>] [--as <name>]
+#   b build [<target>...] [--in <name>]
+#   b breeze <source> [args...]
+#   b run <source> [args...]
+#   b box [<action>]
+#   b adapter <name> [args...]
 set -eu
+
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 root=$(CDPATH= cd -- "$here/.." && pwd)
-export B_CALLER_DIR="${B_CALLER_DIR:-$PWD}"
-export B_HOME="${B_HOME:-$HOME/Library/Application Support/vexgraph/b}"
-cd "$root"
 binary="$root/vexgraph-hobby-projects/b/b"
 
-run_tooling_test() {
-    case "$1" in
-        opencode_preferences)
-            bun test "$root/vexgraph-ecosystem/tests/tools/opencode_preferences_test.ts"
-            ;;
-        checklist_runner)
-            python3 -B "$root/vexgraph-ecosystem/tests/tools/test_checklist_test.py"
-            ;;
-        linter)
-            python3 -B "$root/vexgraph-ecosystem/tests/tools/linter_test.py"
-            ;;
-        readiness)
-            python3 -B "$root/vexgraph-ecosystem/tests/tools/readiness_test.py"
-            ;;
-        ci_repos)
-            python3 -B "$root/vexgraph-ecosystem/tests/tools/ci_repos_test.py"
-            ;;
-        arrange)
-            python3 -B "$root/vexgraph-ecosystem/tests/tools/arrange_test.py"
-            ;;
-        prefs)
-            python3 -B "$root/vexgraph-ecosystem/tests/tools/prefs_test.py"
-            ;;
-        *)
-            return 2
-            ;;
-    esac
-}
-
-if [ "${1:-}" = test ]; then
-    shift
-    if [ "${1:-}" = opencode_preferences ] || [ "${1:-}" = checklist_runner ] \
-        || [ "${1:-}" = linter ] || [ "${1:-}" = readiness ] \
-        || [ "${1:-}" = ci_repos ] || [ "${1:-}" = arrange ] \
-        || [ "${1:-}" = prefs ]; then
-        run_tooling_test "$1"
-        exit $?
-    fi
-    if [ "${1:-}" = preferences ]; then
-        run_tooling_test opencode_preferences \
-            && run_tooling_test checklist_runner \
-            && run_tooling_test linter \
-            && run_tooling_test readiness \
-            && run_tooling_test ci_repos \
-            && run_tooling_test arrange \
-            && run_tooling_test prefs
-        exit $?
-    fi
-    if [ "$#" -eq 0 ]; then
-        "$binary" run exec "$root/tools/workspace.c" -- test
-        result=$?
-        if [ "$result" -ne 0 ]; then exit "$result"; fi
-        run_tooling_test opencode_preferences && run_tooling_test checklist_runner
-        exit $?
-    fi
-    exec "$binary" run exec "$root/tools/workspace.c" -- test "$@"
+if [ ! -f "$binary" ]; then
+    echo "tools/b: error: 'b' launcher not found at $binary" >&2
+    exit 1
 fi
 
-exec "$binary" run exec "$root/tools/workspace.c" -- "$@"
+export B_CALLER_DIR="${B_CALLER_DIR:-$PWD}"
+export B_HOME="${B_HOME:-$HOME/Library/Application Support/b}"
+
+exec "$binary" "$@"

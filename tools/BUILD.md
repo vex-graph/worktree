@@ -1,11 +1,9 @@
 # Vexgraph build and CLion entry points
 
-`./tools/b build` remains the project build entry point. Vexgraph owns
-`tools/workspace.c` and `tools/build_annotation.h`: repository names, dependencies,
-shader generation and registered tests belong here, not in the generic b repo.
-The launcher uses `suite/personal/b/b run exec tools/workspace.c -- <arguments>`.
-Generic b compiles and executes the C coordinator; it has no workspace subcommand.
-This is a project-owned executable graph, not a new declarative manifest format.
+`./tools/b` directly invokes the `b` build engine (`vexgraph-hobby-projects/b/b`).
+The workspace uses `b workspace` to register/scan targets and `b build` to compile
+declared targets in dependency order. The launcher forwards directly to `b` without
+delegating through `tools/workspace.c`.
 
 The saved CLion **b Runner → Run current file** tool invokes `shell/run-current`
 with the active file path. The existing **b** play configuration still references
@@ -27,7 +25,7 @@ Automated proof uses `tests/tools/run_current_test.py` and
 `tests/b/workspace_test.py`, without opening windows. Saved XML wiring is proved;
 CLion UI operation and appearance still need user confirmation after reopening.
 
-The workspace-root `CMakeLists.txt` is an IDE adapter. Open the root as a CMake
+The workspace-root `../vexgraph-ecosystem` is an IDE adapter. Open the root as a CMake
 project and reload it in CLion to index production C/Objective-C with the flags
 exported by `b ide`. Excluded `vexgraph_index_*` object targets supply the code
 model only; runtime builds still delegate to b. Native test Run/Debug targets

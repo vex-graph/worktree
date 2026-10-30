@@ -237,7 +237,7 @@ def cmd_find(root: Path, needle: str, sources: list[Path], limit: int = 40) -> i
 
 def repo_lawbooks(root: Path) -> list[Path]:
     books: list[Path] = []
-    for top in ("vexgraph-ecosystem", "vexgraph-hobby-projects"):
+    for top in ("vexgraph-ecosystem", "vexgraph-hobby-projects", "suite"):
         base = root / top
         if not base.is_dir():
             continue
@@ -326,7 +326,13 @@ def cmd_repo(root: Path, name: str, key: str | None, path_only: bool) -> int:
 
 
 def test_lawbook(root: Path) -> Path:
-    return root / "vexgraph-ecosystem" / "tests" / "test-preferences.md"
+    cand = root / "vexgraph-ecosystem" / "tests" / "test-preferences.md"
+    if cand.is_file():
+        return cand
+    cand2 = root / "tests" / "test-preferences.md"
+    if cand2.is_file():
+        return cand2
+    return cand
 
 
 def cmd_test(root: Path, key: str | None) -> int:
@@ -359,6 +365,9 @@ def repo_registry(root: Path) -> list[str]:
 
 def prompt_text(root: Path) -> str:
     """The assembled block the preferences plugin injects on every request."""
+    test_book = test_lawbook(root)
+    test_headings = doc_headings(read(test_book)) if test_book.is_file() else []
+    test_rel = test_book.relative_to(root) if test_book.is_file() else "vexgraph-ecosystem/tests/test-preferences.md"
     sections = [
         "# Complete workspace preferences\n\n"
         "The author's live architecture preferences for the vexgraph ecosystem. This "
@@ -373,9 +382,9 @@ def prompt_text(root: Path) -> str:
         "Laws are cited by Title, never by number; numbers are slice addresses inside "
         "one file only.",
         "## Universal constitution (compressed)\n\n" + compressed(root).read_text(encoding="utf-8").rstrip("\n"),
-        "## Proof lawbook index — `vexgraph-ecosystem/tests/test-preferences.md`\n\n"
+        f"## Proof lawbook index — `{test_rel}`\n\n"
         "Read the owning law before writing a test: `./tools/prefs test \"<law>\"`.\n\n"
-        + "\n".join(("  " if level == 3 else "") + "- " + title for _, level, title in doc_headings(read(test_lawbook(root)))),
+        + "\n".join(("  " if level == 3 else "") + "- " + title for _, level, title in test_headings),
         "## Repository lawbook index\n\n"
         "Read the complete owning lawbook before work in that repository: "
         "`./tools/prefs repo <name>`. Each file's own body stays on disk.\n\n"
@@ -551,3 +560,4 @@ def main(argv: list[str]) -> int:
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))
+

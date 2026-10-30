@@ -51,12 +51,12 @@ outermost ring — the map. It is not law; it is the reading order.
 | The law query command | `./tools/prefs` |
 | Proof lawbook | `tests/test-preferences.md` |
 | Evidence ledger | `metadata/gists/test-checklist.md` |
-| Repo lawbooks | each repo root, e.g. `suite/ecosystem/vexspoke/vexspoke-preferences.md` |
-| Personal tool lawbooks | `suite/personal/func/func-preferences.md`, `suite/personal/primeagen/primeagen-preferences.md` |
+| Repo lawbooks | each repo root, e.g. `suite/vexspoke` |
+| Personal tool lawbooks | `suite/func`, `suite/primeagen` |
 | The loader | `.opencode/plugins/preferences/index.ts` |
 
 (The engine lawbook is at
-`suite/ecosystem/relational-engine/relational-engine-preferences.md`.)
+`suite/relational-engine`.)
 
 ## Reading one law
 

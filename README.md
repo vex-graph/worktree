@@ -9,9 +9,8 @@ nested path is a separate checkout.
 
 ## Current State
 
-The root workspace coordinates independent projects. `tools/b` launches the
-workspace-owned target graph in `tools/workspace.c`, while the standalone `b`
-project supplies the generic compiler/runtime adapters. Root CI also owns
+The root workspace coordinates independent projects. `tools/b` directly
+launches the `b` build engine in `vexgraph-hobby-projects/b`. Root CI also owns
 workspace-wide documentation and tooling checks. Test evidence is recorded per
 executable owner in `metadata/gists/test-checklist.md`; consult that ledger and
 the readiness report for current results rather than relying on counts copied
@@ -23,7 +22,7 @@ implemented.
 
 ### CLion: CMake is IDE metadata only
 
-Open **this workspace root** in CLion. Its `CMakeLists.txt` is the only maintained
+Open **this workspace root** in CLion. Its `vexgraph-ecosystem` is the only maintained
 project entry: no nested repository, application, personal tool or test checkout
 needs one. It imports `b`'s registered contexts and recursively discovers extra
 `.c`/`.m`/`.h` files in the declared source roots, with separate owner include
@@ -41,30 +40,33 @@ Excluded supplemental source targets do not link releases or run applications.
 No IDE configure pass proves standalone runtime dependency closure.
 
 The build system lives in the independent [`vex-graph/b`](https://github.com/vex-graph/b)
-checkout at `suite/personal/b/`. `b.c` is a language-agnostic CLI — a small suite (`b.h` +
+checkout at `suite/b`. `b.c` is a language-agnostic CLI — a small suite (`b.h` +
 `util.c` + pluggable `languages/*` adapters) that owns `run`, `build` and the
 planned `export` surface. The adapter set is open-ended and grows over time;
-`suite/personal/b/README.md` lists the languages wired today. `tools/workspace.c` remains the
-workspace engine that builds the whole ecosystem graph (libs, shaders, tests,
-apps); `tools/b` is a thin forwarding launcher for it.
+`tools/b` is a forwarding launcher directly executing `vexgraph-hobby-projects/b/b`.
+The workspace uses `b workspace` to register/refresh targets into `.b/workspace.json`,
+and `b build` to compile declared targets in dependency order.
 
 ```sh
-./tools/b build            # compile all targets, or named targets and deps
-./tools/b test [substr]    # run all tests, or matching tests
-./tools/b run [name]       # list runnable targets, or launch a matching target
-./tools/b targets          # list every target, including libraries
-./tools/b check            # owner and public-surface coverage gates
-./tools/b coverage [substr]# instrumented tests and per-function execution gates
-./tools/b ide              # export IDE build metadata
-./tools/b watch | cc | doctor | clean
+./tools/b workspace          # scan workspace and write .b/workspace.json
+./tools/b build [target...]  # compile all targets, or named targets and deps
+./tools/b breeze <file.c>    # run a single file directly (alias: ./tools/b run)
+./tools/b box [<action>]     # package management (--init, --apply, etc.)
+./tools/b adapter <name>     # adapter operations (e.g. adapter list)
+```
+
+Running tests across the workspace is handled by the dedicated test runner:
+
+```sh
+./tools/shell/test.sh [substr]  # run test binaries, reporting PASS/SKIP/FAIL
 ```
 
 Drop a `_main/<name>.c` containing a `main()` and `./tools/b run <name>` builds,
 bundles and launches it as an ad-hoc-codesigned `.app`. All build state lives
 *outside* the tree (`~/Library/Application Support/vexgraph/b/`, override
-`$B_HOME`); compilation databases in `suite/personal/b/` are ignored.
+`$B_HOME`); compilation databases in `suite/b` are ignored.
 
-For standalone projects, add the `suite/personal/b/` checkout to `PATH`, or invoke `suite/personal/b/b`:
+For standalone projects, add the `suite/b` checkout to `PATH`, or invoke `suite/b`:
 
 ```sh
 ./suite/personal/b/b run exec ./hello.c
@@ -82,7 +84,7 @@ The project run configuration named **b** triggers the same tool. This is the
 "open a file, press Run, it runs" path while `tools/workspace.c` is still the
 builder.
 
-See `suite/personal/b/README.md` for the implemented command contract and packaging roadmap.
+See `suite/b` for the implemented command contract and packaging roadmap.
 `run instance` runs directly through a runtime or an existing executable;
 `run exec` builds the source artifact before launching it. Generic export
 packaging is not implemented yet. The former CMake adapter is no longer the
@@ -90,7 +92,7 @@ workspace entry point.
 
 ### Dogfooding with Semicolon
 
-[`suite/projects/semicolon`](suite/projects/semicolon/README.md) is the R6
+[`suite/semicolon`](suite/semicolon/README.md) is the R6
 terminal shell for browsing and editing vexgraph itself. From a project
 directory, `smc` (or `semicolon`) opens the tree; the per-user `smc` link is
 installed explicitly with `sh suite/projects/semicolon/install-command.sh`.
@@ -100,7 +102,7 @@ compiling that file alone. Other supported files use the standalone `b` route.
 The result appears in a separate, bounded, scrollable console; its reported
 exit code or signal belongs to the launched `b` process. A successful launch
 of a windowed app is not a visual test or proof its GUI behaved correctly.
-Semicolon's own terminal build is currently `suite/projects/semicolon/build.py`;
+Semicolon's own terminal build is currently `suite/semicolon`;
 do not infer a registered R6 build target or a general project-graph resolver.
 
 ## CI and readiness
@@ -155,11 +157,10 @@ the ecosystem.
 
 ### Vertically integrated across vexgraph's stack
 
-**`b` is orchestration, not another R tier.** `tools/b` delegates to the
-independent `suite/personal/b` tool and this workspace's target graph in
-`tools/workspace.c`; it compiles/links selected owners and runs registered
-targets. Semicolon consumes that graph through a child-process Run seam; it
-does not own compilers, drivers, or lower-tier implementations.
+**`b` is orchestration, not another R tier.** `tools/b` directly executes the
+`b` build engine in `vexgraph-hobby-projects/b`. It compiles and links declared
+targets via `.b/workspace.json`. Semicolon consumes that graph through a
+child-process Run seam; it does not own compilers, drivers, or lower-tier implementations.
 
 | Layer | Semicolon today | Intended seam, not current integration |
 | :--- | :--- | :--- |
@@ -170,9 +171,9 @@ does not own compilers, drivers, or lower-tier implementations.
 | R5 applications | Primeagen stays independent. | Optional registered consumer workflow, not a reverse dependency. |
 | R6 Semicolon | A working, limited file-browser/editor and `b` run-console shell. | Full workflow composition and the graphical IDE remain unfinished. |
 
-The [Semicolon README](suite/projects/semicolon/README.md) records the current
+The [Semicolon README](suite/semicolon/README.md) records the current
 console, platform proof, and limitations. Language's own source and
-[status](suite/ecosystem/language/README.md) govern what its lexical subset
+[status](suite/language/README.md) govern what its lexical subset
 actually offers; this direct lexical consumer is not a parser, semantic IDE or
 generic adapter/project-engine integration.
 
@@ -186,28 +187,28 @@ superapp products. See the
 
 | Path | Layer | Remote |
 |---|---|---|
-| `suite/personal/b` | standalone build-system CLI; workspace graph under `tools/` | `vex-graph/b` |
-| `suite/personal/func` | standalone compile-time opcode orchestrator | `vex-graph/func` |
-| `suite/ecosystem/lifetime` | R1 kernel host · windows · OS lifetime | [vexgraph-ecosystem/lifetime](https://github.com/vexgraph-ecosystem/lifetime) |
-| `suite/personal/hotcwap` | R1 host supervisor · hot reload | [vexgraph-ecosystem/hotcwap](https://github.com/vexgraph-ecosystem/hotcwap) |
-| `suite/ecosystem/relational-engine` | R2 memory/storage · native C search | `vexgraph-ecosystem/relational-engine` |
-| `suite/ecosystem/vexspoke` | R2 CPU computation · behavior; legacy storage ABI retained | `vexgraph-ecosystem/vexspoke` |
-| `suite/ecosystem/graphvex` | R3 GPU driver (rect-first, no swapchain) | `vexgraph-ecosystem/graphvex` |
-| `suite/personal/api-haven` | personal API / connectors | [vexgraph-ecosystem/api-haven](https://github.com/vexgraph-ecosystem/api-haven) |
-| `suite/ecosystem/determinant` | R3 terminal rendering, widgets, CLI parsing and caller-fed input | `vexgraph-ecosystem/determinant` |
-| `suite/ecosystem/language` | R3 caller-fed lexer/project/index slice; parser and LSP unfinished | `vexgraph-ecosystem/language` |
-| `suite/ecosystem/darkbase-engine` | R3 native vex store · `Database` M1 + `.vexdb` persistence implemented | `vexgraph-ecosystem/darkbase-engine` |
-| `suite/ecosystem/darling-framework` | R4 widget interfaces · partial implementation | `vexgraph-ecosystem/darling-framework` |
-| `suite/ecosystem/sesh` | R4 interface · session relay partial implementation | `vexgraph-ecosystem/sesh` |
-| `suite/ecosystem/harness` | R4 interface · the user's own agent (partial local objects) | `vexgraph-ecosystem/harness` |
-| `suite/ecosystem/samplerate` | R3 driver · native audio engine (CoreAudio/WASAPI/ALSA) | `vexgraph-ecosystem/samplerate` |
-| `suite/projects/drawling` | R5 · unfinished drawing studio | [vexgraph-ecosystem/drawling](https://github.com/vexgraph-ecosystem/drawling) |
-| `suite/projects/impedance` | R5 · unfinished audio application | [vexgraph-ecosystem/impedance](https://github.com/vexgraph-ecosystem/impedance) |
-| `suite/personal/primeagen` | standalone personal R5 agent client; future Semicolon consumer seam | `vex-graph/primeagen` |
-| `suite/projects/semicolon` | R6 · working terminal dogfooding shell; GUI and cross-tier workflow composition unfinished | `vexgraph-ecosystem/semicolon` |
-| `suite/projects/anti` | R6 · unfinished superapp | `vexgraph-ecosystem/anti` |
+| `suite/b` | standalone build-system CLI; workspace graph under `tools/` | `vex-graph/b` |
+| `suite/func` | standalone compile-time opcode orchestrator | `vex-graph/func` |
+| `suite/lifetime` | R1 kernel host · windows · OS lifetime | [vexgraph-ecosystem/lifetime](https://github.com/vexgraph-ecosystem/lifetime) |
+| `suite/hotcwap` | R1 host supervisor · hot reload | [vexgraph-ecosystem/hotcwap](https://github.com/vexgraph-ecosystem/hotcwap) |
+| `suite/relational-engine` | R2 memory/storage · native C search | `vexgraph-ecosystem/relational-engine` |
+| `suite/vexspoke` | R2 CPU computation · behavior; legacy storage ABI retained | `vexgraph-ecosystem/vexspoke` |
+| `suite/graphvex` | R3 GPU driver (rect-first, no swapchain) | `vexgraph-ecosystem/graphvex` |
+| `suite/api-haven` | personal API / connectors | [vexgraph-ecosystem/api-haven](https://github.com/vexgraph-ecosystem/api-haven) |
+| `suite/determinant` | R3 terminal rendering, widgets, CLI parsing and caller-fed input | `vexgraph-ecosystem/determinant` |
+| `suite/language` | R3 caller-fed lexer/project/index slice; parser and LSP unfinished | `vexgraph-ecosystem/language` |
+| `suite/darkbase` | R3 native vex store · `Database` M1 + `.vexdb` persistence implemented | `vexgraph-ecosystem/darkbase-engine` |
+| `suite/darling-framework` | R4 widget interfaces · partial implementation | `vexgraph-ecosystem/darling-framework` |
+| `suite/sesh` | R4 interface · session relay partial implementation | `vexgraph-ecosystem/sesh` |
+| `suite/harness` | R4 interface · the user's own agent (partial local objects) | `vexgraph-hobby-projects/harness` |
+| `suite/samplerate` | R3 driver · native audio engine (CoreAudio/WASAPI/ALSA) | `vexgraph-ecosystem/samplerate` |
+| `suite/drawling` | R5 · unfinished drawing studio | [vexgraph-ecosystem/drawling](https://github.com/vexgraph-ecosystem/drawling) |
+| `suite/impedance` | R5 · unfinished audio application | [vexgraph-ecosystem/impedance](https://github.com/vexgraph-ecosystem/impedance) |
+| `suite/primeagen` | standalone personal R5 agent client; future Semicolon consumer seam | `vex-graph/primeagen` |
+| `suite/semicolon` | R6 · working terminal dogfooding shell; GUI and cross-tier workflow composition unfinished | `vexgraph-ecosystem/semicolon` |
+| `suite/anti` | R6 · unfinished superapp | `vexgraph-ecosystem/anti` |
 | `tests` | shared executable-owner evidence and test lawbook | [vexgraph-ecosystem/tests](https://github.com/vexgraph-ecosystem/tests) |
-| `suite/personal/vex-graph` | profile/meta | `vex-graph/vex-graph` |
+| `metadata/vex-graph` | profile/meta | `vex-graph/vex-graph` |
 
 Some paths may be Git-ignored local material. Use `git status --ignored` and the
 root `.gitignore` to determine what is local-only; do not infer that `resources/`

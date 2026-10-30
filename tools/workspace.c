@@ -3487,7 +3487,6 @@ static void usage(void) {
            "commands:\n"
            "  build [target...]   compile (all, or the named target + deps)\n"
            "  run [target] ...    run an app/tool/test; no target lists what's runnable\n"
-           "  test [substr]       run the test suite (or just tests matching substr)\n"
            "  check               per-file owner + public-surface coverage gates\n"
            "  coverage [substr]   run tests instrumented; gate per-function execution\n"
            "  list                list every runnable target (alias: ls)\n"
@@ -3676,23 +3675,7 @@ int main(int argc, char **argv) {
         }
     }
 
-    if (!strcmp(command, "test") && rest.count == 0) {
-        const char *sub = caller_subsystem();
-        if (sub) {
-            strl_push(&rest, sub);
-            printf("b: auto-scoping tests to '%s' (from current directory)\n", sub);
-        }
-    }
-
-    if (!strcmp(command, "build") || !strcmp(command, "run") || !strcmp(command, "test")) {
-        if (!strcmp(command, "test")) {
-            // the static proof gate runs before the suite: no test run passes
-            // while a unit lacks an owner or a public function goes uninvoked.
-            if (rest.count == 0 || (rest.count > 0 && strstr(rest.items[0], "vexspoke"))) {
-                int rc = ratchet(nullptr, false, false, false, false, false);
-                if (rc) return rc;
-            }
-        }
+    if (!strcmp(command, "build") || !strcmp(command, "run")) {
         build_all();
         if (!strcmp(command, "build")) {
             gen_compile_commands();
@@ -3721,56 +3704,6 @@ int main(int argc, char **argv) {
             execv((*t).out_path, a);
             die("exec %s failed: %s", (*t).out_path, strerror(errno));
         }
-        // test
-        StrList tests = {0};
-        for (int k = 0; k < g_targets_ref.count; k++) {
-            Target *t = &g_targets_ref.items[k];
-            if (!(*t).is_test) continue;
-            if (rest.count && !strstr((*t).name, rest.items[0])) continue;
-            strl_push(&tests, (*t).out_path);
-        }
-        printf("b: running %d test(s)\n", tests.count);
-        int failed = 0, timedout = 0, skipped = 0;
-        for (int k = 0; k < tests.count; k++) {
-            const char *nm = strrchr(tests.items[k], '/');
-            nm = nm ? nm + 1 : tests.items[k];
-            Cmd c = {0};
-            strl_push(&c, tests.items[k]);
-            int st = run_test(nm, &c, 30);
-            if (st == 0) {
-                printf("  PASS    %s\n", nm);
-            } else if (st == 77) {
-                // B_TEST_SKIP: the contract was not exercised on this host.
-                // Neither a pass nor a failure — but never silently green.
-                printf("  SKIP    %s (contract unproved on this host)\n", nm);
-                skipped++;
-            } else if (st == -1) {
-                printf("  TIMEOUT %s (>30s)\n", nm);
-                timedout++;
-            } else {
-                printf("  FAIL    %s (exit %d)\n", nm, st);
-                failed++;
-                char *lp = strf("%s/logs/test_%s.log", g_state, nm);
-                size_t len = 0;
-                char *txt = read_file(lp, &len);
-                if (txt && len) {
-                    char *p = txt + len;
-                    for (int lines = 0; p > txt && lines < 12;) {
-                        p--;
-                        if (*p == '\n') lines++;
-                    }
-                    fputs(p, stdout);
-                }
-                free(txt);
-            }
-        }
-        printf("b: %d passed, %d failed, %d timed out, %d skipped\n",
-               tests.count - failed - timedout - skipped, failed, timedout, skipped);
-        if (skipped > 0 && g_verbose) {
-            printf("b: %d test(s) skipped a contract — see the SKIP lines above; "
-                   "a skip proves nothing\n", skipped);
-        }
-        return (failed || timedout) ? 1 : 0;
     }
 
     usage();

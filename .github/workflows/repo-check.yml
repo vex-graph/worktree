@@ -1,5 +1,5 @@
 # Reusable per-repo check. Callers live in each repository as
-# .github/workflows/vexgraph-ci.yml (installed by tools/ci_repos.py callers).
+# .github/workflows/vexgraph-ecosystem-ci.yml (installed by tools/ci_repos.py callers).
 #
 # The caller is trusted (same ecosystem). `build` and `test` are shell commands
 # supplied by the caller; they are executed verbatim from the repo root.
