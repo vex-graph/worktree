@@ -70,9 +70,14 @@ def inventory(root):
     repos = {root, root / "tests", root / "b"}
     # Scan independently of the umbrella repo's ignores: nested repositories
     # own their inventory and their own ignore rules. .git may be a worktree file.
-    for directory in ("host-behavior", "drivers", "interfaces", "interactables",
+    # The two-root layout is walked directly; the retired one-root directory
+    # names stay listed so an older worktree still inventories.
+    for directory in ("vexgraph-ecosystem", "vexgraph-hobby-projects",
+                      "host-behavior", "drivers", "interfaces", "interactables",
                       "superapp", "personal", "ecosystem", "repos", "projects"):
-        repos.update(p.parent for p in (root / directory).rglob(".git"))
+        base = root / directory
+        if base.is_dir():
+            repos.update(p.parent for p in base.rglob(".git"))
     groups = {}
     for repo in sorted(repos):
         if not (repo / ".git").exists():
