@@ -88,16 +88,19 @@ def repo_dirs(root):
         if not directory.is_dir():
             continue
         found.extend(sorted(p for p in directory.iterdir() if p.is_dir()))
-    return [p for p in found if (p / ".git").exists()]
+    seen = set()
+    unique = []
+    for p in found:
+        if p not in seen and (p / ".git").exists():
+            seen.add(p)
+            unique.append(p)
+    return unique
 
 
 def repo_key(root, path):
     if path == root:
         return WORKTREE
-    rel = path.relative_to(root).as_posix()
-    if rel in ("vexgraph-ecosystem/tests", "tests"):
-        return "tests"
-    return rel
+    return path.relative_to(root).as_posix()
 
 
 def git_files(repo):
@@ -136,7 +139,7 @@ def owner_of_path(path, claims_by_subsystem):
 
 
 def production_files(repo, key):
-    if key == "tests":
+    if key in ("tests", "vexgraph-ecosystem/tests"):
         return 0
     count = 0
     for name in git_files(repo):
