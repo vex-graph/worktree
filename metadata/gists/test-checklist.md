@@ -58,10 +58,6 @@ No inventoried files yet; not verified.
 
 No inventoried files yet; not verified.
 
-## vexgraph-ecosystem/darkbase/darkbase-main
-
-No inventoried files yet; not verified.
-
 ## vexgraph-ecosystem/darling-framework
 
 No inventoried files yet; not verified.

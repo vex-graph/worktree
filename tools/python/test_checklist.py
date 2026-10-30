@@ -68,6 +68,17 @@ def inventory(root):
     design: the ledger is a test-execution record, not a whole-tree inventory.
     """
     repos = {root, root / "tests", root / "b"}
+    platforms_file = root / "tools" / "platforms.json"
+    declared_paths = set()
+    if platforms_file.is_file():
+        try:
+            import json
+            declared = json.loads(platforms_file.read_text(encoding="utf-8")).get("repos", {})
+            for key in declared:
+                if key != "(worktree)":
+                    declared_paths.add(root / key)
+        except Exception:
+            pass
     # Scan independently of the umbrella repo's ignores: nested repositories
     # own their inventory and their own ignore rules. .git may be a worktree file.
     # The two-root layout is walked directly; the retired one-root directory
@@ -77,7 +88,10 @@ def inventory(root):
                       "superapp", "personal", "ecosystem", "repos", "projects"):
         base = root / directory
         if base.is_dir():
-            repos.update(p.parent for p in base.rglob(".git"))
+            for p in base.rglob(".git"):
+                repo = p.parent
+                if not declared_paths or repo in declared_paths:
+                    repos.add(repo)
     groups = {}
     for repo in sorted(repos):
         if not (repo / ".git").exists():
