@@ -49,12 +49,12 @@ jobs:
 
       - name: Tooling tests
         run: |
-          python3 -B tests/tools/linter_test.py
-          python3 -B tests/tools/arrange_test.py
-          python3 -B tests/tools/readiness_test.py
-          python3 -B tests/tools/test_checklist_test.py
-          python3 -B tests/tools/ci_repos_test.py
-          python3 -B tests/tools/prefs_test.py
+          python3 -B vexgraph-ecosystem/tests/tools/linter_test.py
+          python3 -B vexgraph-ecosystem/tests/tools/arrange_test.py
+          python3 -B vexgraph-ecosystem/tests/tools/readiness_test.py
+          python3 -B vexgraph-ecosystem/tests/tools/test_checklist_test.py
+          python3 -B vexgraph-ecosystem/tests/tools/ci_repos_test.py
+          python3 -B vexgraph-ecosystem/tests/tools/prefs_test.py
 
       - name: Preferences integrity (budget, injection, lawbooks)
         run: ./tools/prefs check
@@ -117,12 +117,12 @@ jobs:
       - name: Tooling tests
         shell: bash
         run: |
-          python -B tests/tools/linter_test.py
-          python -B tests/tools/arrange_test.py
-          python -B tests/tools/readiness_test.py
-          python -B tests/tools/test_checklist_test.py
-          python -B tests/tools/ci_repos_test.py
-          python -B tests/tools/prefs_test.py
+          python -B vexgraph-ecosystem/tests/tools/linter_test.py
+          python -B vexgraph-ecosystem/tests/tools/arrange_test.py
+          python -B vexgraph-ecosystem/tests/tools/readiness_test.py
+          python -B vexgraph-ecosystem/tests/tools/test_checklist_test.py
+          python -B vexgraph-ecosystem/tests/tools/ci_repos_test.py
+          python -B vexgraph-ecosystem/tests/tools/prefs_test.py
 
       - name: Preferences integrity (budget, injection, lawbooks)
         shell: bash
