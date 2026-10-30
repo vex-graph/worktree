@@ -169,8 +169,8 @@ jobs:
 
       - name: Publish scoreboard
         run: |
-          python3 tools/readiness.py --markdown >> "$GITHUB_STEP_SUMMARY"
-          python3 tools/readiness.py
+          python3 tools/python/readiness.py --markdown >> "$GITHUB_STEP_SUMMARY"
+          python3 tools/python/readiness.py
 
   # ───────────────────────────────────────────────────────────────────────────
   # Job 3: Semicolon TUI build, bedrock & ecosystem proof (6-Target Matrix)
