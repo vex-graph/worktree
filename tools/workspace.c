@@ -753,6 +753,11 @@ static void base_cflags(StrList *out) {
     strl_push(out, "-Wextra");
     strl_push(out, "-Werror");
     strl_push(out, "-Wno-unused-but-set-variable");
+    // R0 lifetime owns the zero-dependency primitive headers (platform/), and
+    // every tier includes them DOWNWARD, so the path is global instead of
+    // repeated per target (the One File, All Platforms Law, home-is-the-floor
+    // clause). Nothing here links: these are macro headers.
+    strl_pushf(out, "-I%s", abspath("host-behavior/lifetime/src"));
 #ifdef __APPLE__
 #if defined(__arm64__) || defined(__aarch64__)
     strl_push(out, "-arch");
