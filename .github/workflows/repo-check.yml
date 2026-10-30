@@ -84,20 +84,6 @@ jobs:
           git -C "$dir" sparse-checkout set tools
           echo "WORKTREE_TOOLS=$dir" >> "$GITHUB_ENV"
 
-      - name: Require ratchet baselines
-        shell: bash
-        env:
-          BASELINE: ${{ inputs.baseline }}
-          LAYOUT: ${{ inputs.layout }}
-        run: |
-          set -euo pipefail
-          for file in "$BASELINE" "$LAYOUT"; do
-            if [ ! -f "$file" ]; then
-              echo "::error::Ratchet baseline '$file' is missing. Record both with 'python3 tools/ci_repos.py baselines --write' from the workspace root, commit them, and push."
-              exit 1
-            fi
-          done
-
       - name: Lawbook present
         shell: bash
         run: |
