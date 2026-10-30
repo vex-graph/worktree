@@ -30,7 +30,7 @@ jobs:
           python-version: "3.12"
 
       # The tooling tests, the ledger and the ratchets live in nested checkouts
-      # (`tests/`) or scan them (`suite/`), so the manifest must be present
+      # (`tests/`) or scan them (`vexgraph-ecosystem/`), so the manifest must be present
       # before anything else runs. A root-only checkout would also make the
       # workspace-scoped ratchets vacuous: zero files scanned, every recorded
       # violation reported "retired".
@@ -159,7 +159,7 @@ jobs:
         shell: bash
         run: |
           export B_HOME="${RUNNER_TEMP:-/tmp}/vexgraph_b"
-          python -B tests/b/util_test.py
+          python -B vexgraph-ecosystem/tests/b/util_test.py
 
       - name: Scope statement
         shell: bash
@@ -290,14 +290,14 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-          key: cargo-registry-${{ runner.os }}-${{ hashFiles('suite/ecosystem/relational-engine/rust/Cargo.lock') }}
+          key: cargo-registry-${{ runner.os }}-${{ hashFiles('vexgraph-ecosystem/relational-engine/rust/Cargo.lock') }}
           restore-keys: |
             cargo-registry-${{ runner.os }}-
 
       - name: Fetch Rust Dependencies for C ABI Scratchpad
         shell: bash
         run: |
-          cargo fetch --locked --manifest-path suite/ecosystem/relational-engine/rust/Cargo.toml
+          cargo fetch --locked --manifest-path vexgraph-ecosystem/relational-engine/rust/Cargo.toml
 
       - name: Verify Workspace Build Graph (${{ matrix.platform }})
         shell: bash
@@ -305,9 +305,9 @@ jobs:
           export CC="$COMPILER"
           export B_HOME="${RUNNER_TEMP:-/tmp}/vexgraph_b"
           if [ "${{ matrix.os_family }}" = "windows" ]; then
-            python -B tests/b/util_test.py
+            python -B vexgraph-ecosystem/tests/b/util_test.py
           else
-            ./tools/b targets
+            ./tools/b workspace && ./tools/b build
           fi
 
       - name: Build Semicolon TUI Binary
@@ -318,7 +318,7 @@ jobs:
           if ! command -v python3 &>/dev/null && command -v python &>/dev/null; then
             PYTHON_CMD="python"
           fi
-          $PYTHON_CMD suite/projects/semicolon/build.py --compiler "$COMPILER" --output suite/projects/semicolon/.build/semicolon-tui
+          $PYTHON_CMD vexgraph-ecosystem/semicolon/build.py --compiler "$COMPILER" --output vexgraph-ecosystem/semicolon/.build/semicolon-tui
 
       - name: Run Memory-Sanitized Tests (ASan / UBSan & PTY Proof)
         if: matrix.os_family != 'windows'
@@ -333,7 +333,7 @@ jobs:
           export CC="$COMPILER"
           export B_HOME="${RUNNER_TEMP:-/tmp}/vexgraph_b"
           if [ "${{ matrix.os_family }}" = "windows" ]; then
-            python -B tests/b/util_test.py
+            python -B vexgraph-ecosystem/tests/b/util_test.py
           else
             ./tools/b test hot_behavior_test
             ./tools/b test two_dylib_swap_test
@@ -345,5 +345,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: semicolon-tui-${{ matrix.platform }}
-          path: suite/projects/semicolon/.build/semicolon-tui
+          path: vexgraph-ecosystem/semicolon/.build/semicolon-tui
           if-no-files-found: warn
