@@ -303,7 +303,7 @@ jobs:
         shell: bash
         run: |
           export CC="$COMPILER"
-          python3 tests/semicolon/editor/run.py
+          python3 vexgraph-ecosystem/tests/semicolon/editor/run.py
 
       - name: Run Bedrock & Ecosystem Tests (${{ matrix.platform }})
         shell: bash
