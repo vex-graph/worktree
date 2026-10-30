@@ -60,7 +60,7 @@ jobs:
         run: ./tools/prefs check
 
       - name: Checklist evidence ledger is current
-        run: python3 tools/test_checklist.py check
+        run: python3 tools/python/test_checklist.py check
 
       - name: Security baseline (SECURITY.md compliance)
         run: |
