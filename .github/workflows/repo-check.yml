@@ -19,7 +19,7 @@ on:
         type: string
         default: .github/arrange-baseline.json
       tools-ref:
-        description: Branch or tag of vex-graph/worktree that supplies tools/linter.py.
+        description: Branch or tag of vex-graph/worktree that supplies the tools/ tree.
         required: false
         type: string
         default: main

@@ -41,6 +41,10 @@ Minimal core, opt-in everything else. Six capabilities, nothing more by default:
   tools.
 - Use `bash` for build/test/git and read-only inspection. Prefer the umbrella
   build (`./tools/b`) over inventing commands.
+- Run `tools/shell/ci.sh` before any push. It mirrors the CI `audit` job and
+  resolves workflow paths and runner labels locally; a green gate on commits
+  that were never pushed is still a red run on GitHub, because CI tests
+  `origin`, not this working tree.
 - Keep changes small and cohesive; cite laws by Title, never number
   (`metadata/gists/preferences/PREFERENCES.md` is the constitution). Never push without an explicit,
   one-off order (the Git Workflow Law).
