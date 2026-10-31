@@ -62,3 +62,4 @@ metadata/gists/preferences/*
 !metadata/gists/preferences/overview-template.c
 !metadata/gists/preferences/main-template.c
 
+compile_commands.json
