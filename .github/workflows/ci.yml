@@ -29,11 +29,6 @@ jobs:
         with:
           python-version: "3.12"
 
-      # Cheapest gate first: a moved path or a retired runner label fails every
-      # step below it, and neither needs the nested checkouts to detect.
-      - name: Workflow references resolve
-        run: python3 -B tools/python/workflow_refs.py check
-
       # The tooling tests, the ledger and the ratchets live in nested checkouts
       # (`tests/`) or scan them (`vexgraph-ecosystem/`), so the manifest must be present
       # before anything else runs. A root-only checkout would also make the
@@ -51,6 +46,11 @@ jobs:
 
       - name: Require every checkout
         run: python3 tools/python/ci_repos.py check --require-all
+
+      # Cheap before the tooling tests, but it resolves references into the
+      # nested checkouts, so it must run after they exist.
+      - name: Workflow references resolve
+        run: python3 -B tools/python/workflow_refs.py check
 
       - name: Tooling tests
         run: |
