@@ -60,12 +60,13 @@ set(VEXGRAPH_B_COMMAND "${CMAKE_COMMAND}" -E env
 if(CMAKE_BUILD_TYPE MATCHES "^(Release|RelWithDebInfo|MinSizeRel)$")
     list(APPEND VEXGRAPH_B_COMMAND --release)
 endif()
-execute_process(COMMAND ${VEXGRAPH_B_COMMAND} ide
+execute_process(COMMAND ${VEXGRAPH_B_COMMAND} graph list
     WORKING_DIRECTORY "${VEXGRAPH_SOURCE_ROOT}"
-    RESULT_VARIABLE graph_result OUTPUT_VARIABLE graph ERROR_VARIABLE graph_error)
+    RESULT_VARIABLE graph_result OUTPUT_VARIABLE graph_error)
 if(NOT graph_result EQUAL 0)
     message(FATAL_ERROR "b could not export the IDE graph:\n${graph_error}")
 endif()
+file(READ "${VEXGRAPH_SOURCE_ROOT}/.b/graph.json" graph)
 file(WRITE "${CMAKE_BINARY_DIR}/b-test-graph.json" "${graph}")
 
 function(graph_array output json)
@@ -88,21 +89,23 @@ add_custom_target(vexgraph_runtime
     COMMENT "Building runtime with b (no apps or tests launched)"
     USES_TERMINAL VERBATIM)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-    "${VEXGRAPH_SOURCE_ROOT}/tools/workspace.c" "${VEXGRAPH_SOURCE_ROOT}/tools/build_annotation.h"
     "${VEXGRAPH_SOURCE_ROOT}/tools/b")
 
 # Real, excluded object targets give libraries, modules, apps and helper sources
 # their owning code model. Application indexing never admits galleries to CTest.
 # They do not replace b's runtime archives or participate in the default build.
-string(JSON index_count LENGTH "${graph}" index)
+string(JSON index_count LENGTH "${graph}" targets)
 if(index_count GREATER 0)
     math(EXPR last_index "${index_count} - 1")
     foreach(index RANGE 0 ${last_index})
-        string(JSON record GET "${graph}" index ${index})
+        string(JSON record GET "${graph}" targets ${index})
         string(JSON name GET "${record}" name)
         foreach(field sources includes definitions options)
             graph_array(${field} "${record}" ${field})
         endforeach()
+        if(NOT sources)
+            continue()
+        endif()
         set(target "vexgraph_index_${name}")
         add_library(${target} OBJECT EXCLUDE_FROM_ALL ${sources})
         target_include_directories(${target} PRIVATE ${includes})
@@ -168,7 +171,7 @@ endfunction()
 set(VEXGRAPH_MODELED_SOURCES)
 if(index_count GREATER 0)
     foreach(index RANGE 0 ${last_index})
-        string(JSON record GET "${graph}" index ${index})
+        string(JSON record GET "${graph}" targets ${index})
         graph_array(modeled "${record}" sources)
         list(APPEND VEXGRAPH_MODELED_SOURCES ${modeled})
     endforeach()
@@ -280,15 +283,16 @@ endforeach()
 
 option(VEXGRAPH_ENABLE_WINDOW_TESTS "Enable window/GPU/UI CTest runs" OFF)
 set(window_tests application_test bridge_seam_test present_surface_test traffic_light_test window_test)
-string(JSON test_count LENGTH "${graph}" vexgraph-ecosystem/tests)
+string(JSON test_count LENGTH "${graph}" tests)
 if(test_count GREATER 0)
     math(EXPR last_test "${test_count} - 1")
     foreach(index RANGE 0 ${last_test})
-        string(JSON record GET "${graph}" vexgraph-ecosystem/tests ${index})
+        string(JSON record GET "${graph}" tests ${index})
         string(JSON name GET "${record}" name)
-        foreach(field sources includes definitions options libraries)
+        foreach(field sources includes definitions options)
             graph_array(${field} "${record}" ${field})
         endforeach()
+        set(libraries "")
         add_executable(${name} ${sources})
         add_dependencies(${name} vexgraph_runtime)
         target_include_directories(${name} PRIVATE ${includes})
