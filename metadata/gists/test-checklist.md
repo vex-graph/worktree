@@ -1368,7 +1368,7 @@ No inventoried files yet; not verified.
 
 | Filename | Lab tested? | Last checked (Unix seconds) | SHA-256 at check | Evidence / scope | Description | Result |
 | :--- | :---: | ---: | :--- | :--- | :--- | :--- |
-| `vexgraph-hobby-projects/b/tests/ci_smoke_test.py` | ❌ | — | — | No executed evidence | Awaiting automated lab check | untested |
+| `vexgraph-hobby-projects/b/tests/ci_smoke_test.py` | ✅ | 1793451239 | 0391b5653dc5fe80b473f1254d21ec626464a0e209e7df1bb5c52eca96cd148b | ['sh', '-c', 'set -e; cd vexgraph-hobby-projects/b; export B_HOME=$(mktemp -d); export B_TARGET=darwin-arm64; ./b --help &gt;/dev/null; export B_BINARY="$HOME/Library/Application Support/b/cli"; exec python3 -B tests/ci_smoke_test.py', '--timeout', '300']; test | b claims a territory with generate, writes .b/workspace.json with units, refuses a nested claim, run/breeze resolve upward to the territory and refuse outside one, self-box and install round-trip pass. | passed |
 
 ## vexgraph-hobby-projects/func
 
