@@ -236,8 +236,10 @@ def check(args):
                            for yes, no, flag, width in marks)
         print(f"{columns} {key:44s} {claim.get('tier', '?')}")
     if args.require_all:
-        missing = [key for key, _claim in entries(data)
-                   if not readiness(args.root / key)["checkout"]]
+        # A declared repository may say `"required": false` while it has no
+        # checkout yet (darkbase-headless); that is intent, not a gap.
+        missing = [key for key, claim in entries(data)
+                   if claim.get("required", True) and not readiness(args.root / key)["checkout"]]
         for key in missing:
             print(f"missing checkout: {key}", file=sys.stderr)
         errors.extend(f"missing checkout: {key}" for key in missing)

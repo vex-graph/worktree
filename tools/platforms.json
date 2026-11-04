@@ -20,7 +20,7 @@
       ],
       "remote": "https://github.com/vex-graph/worktree.git"
     },
-    "vexgraph-ecosystem/lifetime": {
+    "vex/lifetime": {
       "tier": "R0",
       "subsystem": "lifetime",
       "support": [
@@ -33,7 +33,7 @@
       ],
       "remote": "https://github.com/vexgraph-ecosystem/lifetime.git"
     },
-    "vexgraph-ecosystem/vexspoke": {
+    "vex/vexspoke": {
       "tier": "R2",
       "subsystem": "vexspoke",
       "support": [
@@ -46,9 +46,9 @@
       ],
       "remote": "https://github.com/vexgraph-ecosystem/vexspoke.git"
     },
-    "vexgraph-ecosystem/relational-engine": {
+    "vex/re": {
       "tier": "R1",
-      "subsystem": "relational-engine",
+      "subsystem": "re",
       "support": [
         "macos",
         "linux",
@@ -59,7 +59,7 @@
       ],
       "remote": "https://github.com/vexgraph-ecosystem/relational-engine.git"
     },
-    "vexgraph-ecosystem/graphvex": {
+    "vex/graphvex": {
       "tier": "R3",
       "subsystem": "graphvex",
       "support": [
@@ -72,7 +72,7 @@
       ],
       "remote": "https://github.com/vexgraph-ecosystem/graphvex.git"
     },
-    "vexgraph-ecosystem/determinant": {
+    "vex/determinant": {
       "tier": "R3",
       "subsystem": "determinant",
       "support": [
@@ -83,7 +83,7 @@
       "proven": [],
       "remote": "https://github.com/vexgraph-ecosystem/determinant.git"
     },
-    "vexgraph-ecosystem/language": {
+    "vex/language": {
       "tier": "R3",
       "subsystem": "language",
       "support": [
@@ -94,7 +94,7 @@
       "proven": [],
       "remote": "https://github.com/vexgraph-ecosystem/language.git"
     },
-    "vexgraph-ecosystem/samplerate": {
+    "vex/samplerate": {
       "tier": "R3",
       "subsystem": null,
       "support": [
@@ -105,7 +105,7 @@
       "proven": [],
       "remote": "https://github.com/vexgraph-ecosystem/samplerate.git"
     },
-    "vexgraph-ecosystem/darling-framework": {
+    "vex/darling": {
       "tier": "R4",
       "subsystem": "darling",
       "support": [
@@ -117,7 +117,7 @@
       ],
       "remote": "https://github.com/vexgraph-ecosystem/darling-framework.git"
     },
-    "vexgraph-ecosystem/sesh": {
+    "vex/sesh": {
       "tier": "R4",
       "subsystem": "sesh",
       "support": [
@@ -130,7 +130,7 @@
       ],
       "remote": "https://github.com/vexgraph-ecosystem/sesh.git"
     },
-    "vexgraph-hobby-projects/primeagen": {
+    "vex/primeagen": {
       "tier": "R5",
       "subsystem": "primeagen",
       "support": [
@@ -141,7 +141,7 @@
       "proven": [],
       "remote": "https://github.com/vex-graph/primeagen.git"
     },
-    "vexgraph-ecosystem/impedance": {
+    "vex/impedance": {
       "tier": "R5",
       "subsystem": null,
       "support": [
@@ -151,7 +151,7 @@
       "proven": [],
       "remote": "https://github.com/vexgraph-ecosystem/impedance.git"
     },
-    "vexgraph-ecosystem/drawling": {
+    "vex/drawling": {
       "tier": "R5",
       "subsystem": null,
       "support": [
@@ -161,7 +161,7 @@
       "proven": [],
       "remote": "https://github.com/vexgraph-ecosystem/drawling.git"
     },
-    "vexgraph-ecosystem/anti": {
+    "vex/anti": {
       "tier": "R6",
       "subsystem": null,
       "support": [
@@ -171,7 +171,7 @@
       "proven": [],
       "remote": "https://github.com/vexgraph-ecosystem/anti.git"
     },
-    "vexgraph-ecosystem/semicolon": {
+    "vex/semicolon": {
       "tier": "R6",
       "subsystem": "semicolon",
       "support": [
@@ -184,7 +184,7 @@
       ],
       "remote": "https://github.com/vexgraph-ecosystem/semicolon.git"
     },
-    "vexgraph-hobby-projects/b": {
+    "vex/b": {
       "tier": "tooling",
       "subsystem": "b",
       "support": [
@@ -198,7 +198,7 @@
       ],
       "remote": "https://github.com/vex-graph/b.git"
     },
-    "vexgraph-hobby-projects/func": {
+    "vex/func": {
       "tier": "tooling",
       "subsystem": "func",
       "support": [
@@ -209,20 +209,7 @@
       "proven": [],
       "remote": "https://github.com/vex-graph/func.git"
     },
-    "vexgraph-ecosystem/tests": {
-      "tier": "proof",
-      "subsystem": null,
-      "support": [
-        "macos",
-        "linux",
-        "windows"
-      ],
-      "proven": [
-        "macos"
-      ],
-      "remote": "https://github.com/vexgraph-ecosystem/tests.git"
-    },
-    "vexgraph-ecosystem/darkbase/darkbase-engine": {
+    "vex/darkbase": {
       "tier": "tooling",
       "subsystem": "darkbase",
       "support": [
@@ -233,9 +220,10 @@
       "proven": [
         "macos"
       ],
-      "remote": "https://github.com/vex-graph/darkbase.git"
+      "remote": "https://github.com/vex-graph/darkbase.git",
+      "required": false
     },
-    "vexgraph-hobby-projects/hotcwap": {
+    "vex/hotcwap": {
       "tier": "R1",
       "subsystem": "hotcwap",
       "support": [
@@ -248,7 +236,7 @@
       ],
       "remote": "https://github.com/vexgraph-ecosystem/hotcwap.git"
     },
-    "vexgraph-hobby-projects/api-haven": {
+    "vex/api-haven": {
       "tier": "tooling",
       "subsystem": "api-haven",
       "support": [
@@ -261,7 +249,7 @@
       ],
       "remote": "https://github.com/vexgraph-ecosystem/api-haven.git"
     },
-    "vexgraph-ecosystem/darkbase/darkbase-headless": {
+    "vex/darkbase-headless": {
       "tier": "R4",
       "subsystem": "darkbase-headless",
       "support": [
@@ -272,9 +260,10 @@
       "proven": [
         "macos"
       ],
-      "remote": "https://github.com/vexgraph-ecosystem/darkbase-headless.git"
+      "remote": "https://github.com/vexgraph-ecosystem/darkbase-headless.git",
+      "required": false
     },
-    "vexgraph-hobby-projects/harness": {
+    "vex/harness": {
       "tier": "R4",
       "subsystem": "harness",
       "support": [

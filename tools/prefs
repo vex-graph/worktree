@@ -61,19 +61,20 @@ INJECTED_LIMIT = 32 * 1024
 
 
 def full_doc(root: Path) -> Path:
+    hub = constitution_root()
     for candidate in (
-        root / "metadata" / "gists" / "preferences" / "PREFERENCES.md",
-        root / "metadata" / "gists" / "preferences" / "preferences.md",
-        root / "PREFERENCES.md",
+        hub / "metadata" / "gists" / "preferences" / "PREFERENCES.md",
+        hub / "metadata" / "gists" / "preferences" / "preferences.md",
+        hub / "PREFERENCES.md",
     ):
         if candidate.is_file():
             return candidate
-    return root / "metadata" / "gists" / "preferences" / "PREFERENCES.md"
+    return hub / "metadata" / "gists" / "preferences" / "PREFERENCES.md"
 
 
 def published(root: Path) -> list[tuple[str, Path]]:
     """(Gist filename, local path) for every file the constitution publishes."""
-    working = root / "metadata" / "gists" / "preferences"
+    working = constitution_root() / "metadata" / "gists" / "preferences"
     return [
         ("_introduction.md", working / "_introduction.md"),
         ("gist.md", working / "gist.md"),
@@ -83,23 +84,43 @@ def published(root: Path) -> list[tuple[str, Path]]:
     ]
 
 
-def workspace_root() -> Path:
-    """Walk up from here to the workspace that owns the preferences.
+def constitution_root() -> Path:
+    """Walk up from the cwd to the nearest metadata that owns the constitution.
 
-    The compressed constitution is committed; `PREFERENCES.md` is the full
-    rationale document and is Git-ignored, so it may be absent in a clean
-    checkout. Commands that need the full text ask `full()` and say so; the
+    The compressed constitution is committed to the hub's metadata; the full
+    `PREFERENCES.md` is Git-ignored, so it may be absent in a clean checkout.
+    Commands that need the full text ask `full()` and say so; the
     compressed-only check validates what the repository actually ships.
     """
     here = Path.cwd().resolve()
     for directory in (here, *here.parents):
         if (directory / "metadata" / "gists" / "preferences" / "gist.md").is_file():
             return directory
-    raise SystemExit("prefs: workspace not found (metadata/gists/preferences/gist.md)")
+    raise SystemExit("prefs: constitution not found (metadata/gists/preferences/gist.md)")
+
+
+def workspace_root() -> Path:
+    """The worktree that owns the tools, or the constitution root itself.
+
+    Resolution order: an ancestor-or-self of the cwd owning `tools/prefs` (the
+    normal case, any cwd inside the worktree); then a child of the
+    constitution root owning `tools/prefs` (the hub cwd — the worktree sits
+    one level below the hub); then the constitution root itself (a fixture
+    tree with no tools, where the constitution root is the whole workspace).
+    """
+    here = Path.cwd().resolve()
+    for directory in (here, *here.parents):
+        if (directory / "tools" / "prefs").is_file():
+            return directory
+    hub = constitution_root()
+    for child in hub.iterdir():
+        if child.is_dir() and (child / "tools" / "prefs").is_file():
+            return child
+    return hub
 
 
 def compressed(root: Path) -> Path:
-    return root / "metadata" / "gists" / "preferences" / "gist.md"
+    return constitution_root() / "metadata" / "gists" / "preferences" / "gist.md"
 
 
 def full(root: Path) -> Path:
@@ -237,7 +258,7 @@ def cmd_find(root: Path, needle: str, sources: list[Path], limit: int = 40) -> i
 
 def repo_lawbooks(root: Path) -> list[Path]:
     books: list[Path] = []
-    for top in ("vexgraph-ecosystem", "vexgraph-hobby-projects", "suite"):
+    for top in ("vex",):
         base = root / top
         if not base.is_dir():
             continue
@@ -326,7 +347,7 @@ def cmd_repo(root: Path, name: str, key: str | None, path_only: bool) -> int:
 
 
 def test_lawbook(root: Path) -> Path:
-    cand = root / "vexgraph-ecosystem" / "tests" / "test-preferences.md"
+    cand = root / "vex" / "tests" / "test-preferences.md"
     if cand.is_file():
         return cand
     cand2 = root / "tests" / "test-preferences.md"
@@ -367,7 +388,7 @@ def prompt_text(root: Path) -> str:
     """The assembled block the preferences plugin injects on every request."""
     test_book = test_lawbook(root)
     test_headings = doc_headings(read(test_book)) if test_book.is_file() else []
-    test_rel = test_book.relative_to(root) if test_book.is_file() else "vexgraph-ecosystem/tests/test-preferences.md"
+    test_rel = test_book.relative_to(root) if test_book.is_file() else "vex/tests/test-preferences.md"
     sections = [
         "# Complete workspace preferences\n\n"
         "The author's live architecture preferences for the vexgraph ecosystem. This "
@@ -399,8 +420,9 @@ def cmd_prompt(root: Path) -> int:
 
 
 def cmd_files(root: Path) -> int:
+    hub = constitution_root()
     for remote, local in published(root):
-        print(f"{local.relative_to(root)}  ->  {remote}")
+        print(f"{local.relative_to(hub)}  ->  {remote}")
     return 0
 
 
@@ -486,11 +508,12 @@ def cmd_check(root: Path) -> int:
     if injected > INJECTED_LIMIT:
         problems.append(f"injected block is {injected} bytes, over the {INJECTED_LIMIT}-byte ceiling")
 
+    hub = constitution_root()
     for remote, local in published(root):
         if not local.is_file():
             if local == full_path:
                 continue  # Git-ignored full document: checked when present
-            problems.append(f"{local.relative_to(root)} is missing")
+            problems.append(f"{local.relative_to(hub)} is missing")
             continue
         if not local.read_bytes().endswith(b"\n"):
             problems.append(f"{remote} does not end with a newline (the Gist adds one, so publishing would differ)")

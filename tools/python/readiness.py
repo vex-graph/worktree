@@ -139,7 +139,7 @@ def owner_of_path(path, claims_by_subsystem):
 
 
 def production_files(repo, key):
-    if key in ("tests", "vexgraph-ecosystem/tests"):
+    if key in ("tests", "vex/tests"):
         return 0
     count = 0
     for name in git_files(repo):
