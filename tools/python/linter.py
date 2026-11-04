@@ -38,14 +38,12 @@ BOLD = "\033[1m" if _USE_COLOR else ""
 RESET = "\033[0m" if _USE_COLOR else ""
 
 DEFAULT_ROOTS = (
-    "vexgraph-ecosystem",
-    "vexgraph-hobby-projects",
-    "tests",
+    "vex",
     "tools",
 )
 
 # Roots whose text is scanned for the No Section Sign Law, beyond the source roots.
-TEXT_ROOTS = ("metadata/gists", ".github", "tools")
+TEXT_ROOTS = ("../metadata/gists", ".github", "tools")
 
 EXCLUDE_DIRS = {
     ".git", ".idea", "build", "build-debug", "build-release",
@@ -323,6 +321,7 @@ class Linter:
         self.root_paths = list(root_paths)
         self.cwd = os.path.abspath(cwd or os.getcwd())
         self.files_scanned = 0
+        self.files_would_fix = 0
         self.text_scanned = 0
 
     def rel(self, path):
@@ -349,20 +348,20 @@ class Linter:
         inc = m.group(1)
 
         tiers = (
-            ("vexgraph-ecosystem/lifetime/",
+            ("vex/lifetime/",
              ["darling/", "api/", "hot/"],
              "lifetime (R0 host)"),
-            ("vexgraph-ecosystem/relational-engine/",
+            ("vex/re/",
              ["darling/", "hotcwap/", "window/", "hot/", "api/"],
-             "relational-engine (R1 storage)"),
-            ("vexgraph-ecosystem/vexspoke/",
+             "re (R1 storage)"),
+            ("vex/vexspoke/",
              ["darling/", "hotcwap/", "window/", "hot/", "api/",
               "vulkan/vk_iosurface.h", "vulkan/vk_scene.h",
               "vulkan/vk_view.h", "vulkan/sdf_gpu.h"],
              "vexspoke (R2 CPU)"),
-            ("vexgraph-ecosystem/darling-framework/",
+            ("vex/darling/",
              ["api/"],
-             "darling-framework (R4)"),
+             "darling (R4)"),
         )
         for prefix, prohibited, label in tiers:
             if not rel.startswith(prefix):
@@ -375,7 +374,7 @@ class Linter:
                         f"{label} includes downstream header '{inc}'")
         return None
 
-    def scan_file(self, path, fix=False):
+    def scan_file(self, path, fix=False, dry_run=False):
         rel = self.rel(path)
         violations = []
         has_overview = False
@@ -476,7 +475,10 @@ class Linter:
                     "Living Documentation Law", rel, 1, rel,
                     "Missing ';;DEFINITION' in the first 150 lines"))
 
-        if fix and modified:
+        if fix and modified and dry_run:
+            self.files_would_fix += 1
+
+        if fix and modified and not dry_run:
             try:
                 with open(path, "w", encoding="utf-8", newline="\n") as f:
                     f.writelines(new_lines)
@@ -534,7 +536,7 @@ class Linter:
                         continue
         return violations
 
-    def collect(self, fix=False, filter_rule=None):
+    def collect(self, fix=False, dry_run=False, filter_rule=None):
         violations = []
         for root_path in self.root_paths:
             if not os.path.isabs(root_path):
@@ -550,7 +552,7 @@ class Linter:
                         continue
                     fpath = os.path.join(dirpath, fname)
                     self.files_scanned += 1
-                    violations.extend(self.scan_file(fpath, fix=fix))
+                    violations.extend(self.scan_file(fpath, fix=fix, dry_run=dry_run))
 
         violations.extend(self.scan_text())
         if filter_rule:
@@ -603,6 +605,8 @@ def main(argv=None):
         description="VexGraph style & architectural linter")
     parser.add_argument("--fix", action="store_true",
                         help="rewrite the mechanical subset (arrows, casts, NULL, spacing)")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="with --fix: report what would be rewritten, write nothing")
     parser.add_argument("--verbose", "-v", action="store_true",
                         help="print every violation with its snippet")
     parser.add_argument("--rule", default=None, help="filter by rule title")
@@ -632,7 +636,10 @@ def main(argv=None):
         return 2
 
     linter = Linter(roots)
-    violations = linter.collect(fix=args.fix, filter_rule=args.rule)
+    if args.dry_run and not args.fix:
+        print("linter: --dry-run only makes sense with --fix", file=sys.stderr)
+        return 2
+    violations = linter.collect(fix=args.fix, dry_run=args.dry_run, filter_rule=args.rule)
     rule_counts, repo_counts = summarize(violations)
 
     if args.write_baseline:
@@ -650,6 +657,7 @@ def main(argv=None):
     if args.json:
         report = {
             "files_scanned": linter.files_scanned,
+            "files_would_fix": linter.files_would_fix,
             "total": len(violations),
             "by_rule": dict(rule_counts.most_common()),
             "by_repo": dict(repo_counts.most_common()),
