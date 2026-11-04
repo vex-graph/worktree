@@ -1,0 +1,137 @@
+#!/usr/bin/env python3
+"""tools/fix — apply the correctors, and only the rules that have one.
+
+Scanning and correcting are different acts:
+
+    tools/lint      reports. Never writes. Safe in CI, safe to run on a tree
+                    you have not looked at.
+    tools/fix       rewrites. Only the rules whose detector declares a fixer.
+                    A rule without a corrector is reported by tools/lint and
+                    handed to a human or an agent; this tool never improvises.
+
+Default is a dry run. `--write` is the only thing that touches disk.
+
+    tools/fix                      what would change, per rule, per tool
+    tools/fix --check              exit 1 if anything would change (for CI)
+    tools/fix --write              apply every fixable rule
+    tools/fix --write --rule Cast  apply one rule
+    tools/fix --tool linter        one corrector
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+PYTHON = sys.executable or "python3"
+
+# A corrector is opt-in by existing. Nothing here invents a fix for a rule that
+# only knows how to detect.
+CORRECTORS = ("linter", "arrange")
+
+
+def run(command: list[str], timeout: int = 900) -> tuple[int, str, str]:
+    result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=timeout)
+    return result.returncode, result.stdout, result.stderr
+
+
+def fix_linter(write: bool, rule: str | None) -> dict:
+    command = [PYTHON, "-B", "tools/python/linter.py", "--fix", "--json", "--no-color"]
+    if not write:
+        command.insert(4, "--dry-run")
+    if rule:
+        command.extend(["--rule", rule])
+    status, out, err = run(command)
+    if status not in (0, 1) or not out.strip():
+        raise RuntimeError(f"linter corrector failed ({status}): {err.strip()[:400]}")
+    report = json.loads(out)
+    # Only the rules that carry a fixer; everything else is tools/lint's report.
+    fixable = {}
+    for violation in report.get("violations", []):
+        if violation.get("fixable"):
+            rule = violation["rule"]
+            fixable[rule] = fixable.get(rule, 0) + 1
+    return {
+        "tool": "linter",
+        "files": report.get("files_would_fix", 0),
+        "violations": sum(fixable.values()),
+        "by_rule": fixable,
+    }
+
+
+def fix_arrange(write: bool) -> dict:
+    # arrange has no per-rule switch; it corrects the control-flow family whole.
+    # --diff and --json are competing outputs in arrange; --json alone already
+    # reports without writing, so it is the dry run.
+    command = [PYTHON, "-B", "tools/python/arrange.py", "--json", "--no-color"]
+    if write:
+        command.append("--write")
+    status, out, err = run(command)
+    if status not in (0, 1) or not out.strip():
+        raise RuntimeError(f"arrange corrector failed ({status}): {err.strip()[:400]}")
+    report = json.loads(out)
+    violations = [v for v in report.get("violations", []) if v.get("fixable", True)]
+    fixable = {}
+    for violation in violations:
+        fixable[violation["rule"]] = fixable.get(violation["rule"], 0) + 1
+    return {
+        "tool": "arrange",
+        "files": len({v["file"] for v in violations}),
+        "violations": len(violations),
+        "by_rule": fixable,
+    }
+
+
+def main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="apply the correctors that exist")
+    parser.add_argument("--write", action="store_true", help="actually rewrite files")
+    parser.add_argument("--check", action="store_true", help="exit 1 if anything would change")
+    parser.add_argument("--tool", default=None, choices=CORRECTORS)
+    parser.add_argument("--rule", default=None, help="linter only: rule title substring")
+    parser.add_argument("--json", action="store_true", help="machine-readable output")
+    args = parser.parse_args(argv)
+
+    if args.write and args.check:
+        print("fix: --check and --write are different acts; pick one", file=sys.stderr)
+        return 2
+    if args.rule and args.tool == "arrange":
+        print("fix: arrange corrects its whole family; --rule is linter-only", file=sys.stderr)
+        return 2
+
+    selected = (args.tool,) if args.tool else CORRECTORS
+    results = []
+    try:
+        if "linter" in selected:
+            results.append(fix_linter(args.write, args.rule))
+        if "arrange" in selected:
+            results.append(fix_arrange(args.write))
+    except (RuntimeError, subprocess.TimeoutExpired) as failure:
+        print(f"fix: {failure}", file=sys.stderr)
+        return 2
+
+    pending = sum(r["files"] for r in results)
+    mode = "wrote" if args.write else "would change"
+
+    if args.json:
+        print(json.dumps({"mode": mode, "results": results}, indent=2))
+    else:
+        for result in results:
+            print(f"{result['files']:>5} files {mode}   [{result['tool']}]")
+            for rule, count in sorted(result["by_rule"].items(), key=lambda kv: -kv[1]):
+                print(f"        {count:>6}  {rule}")
+            print()
+        if not results:
+            print("no correctors selected")
+        elif not args.write:
+            print("dry run — pass --write to apply")
+
+    if args.check and pending:
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
