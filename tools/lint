@@ -1,0 +1,178 @@
+#!/usr/bin/env python3
+"""tools/lint — one entry point for every rule check. Reports, never writes.
+
+b owns one unit: build, link, run. It holds no policy. This tool holds the
+policy side — which rules exist, what each one found, and whether the tree has
+regressed against the debt it is already carrying.
+
+The detectors stay where they are; this only runs them and merges their answers:
+
+    linter.py      reference form, access depth, cast spelling, includes, docs
+    arrange.py     Semantic Consistency Law (control flow)
+    alloc_gate.py  Relational Memory Law (libc allocation outside the engine)
+
+Usage:
+    tools/lint                     summary, grouped by rule
+    tools/lint --json              every violation, one machine-readable list
+    tools/lint --rule "Access"     only rules whose title contains the text
+    tools/lint --tool linter       only one detector
+    tools/lint --top 20            how many files to list per rule
+    tools/lint --write-baseline    record today's counts as the ratchet
+    tools/lint --strict            fail on any violation, baseline or not
+
+Exit status:
+    0   no rule got worse than the recorded baseline
+    1   at least one rule grew, or --strict found anything
+    2   a detector failed to run
+
+A corrector is deliberately absent. Fixing is a separate, opt-in act with its
+own diff; a checker that writes is a checker nobody can run in CI.
+"""
+from __future__ import annotations
+
+import argparse
+import collections
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+PYTHON = sys.executable or "python3"
+BASELINE = ROOT / "tools" / "lint-baseline.json"
+
+
+def run(command: list[str], timeout: int = 600) -> tuple[int, str, str]:
+    """Run a detector; return (status, stdout, stderr)."""
+    result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=timeout)
+    return result.returncode, result.stdout, result.stderr
+
+
+def run_linter() -> list[dict]:
+    status, out, err = run([PYTHON, "-B", "tools/python/linter.py", "--json", "--no-color"])
+    if status not in (0, 1) or not out.strip():
+        raise RuntimeError(f"linter failed ({status}): {err.strip()[:400]}")
+    report = json.loads(out)
+    return [dict(v, tool="linter") for v in report.get("violations", [])]
+
+
+def run_arrange() -> list[dict]:
+    status, out, err = run([PYTHON, "-B", "tools/python/arrange.py", "--json", "--no-color"])
+    if status not in (0, 1) or not out.strip():
+        raise RuntimeError(f"arrange failed ({status}): {err.strip()[:400]}")
+    report = json.loads(out)
+    return [dict(v, tool="arrange") for v in report.get("violations", [])]
+
+
+def run_alloc() -> list[dict]:
+    """allocation gate reports per-repo counts, not locations; expand to files."""
+    status, out, err = run([PYTHON, "-B", "tools/python/alloc_gate.py", "scan"])
+    if status != 0:
+        raise RuntimeError(f"alloc_gate failed ({status}): {err.strip()[:400]}")
+    violations = []
+    baseline = {}
+    if BASELINE.exists():
+        pass
+    for line in out.splitlines():
+        fields = line.split()
+        if len(fields) == 2 and fields[1].isdigit() and fields[0] != "total":
+            violations.append({
+                "tool": "alloc_gate",
+                "rule": "Relational Memory Law (libc allocation outside the engine)",
+                "file": fields[0],
+                "line": 0,
+                "message": f"{fields[1]} libc allocation call(s)",
+                "count": int(fields[1]),
+            })
+    return violations
+
+
+def collect(only_tool: str) -> list[dict]:
+    detectors = {"linter": run_linter, "arrange": run_arrange, "alloc_gate": run_alloc}
+    violations = []
+    for name, detector in detectors.items():
+        if only_tool and name != only_tool:
+            continue
+        violations.extend(detector())
+    return violations
+
+
+def counts(violations: list[dict]) -> dict[str, int]:
+    tally = collections.Counter(f"{v['tool']}::{v['rule']}" for v in violations)
+    return dict(tally)
+
+
+def load_baseline() -> dict[str, int] | None:
+    if not BASELINE.exists():
+        return None
+    return json.loads(BASELINE.read_text()).get("counts", {})
+
+
+def main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="every rule check, one report")
+    parser.add_argument("--json", action="store_true", help="machine-readable output")
+    parser.add_argument("--rule", default=None, help="only rules whose title contains this")
+    parser.add_argument("--tool", default=None, choices=("linter", "arrange", "alloc_gate"))
+    parser.add_argument("--top", type=int, default=8, help="files listed per rule")
+    parser.add_argument("--write-baseline", action="store_true", help="record today's counts")
+    parser.add_argument("--strict", action="store_true", help="fail on any violation")
+    args = parser.parse_args(argv)
+
+    try:
+        violations = collect(args.tool)
+    except (RuntimeError, subprocess.TimeoutExpired) as failure:
+        print(f"lint: {failure}", file=sys.stderr)
+        return 2
+
+    if args.rule:
+        needle = args.rule.lower()
+        violations = [v for v in violations if needle in v["rule"].lower()]
+
+    tally = counts(violations)
+    total = sum(v.get("count", 1) for v in violations)
+
+    if args.write_baseline:
+        BASELINE.write_text(json.dumps({"counts": tally}, indent=2) + "\n")
+        print(f"recorded {len(tally)} rule counts, {total} violations → {BASELINE.relative_to(ROOT)}")
+        return 0
+
+    baseline = load_baseline()
+    regressions = []
+    if baseline is not None:
+        for key, value in tally.items():
+            if value > baseline.get(key, 0):
+                regressions.append((key, baseline.get(key, 0), value))
+
+    if args.json:
+        print(json.dumps({
+            "total": total,
+            "by_rule": dict(sorted(tally.items(), key=lambda kv: -kv[1])),
+            "regressions": [{"rule": k, "was": w, "now": n} for k, w, n in regressions],
+            "violations": violations,
+        }, indent=2))
+    else:
+        by_rule = collections.defaultdict(list)
+        for violation in violations:
+            by_rule[f"{violation['tool']}::{violation['rule']}"].append(violation)
+        print(f"{len(by_rule)} rules, {total} violations\n")
+        for key, items in sorted(by_rule.items(), key=lambda kv: -len(kv[1])):
+            tool, rule = key.split("::", 1)
+            print(f"  {len(items):>6}  {rule}   [{tool}]")
+            files = collections.Counter(v["file"] for v in items)
+            for path, count in files.most_common(args.top):
+                print(f"          {count:>4}  {path}")
+        if regressions:
+            print("\nregressions against the recorded baseline:")
+            for key, was, now in regressions:
+                print(f"  {key}: {was} → {now}")
+
+    if args.strict and violations:
+        return 1
+    if regressions:
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
