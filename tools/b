@@ -1,28 +1,30 @@
 #!/bin/sh
-# tools/b — Vexgraph entry point: directly launches the 'b' build engine.
+# tools/b — Vexgraph entry point: the workspace b bootstrap.
 #
-# This workspace uses generic b (from vex-graph/b) as its
-# build system and package coordinator. It does NOT delegate to tools/workspace.c.
+# This workspace uses b (vex/b) as its only build runner. CMake is IDE metadata
+# only (colors, inlay hints, debug symbols); it creates no runnables.
 #
-# Commands (see vexgraph-hobby-projects/b/README.md):
-#   b workspace [<dir>] [--as <name>]
-#   b build [<target>...] [--in <name>]
-#   b breeze <source> [args...]
-#   b run <source> [args...]
-#   b box [<action>]
-#   b adapter <name> [args...]
+# Commands:
+#   b generate                     claim the territory, write .b/workspace.json
+#   b build                        compile every source the territory lists
+#   b build <unit-or-source>       compile and link one unit
+#   b run                          build and run the unit in this directory
+#   b run -- <args...>             the same, forwarding arguments to the unit
+#   b run <file> [args...]         build or interpret one file
+#
+# b.sh owns the bootstrap: it rebuilds b when its own sources are newer, then
+# execs the binary from $B_HOME. Preserve the caller's directory — a unit build
+# resolves its manifest against the working directory.
 set -eu
 
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 root=$(CDPATH= cd -- "$here/.." && pwd)
-binary="$root/vexgraph-hobby-projects/b/b"
+bootstrap="$root/vex/b/b.sh"
 
-if [ ! -f "$binary" ]; then
-    echo "tools/b: error: 'b' launcher not found at $binary" >&2
+if [ ! -f "$bootstrap" ]; then
+    echo "tools/b: error: b bootstrap not found at $bootstrap" >&2
     exit 1
 fi
 
 export B_CALLER_DIR="${B_CALLER_DIR:-$PWD}"
-export B_HOME="${B_HOME:-$HOME/Library/Application Support/b}"
-
-exec "$binary" "$@"
+exec "$bootstrap" "$@"

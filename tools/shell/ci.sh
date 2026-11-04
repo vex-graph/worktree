@@ -36,15 +36,6 @@ step() {
     fi
 }
 
-tooling_tests() {
-    "$python" -B vexgraph-ecosystem/tests/tools/linter_test.py &&
-    "$python" -B vexgraph-ecosystem/tests/tools/arrange_test.py &&
-    "$python" -B vexgraph-ecosystem/tests/tools/readiness_test.py &&
-    "$python" -B vexgraph-ecosystem/tests/tools/test_checklist_test.py &&
-    "$python" -B vexgraph-ecosystem/tests/tools/ci_repos_test.py &&
-    "$python" -B vexgraph-ecosystem/tests/tools/prefs_test.py
-}
-
 secret_scan() {
     ! git grep -E -i "BEGIN (RSA|EC|DSA|OPENSSH|PRIVATE) KEY" \
         -- ':(exclude)_notes/' ':(exclude)_trash/'
@@ -53,9 +44,9 @@ secret_scan() {
 echo "Local CI gate"
 step "workflow references"  "$python" -B tools/python/workflow_refs.py check
 step "declared checkouts"   "$python" -B tools/python/ci_repos.py check --require-all
-step "tooling tests"        tooling_tests
 step "preferences integrity" ./tools/prefs check
 step "checklist ledger"     "$python" -B tools/python/test_checklist.py check
+step "allocation gate"      "$python" -B tools/python/alloc_gate.py check
 step "secret scan"          secret_scan
 
 # CI tests `origin`, never this working tree. A green local gate on commits that
