@@ -1,0 +1,88 @@
+#!/bin/sh
+# tools/orchestrator — the workspace entry point.
+#
+# Three names, three jobs:
+#   b.sh                    the build engine (vex-graph/b.sh/b.sh), a standalone tool.
+#   tools/orchestrator   this file: the workspace front door.
+#   tools/orchestrator test   the workspace test policy, not an engine verb.
+#
+# The orchestrator owns only what the workspace owns. Everything else is the
+# engine's, forwarded verbatim so `orchestrator build` and `b.sh build` are the
+# same command without the orchestrator pretending to implement it.
+#
+#   orchestrator <engine verb> [...]   forwarded to the engine
+#   orchestrator b.sh [...]               forced engine call (disambiguation)
+#   orchestrator test [filter]         workspace test runner
+#   orchestrator test <tooling test>   one tooling test
+#   orchestrator prefs [...]           the preferences command centre
+#   orchestrator ci                    the local CI gate
+#   orchestrator help                  this map
+#
+# Nothing here builds, compiles or interprets its own source: every verb ends in
+# an exec of the owning tool, and the exit status is that tool's status.
+set -eu
+
+here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+root=$(CDPATH= cd -- "$here/.." && pwd)
+
+engine="$root/vex/b/b.sh"
+
+export B_CALLER_DIR="${B_CALLER_DIR:-$PWD}"
+export B_HOME="${B_HOME:-$HOME/Library/Application Support/b.sh}"
+
+usage() {
+    cat <<'MAP'
+tools/orchestrator — workspace entry point
+
+  orchestrator <verb> [...]      forwarded to the b engine
+  orchestrator b <verb> [...]    same, spelled to name the engine
+  orchestrator test [filter]     workspace tests (tools/shell/test.sh)
+  orchestrator prefs [...]       preferences command centre
+  orchestrator ci                local CI gate (tools/shell/ci.sh)
+  orchestrator help              this map
+
+Engine verbs (see vex-graph/b/README.md):
+  generate [<dir>]                   claim a territory, write .b/workspace.json
+  build [<unit>...] [--explain]      build units into .b/obj/<unit>/
+  run exec <file> [args...]          build the file's unit, then run it
+  breeze exec <file> [args...]       the same verb, second spelling
+  box <manifest.json> <export>       export declared portable files
+  adapter list                       adapters, selectors, required tools
+MAP
+}
+
+require() {
+    if [ ! -x "$1" ]; then
+        echo "orchestrator: error: $2 not found or not executable: $1" >&2
+        exit 1
+    fi
+}
+
+verb="${1:-}"
+[ $# -gt 0 ] && shift
+
+case "$verb" in
+    ''|help|-h|--help)
+        usage
+        ;;
+    b.sh)
+        require "$engine" "b engine"
+        exec "$engine" "$@"
+        ;;
+    test)
+        require "$root/tools/shell/test.sh" "workspace test runner"
+        exec "$root/tools/shell/test.sh" "$@"
+        ;;
+    prefs)
+        require "$root/tools/prefs" "preferences command centre"
+        exec "$root/tools/prefs" "$@"
+        ;;
+    ci)
+        require "$root/tools/shell/ci.sh" "local CI gate"
+        exec "$root/tools/shell/ci.sh" "$@"
+        ;;
+    *)
+        require "$engine" "b engine"
+        exec "$engine" "$verb" "$@"
+        ;;
+esac
