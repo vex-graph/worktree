@@ -302,6 +302,74 @@ RE_DEREF_CHAIN = re.compile(
     r"\(\*[^()\n]+\)\.[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+")
 RE_POINTER_CHAIN = re.compile(r"\(\*\(\*[A-Za-z_]\w*\)\.[A-Za-z_]\w*\)\.[A-Za-z_]\w*")
 
+# --- Relational Memory Law: the allocation site rule ----------------------
+# Memory_alloc is the engine's general allocator. It is confined to the tiers
+# that own objects (R2-R4, plus the allocator itself) and, inside them, to
+# constructors: a function that builds one instance and hands it back. Any
+# other use is an allocation with no owner, which is what this rule forbids.
+MEMORY_ALLOC_TIERS = (
+    "vex/re/",                 # R1: the allocator itself
+    "vex/vexspoke/",           # R2
+    "vex/determinant/",        # R3
+    "vex/graphvex/",           # R3
+    "vex/language/",           # R3
+    "vex/samplerate/",         # R3
+    "vex/darling/",            # R4
+    "vex/harness/",            # R4
+    "vex/sesh/",               # R4
+    "vex/darkbase-headless/",  # R4
+    "vex/job/",                # R4
+)
+RE_MEMORY_ALLOC = re.compile(r"\bMemory_alloc\s*\(")
+RE_FUNCTION_DEF = re.compile(
+    r"^\s*(?:static\s+|inline\s+|const\s+|extern\s+|_Noreturn\s+)*"
+    r"[A-Za-z_][A-Za-z0-9_]*[\s\*]+([A-Za-z_][A-Za-z0-9_]*)\s*\(")
+CONTROL_WORDS = {"if", "for", "while", "switch", "return", "sizeof", "do", "else"}
+
+
+# The only constructor is the one the Object() macro dispatches to: Class_N.
+# A bare init() (or Class_init) is the one other entry point, for a final,
+# non-constructable class. There is no third spelling.
+CONSTRUCTOR_NAME = re.compile(r"[A-Z]\w*_[0-9]+")
+FINAL_MARKER = ";;FINAL"
+# Releasing memory is a documented act. It may happen in main, in a class's
+# own teardown, or in a function the author marked ;;DECONSTRUCT. A behavior
+# method may not free: whichever object owns the block releases it once, where
+# the release is visible.
+DECONSTRUCT_MARKER = ";;DECONSTRUCT"
+RE_MEMORY_FREE = re.compile(r"\bMemory_free\s*\(")
+RELEASE_SUFFIXES = ("_free", "_destroy", "_release", "_freeAll", "_destroyAll",
+                    "_deconstruct")
+
+
+# --- String Law: libc comparison and search -------------------------------
+# strcmp/strncmp/strstr/strchr scan to a terminator that length-delimited text
+# does not have, so they read past JSON views, mapped slices and bounded
+# buffers. CharSequence owns the bounded implementations; no other file calls the
+# libc forms.
+RE_LIBC_STRING = re.compile(r"\b(strcmp|strncmp|strstr|strchr)\s*\(")
+LIB_STRING_OWNERS = (
+    "vex/vexspoke/primitive/char_sequence.c",
+    "vex/vexspoke/primitive/vex-string.c",
+)
+
+
+def is_release_site(name):
+    """main, a class teardown, or a constructor cleaning up its own failure."""
+    return (name == "main" or name.startswith("free")
+            or name.endswith(RELEASE_SUFFIXES) or is_constructor(name))
+# The allocator implementation is the one place that may allocate freely: it
+# is what Memory_alloc is, not a caller of it.
+MEMORY_ALLOC_OWNER = "vex/re/nio/mem.c"
+
+
+def is_constructor(name):
+    """Class_N (what Object() dispatches to) or init(): the only allocators."""
+    return bool(CONSTRUCTOR_NAME.fullmatch(name)) or name == "init" or name.endswith(
+        "_init"
+    )
+
+
 
 def fix_cast_spacing(line):
     """Auto-fix cast spacing: (T *) -> (T*) and (T*)var -> (T*) var."""
@@ -388,10 +456,57 @@ class Linter:
         except OSError as exc:
             return [self.violation("Read error", rel, 0, "", str(exc))]
 
+        is_final = any(FINAL_MARKER in line for line in lines[:150])
+        is_deconstruct = any(DECONSTRUCT_MARKER in line for line in lines[:150])
         in_multiline = False
+        function = ""
+        function_floor = 0
+        pending = ""
+        depth = 0
         for lno, raw_line in enumerate(lines, 1):
             state_before = in_multiline
             code, in_multiline = strip_comments_and_strings(raw_line, in_multiline)
+
+            definition = RE_FUNCTION_DEF.match(code)
+            if definition and not function and definition.group(1) not in CONTROL_WORDS:
+                pending = definition.group(1)
+            active = function or pending
+
+            # A prototype names Memory_alloc but calls nothing: skip it.
+            declaration = (
+                definition is not None and definition.group(1) == "Memory_alloc"
+            )
+            if (RE_MEMORY_ALLOC.search(code) and not declaration
+                    and not is_test_path(rel)
+                    and rel != MEMORY_ALLOC_OWNER):
+                if not rel.startswith(MEMORY_ALLOC_TIERS):
+                    violations.append(self.violation(
+                        "Relational Memory Law (Allocation site)", rel, lno,
+                        raw_line,
+                        f"Memory_alloc is confined to R2-R4 "
+                        f"(found in '{active or 'file scope'}')"))
+                elif not is_final and not is_constructor(active):
+                    violations.append(self.violation(
+                        "Relational Memory Law (Allocation site)", rel, lno,
+                        raw_line,
+                        f"Memory_alloc outside the Object() constructor or "
+                        f"init() (found in '{active or 'file scope'}')"))
+
+            if (RE_MEMORY_FREE.search(code) and not is_test_path(rel)
+                    and rel != MEMORY_ALLOC_OWNER and not is_deconstruct
+                    and not is_release_site(active)):
+                violations.append(self.violation(
+                    "Relational Memory Law (Release site)", rel, lno, raw_line,
+                    f"Memory_free outside main, a teardown, or ;;DECONSTRUCT "
+                    f"(found in '{active or 'file scope'}')"))
+
+            libc_string = RE_LIBC_STRING.search(code)
+            if (libc_string and not is_test_path(rel)
+                    and rel not in LIB_STRING_OWNERS):
+                violations.append(self.violation(
+                    "String Law (libc string call)", rel, lno, raw_line,
+                    f"'{libc_string.group(1)}' is unbounded; use CharSequence_compare, "
+                    f"CharSequence_find or CharSequence_findChar"))
 
             if lno <= 150:
                 if ";;OVERVIEW" in raw_line:
@@ -462,6 +577,16 @@ class Linter:
             chain = self.check_two_layer_cap(rel, code, lno, raw_line)
             if chain:
                 violations.append(chain)
+
+            opens = code.count("{")
+            closes = code.count("}")
+            if not function and pending and opens > 0:
+                function = pending
+                function_floor = depth
+                pending = ""
+            depth += opens - closes
+            if function and depth <= function_floor:
+                function = ""
 
             new_lines.append(raw_line)
 
