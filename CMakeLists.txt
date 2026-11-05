@@ -1,39 +1,36 @@
 cmake_minimum_required(VERSION 3.24)
 
-# IDE adapter only: b owns the vexgraph-ecosystem-gitrepo graph and runtime builds.
-if(APPLE)
-    set(CMAKE_OSX_ARCHITECTURES arm64 CACHE STRING "Native architecture")
-    set(CMAKE_OSX_DEPLOYMENT_TARGET 14.0 CACHE STRING "Supported macOS floor")
-endif()
+# ============================================================================
+# IDE ADAPTER ONLY — self-sufficient, no b, no b.assembly.json.
+# ============================================================================
+# b owns builds. This adapter owns everything the IDE needs that b does not:
+# colours, symbol resolution, inlay hints, debug info, compile commands.
+# vex/ is the source of truth: repositories, include roots and sources are
+# derived from the filesystem, never declared here, so a new checkout under
+# vex/ is indexed after a CMake reload with no other edit. It creates no
+# executable and no test target; every build and every run goes through b.
+# The CLion run list lives in .idea/runConfigurations/ (git-ignored, like the
+# rest of .idea/), not in CMake targets.
+# ============================================================================
+
 project(vexgraph-ecosystem LANGUAGES C)
 set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED YES)
 set(CMAKE_C_EXTENSIONS YES)
-if(APPLE AND CMAKE_C_COMPILER_ID MATCHES "Clang")
-    # Shared code-model baseline, including b records without a CPU option.
-    add_compile_options(-mcpu=apple-m1)
-endif()
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 if(APPLE)
+    set(CMAKE_OSX_ARCHITECTURES arm64 CACHE STRING "Native architecture")
+    set(CMAKE_OSX_DEPLOYMENT_TARGET 14.0 CACHE STRING "Supported macOS floor")
     enable_language(OBJC)
     set(CMAKE_OBJC_STANDARD 23)
     set(CMAKE_OBJC_STANDARD_REQUIRED YES)
     set(CMAKE_OBJC_EXTENSIONS YES)
 endif()
-include(CTest)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(VEXGRAPH_SOURCE_ROOT ".")
-function(vexgraph_resolve_path output relative)
-    if(relative MATCHES "^(host-behavior|drivers|interfaces)/(.*)$")
-        set(resolved "suite/ecosystem/${CMAKE_MATCH_2}")
-    elseif(relative MATCHES "^(interactables|superapp)/(.*)$")
-        set(resolved "suite/projects/${CMAKE_MATCH_2}")
-    elseif(relative MATCHES "^personal/(.*)$")
-        set(resolved "suite/personal/${CMAKE_MATCH_1}")
-    else()
-        set(resolved "${relative}")
-    endif()
-    set(${output} "${VEXGRAPH_SOURCE_ROOT}/${resolved}" PARENT_SCOPE)
-endfunction()
+
+set(VEXGRAPH_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
+
 # Some IDE clangd bundles omit their resource headers. Discover the selected
 # compiler's headers instead of pinning an Xcode version or SDK installation.
 set(VEXGRAPH_COMPILER_HEADERS "")
@@ -45,285 +42,70 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang")
         set(VEXGRAPH_COMPILER_HEADERS "${compiler_resource}/include")
     endif()
 endif()
-if(CMAKE_CONFIGURATION_TYPES)
-    message(FATAL_ERROR "Use a single-config generator for the b IDE adapter.")
-endif()
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build configuration" FORCE)
-endif()
 
-# Keep IDE builds separate from the normal b build state.
-set(VEXGRAPH_B_HOME "${CMAKE_BINARY_DIR}/b-state")
-set(VEXGRAPH_B_COMMAND "${CMAKE_COMMAND}" -E env
-    "B_HOME=${VEXGRAPH_B_HOME}" "PATH=$ENV{PATH}:/opt/homebrew/bin:$ENV{HOME}/.cargo/bin"
-    "${VEXGRAPH_SOURCE_ROOT}/tools/b")
-if(CMAKE_BUILD_TYPE MATCHES "^(Release|RelWithDebInfo|MinSizeRel)$")
-    list(APPEND VEXGRAPH_B_COMMAND --release)
-endif()
-execute_process(COMMAND ${VEXGRAPH_B_COMMAND} graph list
-    WORKING_DIRECTORY "${VEXGRAPH_SOURCE_ROOT}"
-    RESULT_VARIABLE graph_result OUTPUT_VARIABLE graph_error)
-if(NOT graph_result EQUAL 0)
-    message(FATAL_ERROR "b could not export the IDE graph:\n${graph_error}")
-endif()
-file(READ "${VEXGRAPH_SOURCE_ROOT}/.b/graph.json" graph)
-file(WRITE "${CMAKE_BINARY_DIR}/b-test-graph.json" "${graph}")
-
-function(graph_array output json)
-    string(JSON count LENGTH "${json}" ${ARGN})
-    set(items)
-    if(count GREATER 0)
-        math(EXPR last "${count} - 1")
-        foreach(index RANGE 0 ${last})
-            string(JSON item GET "${json}" ${ARGN} ${index})
-            list(APPEND items "${item}")
-        endforeach()
-    endif()
-    set(${output} "${items}" PARENT_SCOPE)
-endfunction()
-
-graph_array(byproducts "${graph}" byproducts)
-add_custom_target(vexgraph_runtime
-    COMMAND ${VEXGRAPH_B_COMMAND} build BYPRODUCTS ${byproducts}
-    WORKING_DIRECTORY "${VEXGRAPH_SOURCE_ROOT}"
-    COMMENT "Building runtime with b (no apps or tests launched)"
-    USES_TERMINAL VERBATIM)
-set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-    "${VEXGRAPH_SOURCE_ROOT}/tools/b")
-
-# Real, excluded object targets give libraries, modules, apps and helper sources
-# their owning code model. Application indexing never admits galleries to CTest.
-# They do not replace b's runtime archives or participate in the default build.
-string(JSON index_count LENGTH "${graph}" targets)
-if(index_count GREATER 0)
-    math(EXPR last_index "${index_count} - 1")
-    foreach(index RANGE 0 ${last_index})
-        string(JSON record GET "${graph}" targets ${index})
-        string(JSON name GET "${record}" name)
-        foreach(field sources includes definitions options)
-            graph_array(${field} "${record}" ${field})
-        endforeach()
-        if(NOT sources)
-            continue()
-        endif()
-        set(target "vexgraph_index_${name}")
-        add_library(${target} OBJECT EXCLUDE_FROM_ALL ${sources})
-        target_include_directories(${target} PRIVATE ${includes})
-        if(VEXGRAPH_COMPILER_HEADERS)
-            # Explicit options survive CMake's removal of implicit include dirs.
-            target_compile_options(${target} PRIVATE -isystem "${VEXGRAPH_COMPILER_HEADERS}")
-        endif()
-        target_compile_definitions(${target} PRIVATE ${definitions})
-        target_compile_options(${target} PRIVATE ${options}
-            "$<$<COMPILE_LANGUAGE:OBJC>:-fobjc-arc>")
-    endforeach()
-endif()
-
-# One workspace entry owns recursive discovery. b-exported contexts remain
-# untouched; supplemental excluded targets cover drafts and new source files.
-# Each repository keeps its own include context, never one global header soup.
-function(vexgraph_index_repository name relative template)
-    vexgraph_resolve_path(source_root "${relative}")
-    if(name STREQUAL "vexgraph-hobby-projects/harness" AND VEXGRAPH_HARNESS_SOURCE_DIR)
-        set(source_root "${VEXGRAPH_HARNESS_SOURCE_DIR}")
-    endif()
-    file(GLOB_RECURSE discovered CONFIGURE_DEPENDS
-        "${source_root}/*.c" "${source_root}/*.h" "${source_root}/*.m")
-    list(FILTER discovered EXCLUDE REGEX "/(attic|vendor|third_party|_old|cmake-build[^/]*|CMakeFiles)/")
-    if(NOT APPLE)
-        list(FILTER discovered EXCLUDE REGEX "\\.m$")
-    endif()
-    # Every remaining C/ObjC translation unit stays in the code model, including
-    # other-host platform backends (window_linux, audio_stream_stub, ...). These
-    # targets are EXCLUDE_FROM_ALL and never linked, so including them only adds
-    # clangd diagnostics/inlay hints for files the current host does not build.
-    set(unmodeled ${discovered})
-    foreach(source IN LISTS VEXGRAPH_MODELED_SOURCES)
-        list(REMOVE_ITEM unmodeled "${source}")
-    endforeach()
-    set(translation_units ${unmodeled})
-    list(FILTER translation_units INCLUDE REGEX "\\.(c|m)$")
-    if(NOT translation_units)
-        return()
-    endif()
-    set(target "vexgraph_extra_${name}")
-    add_library(${target} OBJECT EXCLUDE_FROM_ALL ${unmodeled})
-    set_target_properties(${target} PROPERTIES LINKER_LANGUAGE C)
-    if(TARGET "vexgraph_index_${template}")
-        foreach(property INCLUDE_DIRECTORIES COMPILE_DEFINITIONS COMPILE_OPTIONS)
-            get_target_property(value "vexgraph_index_${template}" ${property})
-            if(value)
-                set_property(TARGET ${target} PROPERTY ${property} "${value}")
-            endif()
-        endforeach()
-    else()
-        target_include_directories(${target} PRIVATE "${source_root}" ${ARGN})
-        target_compile_options(${target} PRIVATE -std=gnu23 -Wall -Wextra -Werror)
-        if(APPLE)
-            target_compile_options(${target} PRIVATE -mcpu=apple-m1 "$<$<COMPILE_LANGUAGE:OBJC>:-fobjc-arc>")
-        endif()
-        if(VEXGRAPH_COMPILER_HEADERS)
-            target_compile_options(${target} PRIVATE -isystem "${VEXGRAPH_COMPILER_HEADERS}")
-        endif()
-    endif()
-endfunction()
-
-set(VEXGRAPH_MODELED_SOURCES)
-if(index_count GREATER 0)
-    foreach(index RANGE 0 ${last_index})
-        string(JSON record GET "${graph}" targets ${index})
-        graph_array(modeled "${record}" sources)
-        list(APPEND VEXGRAPH_MODELED_SOURCES ${modeled})
-    endforeach()
-endif()
-set(r2_cpu "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/vexspoke/src")
-set(r2_storage "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/relational-engine/src")
-vexgraph_index_repository(vexgraph-ecosystem/vexspoke host-behavior/vexspoke/src vexgraph-ecosystem/vexspoke)
-vexgraph_index_repository(relational_engine host-behavior/relational-engine/src relational_engine)
-vexgraph_index_repository(vexgraph-ecosystem/lifetime host-behavior/lifetime/src vexgraph-ecosystem/lifetime)
-vexgraph_index_repository(vexgraph-hobby-projects/hotcwap personal/hotcwap vexgraph-hobby-projects/hotcwap)
-vexgraph_index_repository(vexgraph-ecosystem/graphvex drivers/graphvex/src vexgraph-ecosystem/graphvex)
-vexgraph_index_repository(api_haven personal/api-haven/src api_haven)
-vexgraph_index_repository(vexgraph-ecosystem/determinant drivers/determinant/src vexgraph-ecosystem/determinant "${r2_cpu}" "${r2_storage}")
-vexgraph_index_repository(darling interfaces/darling-framework/src darling)
-vexgraph_index_repository(vexgraph-ecosystem/sesh interfaces/sesh/src vexgraph-ecosystem/sesh)
-vexgraph_index_repository(darkbase-main-engine drivers/darkbase-main-engine/src darkbase-main-engine)
-vexgraph_index_repository(vexgraph-ecosystem/impedance interactables/impedance/src vexgraph-ecosystem/impedance)
-vexgraph_index_repository(vexgraph-ecosystem/samplerate drivers/samplerate/src "" "${r2_cpu}" "${r2_storage}")
-set(VEXGRAPH_HARNESS_SOURCE_DIR "" CACHE PATH "Optional local Harness source tree for IDE indexing")
-vexgraph_index_repository(vexgraph-hobby-projects/harness interfaces/harness/src "" "${r2_cpu}")
-vexgraph_index_repository(b vexgraph-hobby-projects/b "")
-# Source-free blueprints produce no fake target. Future source files are found
-# on CMake reload without introducing repository/directory CMake entries.
-vexgraph_index_repository(vexgraph-ecosystem/language drivers/language "" "${r2_cpu}" "${r2_storage}")
-vexgraph_index_repository(func personal/func/src "")
-vexgraph_index_repository(primeagen personal/primeagen ""
-    "${r2_cpu}" "${r2_storage}"
-    "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/lifetime"
-    "${VEXGRAPH_SOURCE_ROOT}/suite/personal/api-haven/src")
-vexgraph_index_repository(tools tools "")
-vexgraph_index_repository(notes _notes "")
-foreach(application vexgraph-ecosystem/drawling)
-    vexgraph_index_repository(${application} "interactables/${application}" ""
-        "${r2_cpu}" "${r2_storage}")
-endforeach()
-vexgraph_index_repository(vexgraph-ecosystem/anti "superapp/anti" ""
-    "${r2_cpu}" "${r2_storage}")
-vexgraph_index_repository(vexgraph-ecosystem/semicolon "superapp/semicolon" ""
-    "${VEXGRAPH_SOURCE_ROOT}/suite/projects/semicolon"
-    "${VEXGRAPH_SOURCE_ROOT}/suite/projects/semicolon/src"
-    "${VEXGRAPH_SOURCE_ROOT}/suite/projects/semicolon/icon"
-    "${r2_cpu}" "${r2_storage}"
-    "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/determinant/src"
-    "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/language")
-
-# Unregistered tests carry no b target, so no compile command reaches clangd.
-# Mirror b's own per-subsystem include context so every test translation unit
-# gets inlay hints without collapsing repositories into one header soup.
-file(GLOB test_subsystems LIST_DIRECTORIES true "${VEXGRAPH_SOURCE_ROOT}/tests/*")
-foreach(subsystem IN LISTS test_subsystems)
-    if(NOT IS_DIRECTORY "${subsystem}")
+# --- include roots, derived from vex/ ---------------------------------------
+# The flat library root (vex/) makes repository-prefixed includes resolve —
+# #include "relational-engine/nio/mem.h" — while every repository's own root
+# and src/ gives the subsystem-rooted form a home: #include "database/database.h".
+# Rust FFI headers ride along through their rust/include dirs.
+set(VEXGRAPH_INCLUDE_ROOTS
+    "${VEXGRAPH_ROOT}"
+    "${VEXGRAPH_ROOT}/vex"
+    "${VEXGRAPH_ROOT}/vex/tests")
+file(GLOB vex_entries LIST_DIRECTORIES true RELATIVE "${VEXGRAPH_ROOT}/vex"
+    "${VEXGRAPH_ROOT}/vex/*")
+foreach(entry IN LISTS vex_entries)
+    if(NOT IS_DIRECTORY "${VEXGRAPH_ROOT}/vex/${entry}")
         continue()
     endif()
-    get_filename_component(test_name "${subsystem}" NAME)
-    set(test_includes
-        "${VEXGRAPH_SOURCE_ROOT}/tests"
-        "${subsystem}"
-        "${r2_cpu}" "${r2_storage}")
-    if(test_name STREQUAL "vexgraph-ecosystem/lifetime")
-        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/lifetime/src")
-    elseif(test_name STREQUAL "vexgraph-hobby-projects/hotcwap")
-        list(APPEND test_includes
-            "${VEXGRAPH_SOURCE_ROOT}/suite/personal/hotcwap"
-            "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/lifetime/src")
-    elseif(test_name STREQUAL "vexgraph-ecosystem/graphvex")
-        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/graphvex/src")
-    elseif(test_name STREQUAL "vexgraph-ecosystem/determinant")
-        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/determinant/src")
-    elseif(test_name STREQUAL "darling")
-        list(APPEND test_includes
-            "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/lifetime/src"
-            "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/graphvex/src"
-            "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/darling-framework/src")
-    elseif(test_name STREQUAL "vexgraph-hobby-projects/api-haven")
-        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/suite/personal/api-haven/src")
-    elseif(test_name STREQUAL "vexgraph-ecosystem/sesh")
-        list(APPEND test_includes
-            "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/sesh/src"
-            "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/sesh"
-            "${VEXGRAPH_SOURCE_ROOT}/suite/personal/api-haven/src")
-    elseif(test_name STREQUAL "darkbase-main-engine")
-        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/darkbase-main-engine/src")
-    elseif(test_name STREQUAL "vexgraph-hobby-projects/harness")
-        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/harness/src")
-    elseif(test_name STREQUAL "vexgraph-ecosystem/language")
-        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/language")
-    elseif(test_name STREQUAL "vexgraph-ecosystem/samplerate")
-        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/samplerate/src")
-    elseif(test_name STREQUAL "primeagen")
-        list(APPEND test_includes
-            "${VEXGRAPH_SOURCE_ROOT}/suite/personal/primeagen"
-            "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/lifetime/src"
-            "${VEXGRAPH_SOURCE_ROOT}/suite/personal/api-haven/src"
-            "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/harness/src")
-    elseif(test_name STREQUAL "b")
-        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/vexgraph-hobby-projects/b")
-    elseif(test_name STREQUAL "func")
-        list(APPEND test_includes "${VEXGRAPH_SOURCE_ROOT}/suite/personal/func/src")
-    elseif(test_name STREQUAL "vexgraph-ecosystem/semicolon")
-        list(APPEND test_includes
-            "${VEXGRAPH_SOURCE_ROOT}/suite/projects/semicolon"
-            "${VEXGRAPH_SOURCE_ROOT}/suite/projects/semicolon/src"
-            "${VEXGRAPH_SOURCE_ROOT}/suite/projects/semicolon/icon"
-            "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/determinant/src"
-            "${VEXGRAPH_SOURCE_ROOT}/suite/ecosystem/language")
+    list(APPEND VEXGRAPH_INCLUDE_ROOTS "${VEXGRAPH_ROOT}/vex/${entry}")
+    if(IS_DIRECTORY "${VEXGRAPH_ROOT}/vex/${entry}/src")
+        list(APPEND VEXGRAPH_INCLUDE_ROOTS "${VEXGRAPH_ROOT}/vex/${entry}/src")
     endif()
-    vexgraph_index_repository("tests_${test_name}" "tests/${test_name}" "" ${test_includes})
-endforeach()
-
-option(VEXGRAPH_ENABLE_WINDOW_TESTS "Enable window/GPU/UI CTest runs" OFF)
-set(window_tests application_test bridge_seam_test present_surface_test traffic_light_test window_test)
-string(JSON test_count LENGTH "${graph}" tests)
-if(test_count GREATER 0)
-    math(EXPR last_test "${test_count} - 1")
-    foreach(index RANGE 0 ${last_test})
-        string(JSON record GET "${graph}" tests ${index})
-        string(JSON name GET "${record}" name)
-        foreach(field sources includes definitions options)
-            graph_array(${field} "${record}" ${field})
-        endforeach()
-        set(libraries "")
-        if(NOT sources)
-            continue()
-        endif()
-        add_executable(${name} ${sources})
-        add_dependencies(${name} vexgraph_runtime)
-        target_include_directories(${name} PRIVATE ${includes})
-        if(VEXGRAPH_COMPILER_HEADERS)
-            target_compile_options(${name} PRIVATE -isystem "${VEXGRAPH_COMPILER_HEADERS}")
-        endif()
-        target_compile_definitions(${name} PRIVATE ${definitions})
-        target_compile_options(${name} PRIVATE ${options} -UNDEBUG)
-        target_link_libraries(${name} PRIVATE ${libraries})
-        set_target_properties(${name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-        if(BUILD_TESTING)
-            add_test(NAME ${name} COMMAND $<TARGET_FILE:${name}>)
-            set_tests_properties(${name} PROPERTIES WORKING_DIRECTORY "${VEXGRAPH_SOURCE_ROOT}"
-                TIMEOUT 120 SKIP_RETURN_CODE 77 RUN_SERIAL TRUE LABELS "lab")
-            if(NOT VEXGRAPH_ENABLE_WINDOW_TESTS AND
-               (name IN_LIST window_tests OR sources MATCHES "/tests/(darling|graphvex)/"))
-                set_tests_properties(${name} PROPERTIES DISABLED TRUE LABELS "lab;window-opt-in")
-            endif()
+    if(IS_DIRECTORY "${VEXGRAPH_ROOT}/vex/${entry}/rust/include")
+        list(APPEND VEXGRAPH_INCLUDE_ROOTS "${VEXGRAPH_ROOT}/vex/${entry}/rust/include")
+    endif()
+    # Some repositories root their subsystems one level down (darkbase's
+    # engine/, b's adapters/). The union index prefers over-resolution to
+    # missing symbols; b derives the precise per-unit roots at build time.
+    file(GLOB sub_entries LIST_DIRECTORIES true RELATIVE "${VEXGRAPH_ROOT}/vex/${entry}"
+        "${VEXGRAPH_ROOT}/vex/${entry}/*")
+    foreach(sub IN LISTS sub_entries)
+        if(IS_DIRECTORY "${VEXGRAPH_ROOT}/vex/${entry}/${sub}")
+            list(APPEND VEXGRAPH_INCLUDE_ROOTS "${VEXGRAPH_ROOT}/vex/${entry}/${sub}")
         endif()
     endforeach()
+endforeach()
+list(REMOVE_DUPLICATES VEXGRAPH_INCLUDE_ROOTS)
+
+# --- sources ----------------------------------------------------------------
+# Every C/ObjC source under vex/, including the shared proof tree and the two
+# tracked exceptions (annotation/, vex-test/). Headers need no object. The one
+# Objective-C++ file (vexspoke's touchid demo) is deliberately not globbed:
+# indexing it would enable OBJCXX, and some generators probe that compiler
+# with the C standard flag, which it rejects — the IDE adapter stays C/ObjC
+# only, and b's own build owns whatever that demo needs.
+file(GLOB_RECURSE VEXGRAPH_SOURCES CONFIGURE_DEPENDS
+    "${VEXGRAPH_ROOT}/vex/*.c"
+    "${VEXGRAPH_ROOT}/vex/*.m")
+list(FILTER VEXGRAPH_SOURCES EXCLUDE REGEX "/(\\.b|cmake-build[^/]*|CMakeFiles|\\.git)/")
+
+# --- one excluded index library, no runnables --------------------------------
+# One union target on purpose: the IDE code model wants the whole tree, not
+# per-unit partitions. EXCLUDE_FROM_ALL keeps it out of every build.
+add_library(vexgraph_index OBJECT EXCLUDE_FROM_ALL ${VEXGRAPH_SOURCES})
+set_target_properties(vexgraph_index PROPERTIES LINKER_LANGUAGE C)
+target_include_directories(vexgraph_index PRIVATE ${VEXGRAPH_INCLUDE_ROOTS})
+target_compile_options(vexgraph_index PRIVATE -std=gnu23 -Wall -Wextra)
+if(VEXGRAPH_COMPILER_HEADERS)
+    target_compile_options(vexgraph_index PRIVATE -isystem "${VEXGRAPH_COMPILER_HEADERS}")
 endif()
-if(BUILD_TESTING)
-    add_test(NAME opencode_preferences_test
-        COMMAND "${VEXGRAPH_SOURCE_ROOT}/tools/b" test opencode_preferences)
-    add_test(NAME checklist_runner_test
-        COMMAND "${VEXGRAPH_SOURCE_ROOT}/tools/b" test checklist_runner)
-    set_tests_properties(opencode_preferences_test checklist_runner_test PROPERTIES
-        WORKING_DIRECTORY "${VEXGRAPH_SOURCE_ROOT}" TIMEOUT 120 RUN_SERIAL TRUE LABELS "lab;tooling")
+if(APPLE)
+    target_compile_options(vexgraph_index PRIVATE -mcpu=apple-m1
+        "$<$<COMPILE_LANGUAGE:OBJC>:-fobjc-arc>")
 endif()
-message(STATUS "CLion: ${index_count} non-test indexing targets, ${test_count} native test targets from b")
-message(STATUS "b remains build truth; window/GPU/UI CTest execution is opt-in")
+
+list(LENGTH VEXGRAPH_INCLUDE_ROOTS vexgraph_root_count)
+list(LENGTH VEXGRAPH_SOURCES vexgraph_source_count)
+message(STATUS "vexgraph IDE adapter: ${vexgraph_source_count} sources, ${vexgraph_root_count} include roots, all derived from vex/")
+message(STATUS "b owns builds; reload CMake after adding files or repositories")

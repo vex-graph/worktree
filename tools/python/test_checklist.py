@@ -9,11 +9,26 @@ import sys
 import time
 
 
-REPORT = Path("metadata/gists/test-checklist.md")
+REPORT_NAME = "metadata/gists/test-checklist.md"
+
+
+def report_path(root: Path) -> Path:
+    """The ledger lives with the hub's metadata, above the workspace root.
+
+    Walk up from the workspace root to the existing ledger; a fresh checkout
+    without the hub falls back to the in-tree default.
+    """
+    for directory in (root, *root.parents):
+        candidate = directory / REPORT_NAME
+        if candidate.is_file():
+            return candidate
+    return root / REPORT_NAME
+
+
 TITLE = "Timestamped Test Checklist Law"
 HEADER = """# Ecosystem test checklist
 
-Generated test report maintained by `python3 tools/test_checklist.py`.
+Generated test report maintained by `python3 tools/python/test_checklist.py`.
 Governed by the **Timestamped Test Checklist Law** in `PREFERENCES.md`.
 
 - ✅ = an automated lab check passed for this exact file hash, in its stated scope.
@@ -41,10 +56,10 @@ Governed by the **Timestamped Test Checklist Law** in `PREFERENCES.md`.
 ## Commands
 
 ```sh
-python3 tools/test_checklist.py sync   # inventory executable tests; invalidate stale greens
-python3 tools/test_checklist.py check  # reject missing rows or stale results
+python3 tools/python/test_checklist.py sync   # inventory executable tests; invalidate stale greens
+python3 tools/python/test_checklist.py check  # reject missing rows or stale results
 # Execute the test first, then record its executed test file:
-python3 tools/test_checklist.py run --file tests/tools/test_checklist_test.py -- python3 -B tests/tools/test_checklist_test.py
+python3 tools/python/test_checklist.py run --file tests/tools/test_checklist_test.py -- python3 -B tests/tools/test_checklist_test.py
 ```
 
 `run` records only inventoried executable test files; naming a documented or
@@ -61,13 +76,13 @@ Do not hand-edit generated tables; add files/tests and use `sync` or `run`.
 """
 
 
-def inventory(root):
+def inventory(root, report):
     """List executable test units (compilable/runnable tests, runners, harness).
 
     Documentation, configuration, images and production source are excluded by
     design: the ledger is a test-execution record, not a whole-tree inventory.
     """
-    repos = {root, root / "tests", root / "b"}
+    repos = {root}
     platforms_file = root / "tools" / "platforms.json"
     declared_paths = set()
     if platforms_file.is_file():
@@ -75,17 +90,19 @@ def inventory(root):
             import json
             declared = json.loads(platforms_file.read_text(encoding="utf-8")).get("repos", {})
             for key in declared:
-                if key != "(worktree)":
-                    declared_paths.add(root / key)
+                if key == "(worktree)":
+                    continue
+                local = root / key
+                if not local.is_dir():
+                    local = root / "vex" / key.split("/")[-1]
+                declared_paths.add(local)
         except Exception:
             pass
     # Scan independently of the umbrella repo's ignores: nested repositories
     # own their inventory and their own ignore rules. .git may be a worktree file.
-    # The two-root layout is walked directly; the retired one-root directory
-    # names stay listed so an older worktree still inventories.
-    for directory in ("vexgraph-ecosystem", "vexgraph-hobby-projects",
-                      "host-behavior", "drivers", "interfaces", "interactables",
-                      "superapp", "personal", "ecosystem", "repos", "projects"):
+    # The shared stack under vex/ is walked directly; every directory holding
+    # a .git is an independent checkout owning its own inventory.
+    for directory in ("vex",):
         base = root / directory
         if base.is_dir():
             for p in base.rglob(".git"):
@@ -110,9 +127,9 @@ def inventory(root):
             # Gitlinks are directories, not files owned by the parent repo.
             if not path.is_file():
                 continue
-            rel = path.relative_to(root).as_posix()
-            if rel != REPORT.as_posix():
-                groups[group].append(rel)
+            if path == report:
+                continue
+            groups[group].append(path.relative_to(root).as_posix())
     return groups
 
 
@@ -190,8 +207,7 @@ def render(root, groups, records):
     return "\n".join(lines)
 
 
-def save(root, groups, records):
-    report = root / REPORT
+def save(root, report, groups, records):
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(render(root, groups, records), encoding="utf-8", newline="\n")
 
@@ -215,17 +231,17 @@ def main(argv=None):
         parser.error("--timeout must be positive")
     here = Path(__file__).resolve().parent
     root = here.parent.parent if here.name == "python" else here.parent
-    groups = inventory(root)
-    records = load(root / REPORT)
+    report = report_path(root)
+    groups = inventory(root, report)
+    records = load(report)
     if opts.action == "check":
-        report = root / REPORT
         if not report.exists() or report.read_text(encoding="utf-8") != render(root, groups, records):
-            print("Checklist missing or stale: run python3 tools/test_checklist.py sync", file=sys.stderr)
+            print("Checklist missing or stale: run python3 tools/python/test_checklist.py sync", file=sys.stderr)
             return 1
         print("Checklist inventory and recorded hashes are current (not a claim that all files pass).")
         return 0
     if opts.action == "sync":
-        save(root, groups, records)
+        save(root, report, groups, records)
         return 0
     paths = {p for entries in groups.values() for p in entries}
     if not command or not opts.file or any(p not in paths for p in opts.file):
@@ -249,7 +265,7 @@ def main(argv=None):
             status = "stale — subject changed during test"
         records[path] = ["✅" if result == 0 and same else "❌", checked, sha,
                          f"{command!r}; {opts.scope}", opts.description, status]
-    save(root, inventory(root), records)
+        save(root, report, inventory(root, report), records)
     return (1 if changed else result if result >= 0 else 128 - result)
 
 

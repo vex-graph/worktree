@@ -4,7 +4,7 @@
 # Talk to sibling agent sessions in this workspace over the OpenCode session
 # API. One tiny tool, no daemon, no state beyond the API itself:
 #
-# and honestly who really cares if i use opencode :sob: as if i killed someone loool
+# and honestly who really cares if i use opencode :sob: idc
 #
 #   agents.sh whoami                 this session's id
 #   agents.sh name [<name>]          show, or set, this session's handle
@@ -31,8 +31,26 @@ case "$here" in
     */scripts|*/shell) root="$(CDPATH= cd -- "$here/../.." && pwd)" ;;
     *)                 root="$(CDPATH= cd -- "$here/.." && pwd)" ;;
 esac
+
+# The bus and the name registry live at the hub (~v/_notes/agents), one level
+# above the worktree: agents hook into the personal hub, not the shared
+# repository. Walk up from the workspace root to the first existing _notes;
+# a standalone checkout without a hub falls back to its own tree.
+notes=""
+d="$root"
+while :; do
+    if [ -d "$d/_notes/agents" ]; then
+        notes="$d/_notes"
+        break
+    fi
+    parent="$(dirname -- "$d")"
+    [ "$parent" = "$d" ] && break
+    d="$parent"
+done
+notes="${notes:-$root/_notes}"
+
 me="${OPENCODE_SESSION_ID:-}"
-bus="${AGENTS_BUS:-$root/_notes/agents/bus.md}"
+bus="${AGENTS_BUS:-$notes/agents/bus.md}"
 
 api() { opencode api "$@"; }
 
@@ -40,7 +58,7 @@ api() { opencode api "$@"; }
 # Outgoing notes are signed so a recipient knows who wrote them. Name
 # resolution order: $AGENTS_NAME, a persisted per-session handle, the session
 # title slug, then agent-<short id>.
-names_dir="${AGENTS_NAMES_DIR:-$root/_notes/agents/names}"
+names_dir="${AGENTS_NAMES_DIR:-$notes/agents/names}"
 me_name_cache=""
 
 short_id() { printf '%s' "${1:-$me}" | sed 's/^ses_//' | cut -c1-8; }

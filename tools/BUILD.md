@@ -19,7 +19,7 @@ programs. Use `suite/personal/b/b build cargo <crate-directory>` for the crate.
 The test-owned Rust fixture prints its arguments and deliberately exits 5;
 an exit-code-5 report is not a compiler or launcher failure. The Finder-PATH
 regression uses disposable source rather than depending on an editable user
-scratch file such as `host-behavior/relational-engine/rust/src/helloworld.rs`.
+scratch file such as `vex/re/rust/src/helloworld.rs`.
 
 Automated proof uses `tests/tools/run_current_test.py` and
 `tests/b/workspace_test.py`, without opening windows. Saved XML wiring is proved;
