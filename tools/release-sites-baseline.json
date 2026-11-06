@@ -1,7 +1,7 @@
 {
   "version": 1,
   "note": "Ratchet baseline: CI fails only when a file/rule count grows.",
-  "total": 112,
+  "total": 115,
   "counts": {
     "vex/darkbase/engine/database/database.c::Relational Memory Law (Release site)": 27,
     "vex/darkbase/engine/wal/wal.c::Relational Memory Law (Release site)": 1,
@@ -13,6 +13,7 @@
     "vex/determinant/ui/tree/terminal_tree_view.c::Relational Memory Law (Release site)": 2,
     "vex/graphvex/decode/png.c::Relational Memory Law (Release site)": 1,
     "vex/graphvex/nio/pool.c::Relational Memory Law (Release site)": 1,
+    "vex/re/io/event/file_event.c::Relational Memory Law (Release site)": 3,
     "vex/re/io/file.c::Relational Memory Law (Release site)": 1,
     "vex/re/relational/variable_hash_map.c::Relational Memory Law (Release site)": 1,
     "vex/samplerate/platform/audio_cocoa.m::Relational Memory Law (Release site)": 1,
