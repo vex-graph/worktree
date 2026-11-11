@@ -136,7 +136,8 @@ list(FILTER VEXGRAPH_SOURCES EXCLUDE REGEX "/(\\.b|cmake-build[^/]*|CMakeFiles|\
 add_library(vexgraph_index OBJECT EXCLUDE_FROM_ALL ${VEXGRAPH_SOURCES}
         vex/re/re.h
         vex/re/nio/nio.h
-        lib/lang/lang.h)
+        lib/lang/lang.h
+        vex/re/nio/arena.c)
 if(EXISTS "${VEXGRAPH_VEXC_ROOT}/debug/main.c")
     target_sources(vexgraph_index PRIVATE "${VEXGRAPH_VEXC_ROOT}/debug/main.c")
 endif()
