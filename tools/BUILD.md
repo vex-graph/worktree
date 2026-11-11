@@ -25,18 +25,21 @@ Automated proof uses `tests/tools/run_current_test.py` and
 `tests/b/workspace_test.py`, without opening windows. Saved XML wiring is proved;
 CLion UI operation and appearance still need user confirmation after reopening.
 
-The workspace-root `../vexgraph-ecosystem` is an IDE adapter. Open the root as a CMake
-project and reload it in CLion to index production C/Objective-C with the flags
-exported by `b ide`. Excluded `vexgraph_index_*` object targets supply the code
-model only; runtime builds still delegate to b. Native test Run/Debug targets
-retain assertions, and window/GPU/UI CTest execution is disabled by default.
+`CMakeLists.txt` at the repository root is the workspace's IDE adapter. Open
+the repository root as a CMake project and reload it in CLion to index
+production C/Objective-C with the flags exported by `b ide`; the generated build
+directory stays in `.idea/cmake-build-debug`, outside the source tree. The
+adapter derives its sources and include roots from `vex/` and `lib/` and creates
+one excluded `vexgraph_index` object library for the code model only. Runtime
+builds still delegate to b. Native test Run/Debug targets retain assertions, and
+window/GPU/UI CTest execution is disabled by default.
 
 The adapter also indexes every registered application/tool and its shared helper
 sources, including `tests/darling/compositor/filter_gallery.c` and
 `tests/darling/darling_tests.c`. Each keeps its own transitive include context;
-gallery indexing does not register or launch it as a test. Tests borrow the only
-workspace CMake entry; there is no `tests/CMakeLists.txt`. After changing the graph,
-reload the active CMake project so CLion replaces its old source contexts.
+gallery indexing does not register or launch it as a test. Tests are indexed by
+the same adapter; there is no `tests/CMakeLists.txt`. After changing the graph,
+reload the CMake project so CLion replaces its old source contexts.
 
 Repository inventory follows `host-behavior/` (R1/R2), `drivers/` (R3),
 `interfaces/` (R4), `interactables/` (R5), and `superapp/` (R6 Anti/Semicolon).

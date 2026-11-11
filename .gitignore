@@ -26,10 +26,12 @@ __pycache__/
 
 
 # vex directory
-vex/
-
-# but include annotations though
-!vex/annotation/
+# `vex/*` (not `vex/`) ignores each child checkout, which lets the workspace's
+# own files below be re-included: git cannot re-include a file inside an
+# ignored directory, only beside it.
+vex/*
+!vex/vex-test/
+!vex/vex-test/**
 
 # code compilations
 code.txt

@@ -288,8 +288,8 @@ def replace_line_arrows(line):
 
 
 C_TYPES = (
-    r"(?:void|char|short|int|long|float|double|uint8_t|uint16_t|uint32_t|uint64_t|"
-    r"int8_t|int16_t|int32_t|int64_t|size_t|uintptr_t|intptr_t|bool|unsigned|signed|"
+    r"(?:void|char|short|int|long|f32|d64|u8|u16|u32|u64|"
+    r"||i32|int64_t|bytes|uintptr_t|intptr_t|bool|unsigned|signed|"
     r"unsigned\s+char|unsigned\s+short|unsigned\s+int|unsigned\s+long|"
     r"struct\s+[A-Za-z_]\w*|const\s+[A-Za-z_]\w*|[A-Za-z_]\w*)"
 )
@@ -303,22 +303,21 @@ RE_DEREF_CHAIN = re.compile(
 RE_POINTER_CHAIN = re.compile(r"\(\*\(\*[A-Za-z_]\w*\)\.[A-Za-z_]\w*\)\.[A-Za-z_]\w*")
 
 # --- Relational Memory Law: the allocation site rule ----------------------
-# Memory_alloc is the engine's general allocator. It is confined to the tiers
-# that own objects (R2-R4, plus the allocator itself) and, inside them, to
+# Memory_alloc is the engine's general allocator. It is confined to the roles
+# that own objects (core, plus the allocator itself in re) and, inside them, to
 # constructors: a function that builds one instance and hands it back. Any
 # other use is an allocation with no owner, which is what this rule forbids.
 MEMORY_ALLOC_TIERS = (
-    "vex/re/",                 # R1: the allocator itself
-    "vex/vexspoke/",           # R2
-    "vex/determinant/",        # R3
-    "vex/graphvex/",           # R3
-    "vex/language/",           # R3
-    "vex/samplerate/",         # R3
-    "vex/darling/",            # R4
-    "vex/harness/",            # R4
-    "vex/sesh/",               # R4
-    "vex/darkbase-headless/",  # R4
-    "vex/job/",                # R4
+    "vex/re/",                 # lifetime: the allocator itself
+    "vex/vexspoke/",           # core
+    "vex/determinant/",        # core
+    "vex/graphvex/",           # core
+    "vex/language/",           # core
+    "vex/samplerate/",         # core
+    "vex/darling/",            # core
+    "vex/harness/",            # core
+    "vex/sesh/",               # core
+    "vex/job/",                # tool (not alloc-exempt)
 )
 RE_MEMORY_ALLOC = re.compile(r"\bMemory_alloc\s*\(")
 RE_FUNCTION_DEF = re.compile(
@@ -418,18 +417,18 @@ class Linter:
         tiers = (
             ("vex/lifetime/",
              ["darling/", "api/", "hot/"],
-             "lifetime (R0 host)"),
+             "lifetime (substrate)"),
             ("vex/re/",
              ["darling/", "hotcwap/", "window/", "hot/", "api/"],
-             "re (R1 storage)"),
+             "lifetime (allocator/storage)"),
             ("vex/vexspoke/",
              ["darling/", "hotcwap/", "window/", "hot/", "api/",
               "vulkan/vk_iosurface.h", "vulkan/vk_scene.h",
               "vulkan/vk_view.h", "vulkan/sdf_gpu.h"],
-             "vexspoke (R2 CPU)"),
+             "core (compute)"),
             ("vex/darling/",
              ["api/"],
-             "darling (R4)"),
+             "core (UI)"),
         )
         for prefix, prohibited, label in tiers:
             if not rel.startswith(prefix):
@@ -483,7 +482,7 @@ class Linter:
                     violations.append(self.violation(
                         "Relational Memory Law (Allocation site)", rel, lno,
                         raw_line,
-                        f"Memory_alloc is confined to R2-R4 "
+                        f"Memory_alloc is confined to core roles "
                         f"(found in '{active or 'file scope'}')"))
                 elif not is_final and not is_constructor(active):
                     violations.append(self.violation(

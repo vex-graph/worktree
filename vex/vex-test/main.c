@@ -43,10 +43,10 @@ typedef struct Host {
 } Host;
 
 // Monotonic seconds for the module's per-frame clock (never a frame count).
-static double hostNow() {
+static d64 hostNow() {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (double) ts.tv_sec + (double) ts.tv_nsec / 1e9;
+    return (d64) ts.tv_sec + (d64) ts.tv_nsec / 1e9;
 }
 
 // Re-resolve the module's entry points and rebuild the scene. Runs after the
@@ -61,7 +61,7 @@ static void hostAttach(Host *host) {
 
 // Hot-reload notification. The outgoing image is still mapped in the retire
 // ring, so calling the OLD detach here is safe; then the new image rebuilds.
-static void hostReload(Application *app, uint32_t loaded, void *userdata) {
+static void hostReload(Application *app, u32 loaded, void *userdata) {
     (void) app;
     (void) loaded;
     Host *host = userdata;
@@ -117,7 +117,7 @@ int main(void) {
     Application_onHotReload(host.app, hostReload, &host);
 
     // 6. first load, then resolve the module's entry points.
-    uint32_t loaded = 0;
+    u32 loaded = 0;
     if (Hot_poll(host.hot, &loaded) != HOT_OK) {
         Frame_destroy(host.frame);
         Hot_shutdown(host.hot);

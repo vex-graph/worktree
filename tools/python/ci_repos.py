@@ -3,9 +3,9 @@
 tools/ci_repos.py — manifest-driven checkout and per-repo CI callers.
 
 The readiness manifest (`tools/platforms.json`) already names every repository,
-its tier and its declared platforms. This tool uses that single source to:
+its role and its declared platforms. This tool uses that single source to:
 
-  list                     print repo key, tier and remote
+  list                     print repo key, role and remote
   clone [--auth TOKEN]     clone every missing repository into its key path
   callers [--write]        install the reusable-workflow caller in each repo
   baselines [--write]      record each repo's lint + layout baselines (dry run by default)
@@ -36,6 +36,8 @@ def _find_root(start: Path) -> Path:
 
 ROOT = _find_root(Path(__file__).resolve().parent)
 MANIFEST = Path("tools/platforms.json")
+# The four roles. `workspace` is the tree itself, not a repository role.
+ROLES = ("lifetime", "core", "app", "tool", "workspace")
 BASELINE = ".github/lint-baseline.json"
 LAYOUT = ".github/arrange-baseline.json"
 LINTER = Path(__file__).resolve().parent / "linter.py"
@@ -77,8 +79,21 @@ def load_manifest(root):
         remote = claim.get("remote", "")
         if not remote.startswith("https://") or not remote.endswith(".git"):
             errors.append(f"{key}: remote must be an https .git URL")
-        if not isinstance(claim.get("tier"), str):
-            errors.append(f"{key}: missing tier")
+        role = claim.get("role")
+        if role not in ROLES:
+            errors.append(f"{key}: role must be one of {', '.join(sorted(ROLES))}")
+        extra = claim.get("roles")
+        if extra is not None:
+            if not isinstance(extra, list) or not extra:
+                errors.append(f"{key}: roles must be a non-empty list")
+            else:
+                for item in extra:
+                    if item not in ROLES:
+                        errors.append(f"{key}: roles entry {item!r} is not a role")
+                if role not in extra:
+                    errors.append(f"{key}: roles must include the primary role {role!r}")
+        if not isinstance(claim.get("allocExempt", False), bool):
+            errors.append(f"{key}: allocExempt must be a boolean")
     return data, errors
 
 
@@ -234,10 +249,10 @@ def check(args):
         )
         columns = " ".join((yes if flag else no).ljust(width)
                            for yes, no, flag, width in marks)
-        print(f"{columns} {key:44s} {claim.get('tier', '?')}")
+        print(f"{columns} {key:44s} {claim.get('role', '?')}")
     if args.require_all:
         # A declared repository may say `"required": false` while it has no
-        # checkout yet (darkbase-headless); that is intent, not a gap.
+        # checkout yet (darkbase); that is intent, not a gap.
         missing = [key for key, claim in entries(data)
                    if claim.get("required", True) and not readiness(args.root / key)["checkout"]]
         for key in missing:
@@ -291,7 +306,7 @@ def main(argv=None):
     data, errors = load_manifest(args.root)
     if args.action == "list":
         for key, claim in entries(data):
-            print(f"{key}\t{claim.get('tier', '?')}\t{claim.get('remote', '')}")
+            print(f"{key}\t{claim.get('role', '?')}\t{claim.get('remote', '')}")
         return 1 if errors else 0
     return args.func(args)
 

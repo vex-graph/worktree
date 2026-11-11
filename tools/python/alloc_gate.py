@@ -50,12 +50,13 @@ SKIP_PREFIXES = ("//", "*", "/*", "#")
 
 
 def tooling_repos() -> set[str]:
-    """Repositories the manifest declares as `tooling` (the named exception).
+    """Repositories the manifest marks `allocExempt` (the named exception).
 
     The law binds the RUNTIME. A standalone tool that runs one-shot and exits
     satisfies all four exemption criteria — no daemon, no hosted image, no
     memory crossing a module boundary, no lifetime past one command — so libc
-    is correct there and an arena would buy nothing.
+    is correct there and an arena would buy nothing. The flag is explicit and
+    independent of `role`: a tool that loads a dynamic image is not exempt.
     """
     if not MANIFEST.is_file():
         return set()
@@ -64,7 +65,7 @@ def tooling_repos() -> set[str]:
     except (OSError, ValueError):
         return set()
     return {key.split("/")[-1] for key, value in repos.items()
-            if value.get("tier") == "tooling"}
+            if value.get("allocExempt") is True}
 
 SOURCE_SUFFIXES = (".c", ".m", ".h")
 

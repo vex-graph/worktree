@@ -74,8 +74,6 @@
     "vex/semicolon/main/tui-main.c": 72,
     "vex/vexspoke/algo/bvh.c": 6,
     "vex/vexspoke/algo/tree_sit.c": 3,
-    "vex/vexspoke/atomic/ring.c": 2,
-    "vex/vexspoke/bit/bit.c": 2,
     "vex/vexspoke/deferred/dispatch.c": 5,
     "vex/vexspoke/exception/exception.c": 5,
     "vex/vexspoke/net/download.c": 2,
@@ -83,6 +81,7 @@
     "vex/vexspoke/security/argon2.c": 6,
     "vex/vexspoke/security/hkdf.c": 2,
     "vex/vexspoke/security/secure_random.c": 2,
+    "vex/vexspoke/struct/ring.c": 2,
     "vex/vexspoke/system/image_mac.m": 2,
     "vex/vexspoke/system/system.c": 12
   }

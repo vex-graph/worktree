@@ -102,7 +102,7 @@ def inventory(root, report):
     # own their inventory and their own ignore rules. .git may be a worktree file.
     # The shared stack under vex/ is walked directly; every directory holding
     # a .git is an independent checkout owning its own inventory.
-    for directory in ("vex",):
+    for directory in ("vex", "lib"):
         base = root / directory
         if base.is_dir():
             for p in base.rglob(".git"):

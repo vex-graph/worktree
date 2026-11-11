@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "note": "Declared, reviewable platform intent and proof. `support` is what the repo intends to run on; `proven` is what its own documentation claims has executed. Observed CI evidence is separate and never edits this file.",
+  "version": 2,
+  "note": "Declared, reviewable platform intent and proof. `role` is lifetime (substrate), core (library), app (has a main), tool (runs and exits, never linked), or workspace (this tree). `roles` lists every role a repo carries when it carries more than one. `allocExempt` is the named standalone-tooling exception of the Relational Memory Law and is independent of `role`: a tool that hosts or loads an image is not exempt. `support` is what the repo intends to run on; `proven` is what its own documentation claims has executed. Observed CI evidence is separate and never edits this file.",
   "platforms": [
     "macos",
     "linux",
@@ -8,7 +8,7 @@
   ],
   "repos": {
     "(worktree)": {
-      "tier": "workspace",
+      "role": "workspace",
       "subsystem": "tools",
       "support": [
         "macos",
@@ -21,7 +21,7 @@
       "remote": "https://github.com/vex-graph/worktree.git"
     },
     "vex/lifetime": {
-      "tier": "R0",
+      "role": "lifetime",
       "subsystem": "lifetime",
       "support": [
         "macos",
@@ -31,23 +31,10 @@
       "proven": [
         "macos"
       ],
-      "remote": "https://github.com/vexgraph-ecosystem/lifetime.git"
-    },
-    "vex/vexspoke": {
-      "tier": "R2",
-      "subsystem": "vexspoke",
-      "support": [
-        "macos",
-        "linux",
-        "windows"
-      ],
-      "proven": [
-        "macos"
-      ],
-      "remote": "https://github.com/vexgraph-ecosystem/vexspoke.git"
+      "remote": "https://github.com/vex-lib/lifetime.git"
     },
     "vex/re": {
-      "tier": "R1",
+      "role": "lifetime",
       "subsystem": "re",
       "support": [
         "macos",
@@ -57,10 +44,23 @@
       "proven": [
         "macos"
       ],
-      "remote": "https://github.com/vexgraph-ecosystem/relational-engine.git"
+      "remote": "https://github.com/vex-lib/relational-engine.git"
+    },
+    "vex/vexspoke": {
+      "role": "core",
+      "subsystem": "vexspoke",
+      "support": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "proven": [
+        "macos"
+      ],
+      "remote": "https://github.com/vex-lib/vexspoke.git"
     },
     "vex/graphvex": {
-      "tier": "R3",
+      "role": "core",
       "subsystem": "graphvex",
       "support": [
         "macos",
@@ -70,10 +70,10 @@
       "proven": [
         "macos"
       ],
-      "remote": "https://github.com/vexgraph-ecosystem/graphvex.git"
+      "remote": "https://github.com/vex-lib/graphvex.git"
     },
     "vex/determinant": {
-      "tier": "R3",
+      "role": "core",
       "subsystem": "determinant",
       "support": [
         "macos",
@@ -81,10 +81,10 @@
         "windows"
       ],
       "proven": [],
-      "remote": "https://github.com/vexgraph-ecosystem/determinant.git"
+      "remote": "https://github.com/vex-lib/determinant.git"
     },
     "vex/language": {
-      "tier": "R3",
+      "role": "core",
       "subsystem": "language",
       "support": [
         "macos",
@@ -92,10 +92,10 @@
         "windows"
       ],
       "proven": [],
-      "remote": "https://github.com/vexgraph-ecosystem/language.git"
+      "remote": "https://github.com/vex-lib/language.git"
     },
     "vex/samplerate": {
-      "tier": "R3",
+      "role": "core",
       "subsystem": null,
       "support": [
         "macos",
@@ -103,10 +103,22 @@
         "windows"
       ],
       "proven": [],
-      "remote": "https://github.com/vexgraph-ecosystem/samplerate.git"
+      "remote": "https://github.com/vex-lib/samplerate.git"
+    },
+    "vex/scene": {
+      "role": "core",
+      "subsystem": "scene",
+      "support": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "proven": [],
+      "remote": "https://github.com/vex-lib/meld.git",
+      "required": false
     },
     "vex/darling": {
-      "tier": "R4",
+      "role": "core",
       "subsystem": "darling",
       "support": [
         "macos",
@@ -115,10 +127,10 @@
       "proven": [
         "macos"
       ],
-      "remote": "https://github.com/vexgraph-ecosystem/darling-framework.git"
+      "remote": "https://github.com/vex-lib/darling-framework.git"
     },
     "vex/sesh": {
-      "tier": "R4",
+      "role": "core",
       "subsystem": "sesh",
       "support": [
         "macos",
@@ -128,89 +140,25 @@
       "proven": [
         "macos"
       ],
-      "remote": "https://github.com/vexgraph-ecosystem/sesh.git"
+      "remote": "https://github.com/vex-graph/sesh.git"
     },
-    "vex/primeagen": {
-      "tier": "R5",
-      "subsystem": "primeagen",
+    "vex/harness": {
+      "role": "core",
+      "subsystem": "harness",
       "support": [
         "macos",
         "linux",
         "windows"
       ],
       "proven": [],
-      "remote": "https://github.com/vex-graph/primeagen.git"
-    },
-    "vex/impedance": {
-      "tier": "R5",
-      "subsystem": null,
-      "support": [
-        "macos",
-        "windows"
-      ],
-      "proven": [],
-      "remote": "https://github.com/vexgraph-ecosystem/impedance.git"
-    },
-    "vex/drawling": {
-      "tier": "R5",
-      "subsystem": null,
-      "support": [
-        "macos",
-        "windows"
-      ],
-      "proven": [],
-      "remote": "https://github.com/vexgraph-ecosystem/drawling.git"
-    },
-    "vex/anti": {
-      "tier": "R6",
-      "subsystem": null,
-      "support": [
-        "macos",
-        "windows"
-      ],
-      "proven": [],
-      "remote": "https://github.com/vexgraph-ecosystem/anti.git"
-    },
-    "vex/semicolon": {
-      "tier": "R6",
-      "subsystem": "semicolon",
-      "support": [
-        "macos",
-        "linux",
-        "windows"
-      ],
-      "proven": [
-        "macos"
-      ],
-      "remote": "https://github.com/vexgraph-ecosystem/semicolon.git"
-    },
-    "vex/b": {
-      "tier": "tooling",
-      "subsystem": "b",
-      "support": [
-        "macos",
-        "linux",
-        "windows"
-      ],
-      "proven": [
-        "macos",
-        "linux"
-      ],
-      "remote": "https://github.com/vex-graph/b.git"
-    },
-    "vex/func": {
-      "tier": "tooling",
-      "subsystem": "func",
-      "support": [
-        "macos",
-        "linux",
-        "windows"
-      ],
-      "proven": [],
-      "remote": "https://github.com/vex-graph/func.git"
+      "remote": "https://github.com/vex-graph/harness.git"
     },
     "vex/darkbase": {
-      "tier": "tooling",
+      "role": "core",
+      "roles": [
+        "core",
+        "app"
+      ],
       "subsystem": "darkbase",
       "support": [
         "macos",
@@ -223,8 +171,100 @@
       "remote": "https://github.com/vex-graph/darkbase.git",
       "required": false
     },
+    "vex/primeagen": {
+      "role": "app",
+      "subsystem": "primeagen",
+      "support": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "proven": [],
+      "remote": "https://github.com/vex-graph/primeagen.git"
+    },
+    "vex/impedance": {
+      "role": "app",
+      "subsystem": null,
+      "support": [
+        "macos",
+        "windows"
+      ],
+      "proven": [],
+      "remote": "https://github.com/vex-suite/impedance.git"
+    },
+    "vex/drawling": {
+      "role": "app",
+      "subsystem": null,
+      "support": [
+        "macos",
+        "windows"
+      ],
+      "proven": [],
+      "remote": "https://github.com/vex-suite/drawling.git"
+    },
+    "vex/anti": {
+      "role": "app",
+      "subsystem": null,
+      "support": [
+        "macos",
+        "windows"
+      ],
+      "proven": [],
+      "remote": "https://github.com/vex-suite/anti.git"
+    },
+    "vex/semicolon": {
+      "role": "app",
+      "subsystem": "semicolon",
+      "support": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "proven": [
+        "macos"
+      ],
+      "remote": "https://github.com/vex-suite/semicolon.git"
+    },
+    "vex/b": {
+      "role": "tool",
+      "subsystem": "b",
+      "allocExempt": true,
+      "support": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "proven": [
+        "macos",
+        "linux"
+      ],
+      "remote": "https://github.com/vex-graph/b.git"
+    },
+    "vex/func": {
+      "role": "tool",
+      "subsystem": "func",
+      "allocExempt": true,
+      "support": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "proven": [],
+      "remote": "https://github.com/vex-graph/func.git"
+    },
+    "vex/job": {
+      "role": "tool",
+      "subsystem": "job",
+      "support": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "proven": [],
+      "remote": "https://github.com/vex-graph/img.git"
+    },
     "vex/hotcwap": {
-      "tier": "R1",
+      "role": "tool",
       "subsystem": "hotcwap",
       "support": [
         "macos",
@@ -234,11 +274,16 @@
       "proven": [
         "macos"
       ],
-      "remote": "https://github.com/vexgraph-ecosystem/hotcwap.git"
+      "remote": "https://github.com/vex-graph/hotcwap.git"
     },
     "vex/api-haven": {
-      "tier": "tooling",
+      "role": "core",
+      "roles": [
+        "core",
+        "tool"
+      ],
       "subsystem": "api-haven",
+      "allocExempt": true,
       "support": [
         "macos",
         "linux",
@@ -247,11 +292,11 @@
       "proven": [
         "macos"
       ],
-      "remote": "https://github.com/vexgraph-ecosystem/api-haven.git"
+      "remote": "https://github.com/vex-graph/api-haven.git"
     },
-    "vex/darkbase-headless": {
-      "tier": "R4",
-      "subsystem": "darkbase-headless",
+    "lib": {
+      "role": "lifetime",
+      "subsystem": "lib",
       "support": [
         "macos",
         "linux",
@@ -260,19 +305,7 @@
       "proven": [
         "macos"
       ],
-      "remote": "https://github.com/vexgraph-ecosystem/darkbase-headless.git",
-      "required": false
-    },
-    "vex/harness": {
-      "tier": "R4",
-      "subsystem": "harness",
-      "support": [
-        "macos",
-        "linux",
-        "windows"
-      ],
-      "proven": [],
-      "remote": "https://github.com/vexgraph-ecosystem/harness.git"
+      "remote": "https://github.com/vex-graph/vex-c.git"
     }
   }
 }

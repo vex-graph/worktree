@@ -27,4 +27,6 @@ if [ ! -f "$bootstrap" ]; then
 fi
 
 export B_CALLER_DIR="${B_CALLER_DIR:-$PWD}"
+export B_WORKSPACE_ROOT="${B_WORKSPACE_ROOT:-$root}"
+export B_INCLUDE="$root/lib"
 exec "$bootstrap" "$@"

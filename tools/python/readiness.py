@@ -44,15 +44,12 @@ def _find_root(start: Path) -> Path:
 
 
 ROOT = _find_root(Path(__file__).resolve().parent)
-REPORT = Path("metadata/gists/test-checklist.md")
+# Report order: substrate first, apps last. `workspace` is this tree.
+ROLE_ORDER = {"workspace": -1, "lifetime": 0, "core": 1, "app": 2, "tool": 3}
 PLATFORMS = Path("tools/platforms.json")
 SOURCE_SUFFIXES = {".c", ".h", ".m", ".mm", ".cc", ".cpp", ".cxx", ".rs"}
 SUBSYSTEM_DIRS = (
-    "vexgraph-ecosystem",
-    "vexgraph-hobby-projects",
-    "suite/ecosystem",
-    "suite/personal",
-    "suite/projects",
+    "vex",
 )
 WORKTREE = "(worktree)"
 
@@ -71,16 +68,18 @@ ARRANGE = load_module("arrange", _tools_py / "arrange.py" if (_tools_py / "arran
 
 
 def tests_checkout(root):
-    for cand in (root / "vexgraph-ecosystem" / "tests", root / "tests"):
+    for cand in (root / "vex" / "tests", root / "tests"):
         if (cand / ".git").exists():
             return cand
-    return root / "vexgraph-ecosystem" / "tests"
+    return root / "vex" / "tests"
 
 
 def repo_dirs(root):
     """Every checked-out repository the scoreboard covers, plus the worktree."""
     tc = tests_checkout(root)
     found = [root]
+    if (root / "lib" / ".git").exists():
+        found.append(root / "lib")
     if (tc / ".git").exists():
         found.append(tc)
     for base in SUBSYSTEM_DIRS:
@@ -121,17 +120,14 @@ def owner_of_path(path, claims_by_subsystem):
     it. Tooling tests and workspace files belong to the worktree.
     """
     parts = path.split("/")
+    if parts[0] == "lib":
+        return "lib"
     if len(parts) > 1 and parts[0] == "suite":
         return "/".join(parts[:3])
     if len(parts) > 2 and parts[0] in SUBSYSTEM_DIRS:
         return "/".join(parts[:2])
     if parts[0] == "tests" and len(parts) > 1:
         subsystem = parts[1]
-        if subsystem == "tools":
-            return WORKTREE
-        return claims_by_subsystem.get(subsystem, "tests")
-    if len(parts) > 2 and parts[0] == "vexgraph-ecosystem" and parts[1] == "tests":
-        subsystem = parts[2]
         if subsystem == "tools":
             return WORKTREE
         return claims_by_subsystem.get(subsystem, "tests")
@@ -144,7 +140,7 @@ def production_files(repo, key):
     count = 0
     for name in git_files(repo):
         path = repo / name
-        if not path.is_file() or "tests" in Path(name).parts:
+        if not path.is_file() or {"test", "tests"} & set(Path(name).parts):
             continue
         if path.suffix in SOURCE_SUFFIXES:
             count += 1
@@ -161,7 +157,7 @@ def load_claims(root):
 def ledger_counts(root, key, claims_by_subsystem):
     """Executed evidence for one owner: green, stale, untested, total."""
     try:
-        records = CHECKLIST.load(root / REPORT)
+        records = CHECKLIST.load(CHECKLIST.report_path(root))
     except (OSError, ValueError):
         return {"green": 0, "stale": 0, "untested": 0, "total": 0, "last": None}
     counts = Counter()
@@ -201,6 +197,11 @@ def test_units(root, claims_by_subsystem):
             counts[WORKTREE] += 1
         else:
             counts[claims_by_subsystem.get(subsystem, "tests")] += 1
+    lib = root / "lib"
+    if (lib / ".git").exists():
+        for name in git_files(lib):
+            if CHECKLIST.is_executable_test(name):
+                counts["lib"] += 1
     return counts
 
 
@@ -264,7 +265,7 @@ def build_report(root, execute=False, timeout=1800):
             sources = production_files(repo, key)
         rows.append({
             "repo": key,
-            "tier": claim.get("tier", "?"),
+            "role": claim.get("role", "?"),
             "sources": sources,
             "test_units": units.get(key, 0),
             "green": ledger["green"],
@@ -278,7 +279,7 @@ def build_report(root, execute=False, timeout=1800):
             "proven": claim.get("proven", []),
         })
 
-    rows.sort(key=lambda row: (row["tier"], row["repo"]))
+    rows.sort(key=lambda row: (ROLE_ORDER.get(row["role"], 9), row["repo"]))
 
     summary = {
         "repos": len(rows),
@@ -309,14 +310,14 @@ def build_report(root, execute=False, timeout=1800):
 def text_report(report):
     summary = report["summary"]
     lines = ["Vexgraph readiness", "",
-             f"{'repo':44s} {'tier':8s} {'src':>5s} {'tests':>7s} "
+             f"{'repo':44s} {'role':8s} {'src':>5s} {'tests':>7s} "
              f"{'ledger':>9s} {'lint':>6s} {'layout':>7s}  proven"]
     for row in report["rows"]:
         ledger = f"{row['green']}/{row['ledger_total']}"
         if row["stale"]:
             ledger += f"!{row['stale']}"
         proven = ",".join(row["proven"]) or "-"
-        lines.append(f"{row['repo']:44s} {row['tier']:8s} {row['sources']:5d} "
+        lines.append(f"{row['repo']:44s} {row['role']:8s} {row['sources']:5d} "
                      f"{row['test_units']:7d} {ledger:>9s} {row['lint']:6d} "
                      f"{row['layout']:7d}  {proven}")
     lines.append("")
@@ -349,13 +350,13 @@ def markdown_report(report):
         f"**{summary['lint_total']}** lint violations | "
         f"**{summary['layout_total']}** layout findings",
         "",
-        "| Repo | Tier | Sources | Test units | Green | Stale | Untested | Lint | Layout | Proven |",
+        "| Repo | Role | Sources | Test units | Green | Stale | Untested | Lint | Layout | Proven |",
         "| :--- | :---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- |",
     ]
     for row in report["rows"]:
         proven = ", ".join(row["proven"]) or "none"
         lines.append(
-            f"| `{row['repo']}` | {row['tier']} | {row['sources']} | "
+            f"| `{row['repo']}` | {row['role']} | {row['sources']} | "
             f"{row['test_units']} | {row['green']} | {row['stale']} | "
             f"{row['untested']} | {row['lint']} | {row['layout']} | {proven} |")
     proven = ", ".join(f"{k} {v}/{summary['repos']}"

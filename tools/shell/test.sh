@@ -1,7 +1,8 @@
 #!/bin/sh
 # tools/shell/test.sh — run owner-test units through b.
 #
-# A test is a directory carrying a b.assembly.json under vex/<repo>/test/.
+# A test is a directory carrying a b.assembly.json under vex/<repo>/test/ or
+# lib/test/.
 # b owns exactly one unit: `b run` inside that directory builds it and executes
 # it. This script owns the policy b deliberately refuses to hold — which units
 # exist, which ones a filter selects, and how a run is reported.
@@ -36,7 +37,12 @@ skipped=0
 failed=0
 failures=""
 
-for manifest in $(find vex -name b.assembly.json -not -path '*/.b/*' -not -path '*/.git/*' | sort); do
+roots="vex"
+if [ -d lib ]; then
+    roots="vex lib"
+fi
+
+for manifest in $(find $roots -name b.assembly.json -not -path '*/.b/*' -not -path '*/.git/*' | sort); do
     unit=$(dirname "$manifest")
     case "$unit" in
         */test|*/test/*) ;;
@@ -49,7 +55,11 @@ for manifest in $(find vex -name b.assembly.json -not -path '*/.b/*' -not -path 
         esac
     fi
 
-    printf '  %-58s' "${unit#vex/}"
+    case "$unit" in
+        vex/*) display=${unit#vex/} ;;
+        *)     display=$unit ;;
+    esac
+    printf '  %-58s' "$display"
     log=$(mktemp "${TMPDIR:-/tmp}/vex-test.XXXXXX")
     if ( cd "$unit" && "$launcher" run ) >"$log" 2>&1; then
         status=0

@@ -60,15 +60,25 @@ implemented.
 
 ## Build: `b`
 
+### HARD RULE: CMake for IDE only, `b` for building — full stop
+
+- **CMake** (`CMakeLists.txt`) is IDE metadata only. It exists so CLion gets compile commands, symbol resolution and inlay hints. It builds nothing, runs nothing, and never ships anything.
+- **`b`** (`./tools/b`) is the only build system. `b build`, `b run`, `b generate`, `b assembly`.
+- Never add a per-repo or per-folder `CMakeLists.txt`. Never run `cmake --build` or `make` by hand. Never commit CMake cache/build output.
+
 ### CLion: CMake is IDE metadata only
 
-Open **this workspace root** in CLion (or any JetBrains IDE). Its `vex` directory is the only maintained
-project entry: no nested repository, application, personal tool or test checkout
-needs one. `CMakeLists.txt` is self-sufficient — it reads nothing from `b`,
-derives every repository, include root and source from `vex/` itself, and
-creates one excluded object library indexing the whole tree. That is the whole
-adapter: it supplies compile commands for colours, symbol resolution, inlay
-hints and debug info.
+`CMakeLists.txt` at this repository root is the only CMake entry. It is
+self-sufficient — it reads nothing from `b`, derives every repository, include
+root and source from `vex/` and `lib/` themselves, and creates one excluded
+object library indexing the whole tree. That is the whole adapter: compile
+commands for colours, symbol resolution, inlay hints and debug info. It adds no
+build system beside `b`; no nested repository, application, personal tool or
+test checkout needs its own CMake file.
+
+The build directory lives outside the tree, at `.idea/cmake-build-debug`, set
+by the Debug profile's `GENERATION_DIR`. CMake writes nothing under `vex/` or
+`lib/`; deleting the build directory loses only generated cache and objects.
 
 It creates **no executable and no test target**, so CLion's CMake integration
 contributes nothing to the run dropdown. Reload CMake after adding files; do not
@@ -158,13 +168,11 @@ demand:
 ./tools/orchestrator ci                  # tools/shell/ci.sh, read-only
 ```
 
-Observed on 2026-11-02, mid-restructure: workflow references, preferences
-integrity and the secret scan PASS. The declared-checkout and tooling-test
-steps FAIL because `tools/platforms.json` still keys repositories by their
-remote identities (`vexgraph-ecosystem/<repo>`) while the checkouts live flat
-under `vex/<repo>`; the checklist-ledger step FAILs until the ledger is
-re-synced to the new geography. `readiness.py` likewise sees only the workspace
-row for the same reason.
+The manifest keys repositories by their flat checkout paths (`vex/<name>`) and
+declares the three public orgs: `vex-lib` (lifetime and core), `vex-graph`
+(personal tools, agent and relay components) and `vex-suite` (applications).
+Run the gate for current results; a declared platform is not proof that a
+product runs there.
 
 `tools/platforms.json` declares repository platforms; `tools/python/readiness.py`
 composes those declarations with the checklist and lint state;
@@ -231,10 +239,10 @@ what a consumer writes:
 #include "darling/frame/frame.h"
 ```
 
-The remote URLs keep the long names (`vexgraph-ecosystem/relational-engine`,
-`vexgraph-ecosystem/darling-framework`); only the local checkout and the
-include roots are short. The two names are the same library — `re` is not a
-fork or a shim, it is `relational-engine` under the name it is imported by.
+The remote URLs keep the long names (`vex-lib/relational-engine`,
+`vex-lib/darling-framework`); only the local checkout and the include roots are
+short. The two names are the same library — `re` is not a fork or a shim, it is
+`relational-engine` under the name it is imported by.
 
 ## Clone the whole ecosystem
 
@@ -247,7 +255,7 @@ To reproduce this exact three-level shape from public sources only:
 
 It clones this repository as `<destination>/worktree`, every manifest-declared
 repository flat into `<destination>/worktree/vex/<name>` (the manifest keys are
-remote identities, so each lands at `vex/<basename>`), the five published
+flat `vex/<name>` paths), the five published
 Gists into `<destination>/metadata/gists/`, and the profile checkout into
 `<destination>/metadata/vex-graph/`. It deliberately does not copy the
 per-person level: harness configuration (`.claude`, `.opencode`, `.idea`), the
