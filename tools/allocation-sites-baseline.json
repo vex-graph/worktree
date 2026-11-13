@@ -1,7 +1,7 @@
 {
   "version": 1,
   "note": "Ratchet baseline: CI fails only when a file/rule count grows.",
-  "total": 119,
+  "total": 120,
   "counts": {
     "vex/darkbase/engine/database/database.c::Relational Memory Law (Allocation site)": 14,
     "vex/darkbase/engine/database/database_result.c::Relational Memory Law (Allocation site)": 1,
@@ -33,6 +33,7 @@
     "vex/vexspoke/algo/dijkstra.c::Relational Memory Law (Allocation site)": 5,
     "vex/vexspoke/algo/kd_tree.c::Relational Memory Law (Allocation site)": 2,
     "vex/vexspoke/algo/sort.c::Relational Memory Law (Allocation site)": 3,
+    "vex/vexspoke/generic/list_tmpl.h::Relational Memory Law (Allocation site)": 1,
     "vex/vexspoke/input/key.c::Relational Memory Law (Allocation site)": 2,
     "vex/vexspoke/input/mouse.c::Relational Memory Law (Allocation site)": 2,
     "vex/vexspoke/input/touch.c::Relational Memory Law (Allocation site)": 2,
