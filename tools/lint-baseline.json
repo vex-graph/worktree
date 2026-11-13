@@ -8,6 +8,7 @@
     "linter::Vertical Integration Law (Layer Inversion)": 1,
     "linter::Primitive Spelling Law (fn return)": 3482,
     "linter::Primitive Spelling Law (const_any)": 105,
+    "linter::Primitive Spelling Law (void pointer)": 57,
     "arrange::Semantic Consistency Law (Control flow: single-statement braces)": 293,
     "arrange::Semantic Consistency Law (Control flow: statement separation)": 55479,
     "arrange::Semantic Consistency Law (Control flow: body on the header line)": 1555,

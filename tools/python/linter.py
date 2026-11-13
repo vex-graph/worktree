@@ -304,6 +304,9 @@ RE_NULL = re.compile(r"\bNULL\b")
 RE_VOID_RETURN = re.compile(
     r"^\s*(?:(?:static|inline|extern|_Noreturn)\s+)*void\s+[A-Za-z_]\w*\s*\(")
 RE_CONST_ANY = re.compile(r"\bconst\s+any\b")
+
+# `void**` is `any*`: the depth lives in the stars, never in the name.
+RE_VOID_POINTER = re.compile(r"\bvoid\s*\*")
 RE_DOT_CHAIN = re.compile(r"\b[A-Za-z_]\w*(?:\.[A-Za-z_]\w*){3,}\b")
 RE_DEREF_CHAIN = re.compile(
     r"\(\*[^()\n]+\)\.[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+")
@@ -597,6 +600,15 @@ class Linter:
                     fixable=True))
                 if fix and fixed_line != raw_line:
                     raw_line, modified = fixed_line, True
+
+            # Not auto-fixed on purpose: `void *` becomes `any`, so `void **`
+            # becomes `any *` — a rewrite that consumes a star. Replacing the
+            # token instead would turn `void**` into `any**` and silently add a
+            # level of indirection.
+            if RE_VOID_POINTER.search(code):
+                violations.append(self.violation(
+                    "Primitive Spelling Law (void pointer)", rel, lno, raw_line,
+                    "'void*' is spelled 'any', and 'void**' is 'any*': the depth lives in the stars"))
 
             chain = self.check_two_layer_cap(rel, code, lno, raw_line)
             if chain:
