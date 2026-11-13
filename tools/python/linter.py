@@ -297,6 +297,13 @@ C_TYPES = (
 RE_CAST_SPACE_INSIDE = re.compile(rf"\(\s*({C_TYPES})\s+(\*+)\s*\)")
 RE_CAST_NO_SPACE_AFTER = re.compile(rf"\(\s*({C_TYPES}\*+)\)([\w\(])")
 RE_NULL = re.compile(r"\bNULL\b")
+
+# Primitive Spelling Law: `fn` is `void` in return position, and a read-only
+# untyped pointer is `const_any` — `const any` qualifies the pointer, and the
+# language discards that qualifier on a parameter.
+RE_VOID_RETURN = re.compile(
+    r"^\s*(?:(?:static|inline|extern|_Noreturn)\s+)*void\s+[A-Za-z_]\w*\s*\(")
+RE_CONST_ANY = re.compile(r"\bconst\s+any\b")
 RE_DOT_CHAIN = re.compile(r"\b[A-Za-z_]\w*(?:\.[A-Za-z_]\w*){3,}\b")
 RE_DEREF_CHAIN = re.compile(
     r"\(\*[^()\n]+\)\.[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+")
@@ -571,6 +578,25 @@ class Linter:
                         lambda s: RE_NULL.sub("nullptr", s))
                     if fixed != raw_line:
                         raw_line, modified = fixed, True
+
+            if RE_VOID_RETURN.match(code):
+                fixed_line = RE_VOID_RETURN.sub(
+                    lambda m: m.group(0).replace("void", "fn", 1), raw_line, count=1)
+                violations.append(self.violation(
+                    "Primitive Spelling Law (fn return)", rel, lno, raw_line,
+                    "Function returning no value is spelled 'fn', not 'void'",
+                    fixable=fixed_line != raw_line))
+                if fix and fixed_line != raw_line:
+                    raw_line, modified = fixed_line, True
+
+            if RE_CONST_ANY.search(code):
+                fixed_line = RE_CONST_ANY.sub("const_any", raw_line)
+                violations.append(self.violation(
+                    "Primitive Spelling Law (const_any)", rel, lno, raw_line,
+                    "'const any' is a const pointer; read-only untyped data is 'const_any'",
+                    fixable=True))
+                if fix and fixed_line != raw_line:
+                    raw_line, modified = fixed_line, True
 
             chain = self.check_two_layer_cap(rel, code, lno, raw_line)
             if chain:
