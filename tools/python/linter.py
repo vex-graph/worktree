@@ -310,6 +310,13 @@ RE_VOID_RETURN = re.compile(
     r"^\s*(?:(?:static|inline|extern|_Noreturn)\s+)*void\s+[A-Za-z_]\w*\s*\(")
 RE_CONST_ANY = re.compile(r"\bconst\s+any\b")
 
+# `void` is the C keyword, and after the `fn` rename it survives in ecosystem
+# source only as the alias header's own definition and as data inside string
+# literals (keyword tables, C snippets in tests, generated C). Comments and
+# strings are stripped before this runs, so a hit here is a type spelling.
+RE_VOID_KEYWORD = re.compile(r"\bvoid\b")
+VOID_ALIAS_OWNER = "lib/lang/primitive.h"
+
 # `void**` is `any*`, and so is `fn**` — `fn` is `void` through the typedef, so
 # both spellings name an untyped pointer. The depth lives in the stars.
 RE_VOID_POINTER = re.compile(r"\b(?:void|fn)\s*\*")
@@ -623,6 +630,11 @@ class Linter:
                 violations.append(self.violation(
                     "Primitive Spelling Law (void pointer)", rel, lno, raw_line,
                     "'void*' and 'fn*' are spelled 'any', and 'void**' is 'any*': the depth lives in the stars"))
+
+            if RE_VOID_KEYWORD.search(code) and rel != VOID_ALIAS_OWNER:
+                violations.append(self.violation(
+                    "Primitive Spelling Law (void keyword)", rel, lno, raw_line,
+                    "'void' is spelled 'fn' in return position and 'any' as a pointer; the alias header is the one place it is defined"))
 
             chain = self.check_two_layer_cap(rel, code, lno, raw_line)
             if chain:
