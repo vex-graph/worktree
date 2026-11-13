@@ -37,7 +37,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-GIST = "4132a6c45cb6d3797c3e8eff2e94035a"
+GIST = "4132a6c45cb6d3797c3e8eff2e94035a"          # the constitution
+SKILL_GIST = "4ef4f42888de052975de0bf541e5504e"    # the working method
 
 LAW = re.compile(r"^## (\d+)\. (.+)$")
 SECTION = re.compile(r"^### (\d+)\.(\d+) (.+)$")
@@ -74,7 +75,8 @@ def full_doc(root: Path) -> Path:
 
 def published(root: Path) -> list[tuple[str, Path]]:
     """(Gist filename, local path) for every file the constitution publishes."""
-    working = constitution_root() / "metadata" / "gists" / "preferences"
+    hub = constitution_root()
+    working = hub / "metadata" / "gists" / "preferences"
     return [
         ("_introduction.md", working / "_introduction.md"),
         ("gist.md", working / "gist.md"),
@@ -82,6 +84,22 @@ def published(root: Path) -> list[tuple[str, Path]]:
         ("main-template.c", working / "main-template.c"),
         ("preferences-full-documentation.md", full_doc(root)),
     ]
+
+
+def skill_published(root: Path) -> list[tuple[str, Path]]:
+    """(Gist filename, local path) for the working-method gist.
+
+    The method is not a law and does not ship with the constitution: it lives in
+    its own public gist so a reader can find it without the whole lawbook.
+    """
+    hub = constitution_root()
+    skill = hub / "metadata" / "gists" / "skill"
+    return [("how_i_code_that_agents_can_digest.md", skill / "how_i_code_that_agents_can_digest.md")]
+
+
+def editions(root: Path) -> list[tuple[str, list[tuple[str, Path]]]]:
+    """(Gist id, its files) for every gist prefs publishes."""
+    return [(GIST, published(root)), (SKILL_GIST, skill_published(root))]
 
 
 def constitution_root() -> Path:
@@ -421,8 +439,9 @@ def cmd_prompt(root: Path) -> int:
 
 def cmd_files(root: Path) -> int:
     hub = constitution_root()
-    for remote, local in published(root):
-        print(f"{local.relative_to(hub)}  ->  {remote}")
+    for gist, files in editions(root):
+        for remote, local in files:
+            print(f"{local.relative_to(hub)}  ->  {gist}/{remote}")
     return 0
 
 
@@ -431,17 +450,37 @@ def gh(arguments: list[str]) -> subprocess.CompletedProcess[bytes]:
     return subprocess.run(["gh", *arguments], capture_output=True, timeout=120)
 
 
+def gist_files(gist: str) -> set[str]:
+    """The filenames one Gist already holds; empty when it cannot be listed."""
+    result = gh(["gist", "view", gist, "--files"])
+    if result.returncode:
+        return set()
+    return {line.strip() for line in result.stdout.decode(errors="replace").splitlines() if line.strip()}
+
+
 def cmd_publish(root: Path, wanted: list[str]) -> int:
     full(root)  # publishing ships the full document; refuse when it is absent
-    files = published(root)
-    if wanted:
-        folded = [name.lower() for name in wanted]
-        files = [pair for pair in files if pair[0].lower() in folded or pair[1].stem.lower() in folded]
-        if not files:
-            print(f"prefs: nothing to publish for {wanted!r} (try: prefs files)", file=sys.stderr)
-            return 1
-    for remote, local in files:
-        result = gh(["gist", "edit", GIST, "--filename", remote, str(local)])
+    folded = [name.lower() for name in wanted]
+    chosen = []
+    for gist, files in editions(root):
+        if wanted:
+            files = [pair for pair in files if pair[0].lower() in folded or pair[1].stem.lower() in folded]
+        chosen.extend((gist, remote, local) for remote, local in files)
+    if wanted and not chosen:
+        print(f"prefs: nothing to publish for {wanted!r} (try: prefs files)", file=sys.stderr)
+        return 1
+    existing = {gist: gist_files(gist) for gist, _ in editions(root)}
+    for gist, remote, local in chosen:
+        if remote in existing[gist]:
+            arguments = ["gist", "edit", gist, "--filename", remote, str(local)]
+        else:
+            # `--add` names the remote file from the local basename, so a file
+            # published under another name has to exist before it can be edited.
+            if local.name != remote:
+                print(f"prefs: cannot add {remote}: local name is {local.name}", file=sys.stderr)
+                return 1
+            arguments = ["gist", "edit", gist, "--add", str(local)]
+        result = gh(arguments)
         if result.returncode:
             print(f"prefs: publish failed for {remote}", file=sys.stderr)
             print(result.stderr.decode(errors="replace").strip(), file=sys.stderr)
@@ -453,18 +492,21 @@ def cmd_publish(root: Path, wanted: list[str]) -> int:
 def cmd_verify(root: Path) -> int:
     full(root)  # verification compares the full document too
     problems = 0
-    for remote, local in published(root):
-        result = gh(["gist", "view", GIST, "--filename", remote, "--raw"])
-        if result.returncode:
-            print(f"MISMATCH {remote}: not readable ({result.stderr.decode(errors='replace').strip()})")
-            problems += 1
-            continue
-        local_bytes = local.read_bytes()
-        same = result.stdout == local_bytes
-        problems += 0 if same else 1
-        print(f"{'match' if same else 'MISMATCH'}  {remote}  {len(local_bytes)}B")
+    total = 0
+    for gist, files in editions(root):
+        for remote, local in files:
+            total += 1
+            result = gh(["gist", "view", gist, "--filename", remote, "--raw"])
+            if result.returncode:
+                print(f"MISMATCH {remote}: not readable ({result.stderr.decode(errors='replace').strip()})")
+                problems += 1
+                continue
+            local_bytes = local.read_bytes()
+            same = result.stdout == local_bytes
+            problems += 0 if same else 1
+            print(f"{'match' if same else 'MISMATCH'}  {remote}  {len(local_bytes)}B")
     if problems:
-        print(f"FAIL {problems} of {len(published(root))} files differ from the Gist")
+        print(f"FAIL {problems} of {total} files differ from their Gist")
         return 1
     print("PASS all published files match")
     return 0
@@ -509,14 +551,15 @@ def cmd_check(root: Path) -> int:
         problems.append(f"injected block is {injected} bytes, over the {INJECTED_LIMIT}-byte ceiling")
 
     hub = constitution_root()
-    for remote, local in published(root):
-        if not local.is_file():
-            if local == full_path:
-                continue  # Git-ignored full document: checked when present
-            problems.append(f"{local.relative_to(hub)} is missing")
-            continue
-        if not local.read_bytes().endswith(b"\n"):
-            problems.append(f"{remote} does not end with a newline (the Gist adds one, so publishing would differ)")
+    for _gist, files in editions(root):
+        for remote, local in files:
+            if not local.is_file():
+                if local == full_path:
+                    continue  # Git-ignored full document: checked when present
+                problems.append(f"{local.relative_to(hub)} is missing")
+                continue
+            if not local.read_bytes().endswith(b"\n"):
+                problems.append(f"{remote} does not end with a newline (the Gist adds one, so publishing would differ)")
 
     books = repo_lawbooks(root)
     dead = [(book, token) for book in books for token in dead_lawbook_links(book)]
