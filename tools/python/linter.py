@@ -288,7 +288,7 @@ def replace_line_arrows(line):
 
 
 C_TYPES = (
-    r"(?:void|char|short|int|long|f32|d64|u8|u16|u32|u64|"
+    r"(?:fn|void|char|short|int|long|f32|d64|u8|u16|u32|u64|"
     r"||i32|int64_t|bytes|pointer|intptr_t|bool|unsigned|signed|"
     r"unsigned\s+char|unsigned\s+short|unsigned\s+int|unsigned\s+long|"
     r"struct\s+[A-Za-z_]\w*|const\s+[A-Za-z_]\w*|[A-Za-z_]\w*)"
@@ -301,12 +301,18 @@ RE_NULL = re.compile(r"\bNULL\b")
 # Primitive Spelling Law: `fn` is `void` in return position, and a read-only
 # untyped pointer is `const_any` — `const any` qualifies the pointer, and the
 # language discards that qualifier on a parameter.
+#
+# The `void` in these patterns is the C keyword the rule hunts for. It is not a
+# spelling of the type in ecosystem source, and a mechanical `void`->`fn` sweep
+# must not rewrite it: doing so turns each rule into a detector of the thing it
+# is supposed to recommend.
 RE_VOID_RETURN = re.compile(
     r"^\s*(?:(?:static|inline|extern|_Noreturn)\s+)*void\s+[A-Za-z_]\w*\s*\(")
 RE_CONST_ANY = re.compile(r"\bconst\s+any\b")
 
-# `void**` is `any*`: the depth lives in the stars, never in the name.
-RE_VOID_POINTER = re.compile(r"\bvoid\s*\*")
+# `void**` is `any*`, and so is `fn**` — `fn` is `void` through the typedef, so
+# both spellings name an untyped pointer. The depth lives in the stars.
+RE_VOID_POINTER = re.compile(r"\b(?:void|fn)\s*\*")
 RE_DOT_CHAIN = re.compile(r"\b[A-Za-z_]\w*(?:\.[A-Za-z_]\w*){3,}\b")
 RE_DEREF_CHAIN = re.compile(
     r"\(\*[^()\n]+\)\.[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+")
@@ -399,6 +405,14 @@ class Linter:
         self.files_scanned = 0
         self.files_would_fix = 0
         self.text_scanned = 0
+        # `--fix --rule X` must rewrite only X. Without this, the filter ran
+        # after the files were already written, so asking to fix one rule
+        # rewrote every fixable rule in the tree.
+        self._fix_filter = None
+
+    def fix_enabled(self, rule):
+        """True when a fix may be written for this rule."""
+        return self._fix_filter is None or self._fix_filter in rule.lower()
 
     def rel(self, path):
         try:
@@ -531,7 +545,7 @@ class Linter:
                     "Canonical Include Paths Law", rel, lno, raw_line,
                     "Prohibited '../' parent directory traversal in include path",
                     fixable=True))
-                if fix:
+                if fix and self.fix_enabled("Canonical Include Paths Law"):
                     fixed = re.sub(r'#include\s*"\.\./src/([^"]+)"',
                                    r'#include "\1"', raw_line)
                     if fixed != raw_line:
@@ -543,7 +557,7 @@ class Linter:
                     "Semantic Consistency Law (Reference form)", rel, lno,
                     raw_line, "Found arrow operator '->'. Use '(*ptr).field'.",
                     fixable=fixed_line != raw_line))
-                if fix and fixed_line != raw_line:
+                if fix and self.fix_enabled("Semantic Consistency Law (Reference form)") and fixed_line != raw_line:
                     raw_line, modified = fixed_line, True
 
             m_space_inside = RE_CAST_SPACE_INSIDE.search(code)
@@ -553,7 +567,7 @@ class Linter:
                     rel, lno, raw_line,
                     f"Space before '*' inside cast paren: '{m_space_inside.group(0)}'",
                     fixable=True))
-                if fix:
+                if fix and self.fix_enabled("Semantic Consistency Law (Cast and pointer spelling)"):
                     fixed = fix_cast_spacing(raw_line)
                     if fixed != raw_line:
                         raw_line, modified = fixed, True
@@ -565,7 +579,7 @@ class Linter:
                     rel, lno, raw_line,
                     f"Missing space after cast paren: '{m_no_space.group(0)}'",
                     fixable=True))
-                if fix:
+                if fix and self.fix_enabled("Semantic Consistency Law (Cast and pointer spelling)"):
                     fixed = fix_cast_spacing(raw_line)
                     if fixed != raw_line:
                         raw_line, modified = fixed, True
@@ -575,7 +589,7 @@ class Linter:
                     "Semantic Consistency Law (Cast and pointer spelling)",
                     rel, lno, raw_line,
                     "'NULL' is not C23; use 'nullptr'", fixable=True))
-                if fix:
+                if fix and self.fix_enabled("Semantic Consistency Law (Cast and pointer spelling)"):
                     fixed, _ = rewrite_code(
                         raw_line, state_before,
                         lambda s: RE_NULL.sub("nullptr", s))
@@ -589,7 +603,7 @@ class Linter:
                     "Primitive Spelling Law (fn return)", rel, lno, raw_line,
                     "Function returning no value is spelled 'fn', not 'void'",
                     fixable=fixed_line != raw_line))
-                if fix and fixed_line != raw_line:
+                if fix and self.fix_enabled("Primitive Spelling Law (fn return)") and fixed_line != raw_line:
                     raw_line, modified = fixed_line, True
 
             if RE_CONST_ANY.search(code):
@@ -598,7 +612,7 @@ class Linter:
                     "Primitive Spelling Law (const_any)", rel, lno, raw_line,
                     "'const any' is a const pointer; read-only untyped data is 'const_any'",
                     fixable=True))
-                if fix and fixed_line != raw_line:
+                if fix and self.fix_enabled("Primitive Spelling Law (const_any)") and fixed_line != raw_line:
                     raw_line, modified = fixed_line, True
 
             # Not auto-fixed on purpose: `void *` becomes `any`, so `void **`
@@ -608,7 +622,7 @@ class Linter:
             if RE_VOID_POINTER.search(code):
                 violations.append(self.violation(
                     "Primitive Spelling Law (void pointer)", rel, lno, raw_line,
-                    "'void*' is spelled 'any', and 'void**' is 'any*': the depth lives in the stars"))
+                    "'void*' and 'fn*' are spelled 'any', and 'void**' is 'any*': the depth lives in the stars"))
 
             chain = self.check_two_layer_cap(rel, code, lno, raw_line)
             if chain:
@@ -699,6 +713,7 @@ class Linter:
 
     def collect(self, fix=False, dry_run=False, filter_rule=None):
         violations = []
+        self._fix_filter = filter_rule.lower() if filter_rule else None
         for root_path in self.root_paths:
             if not os.path.isabs(root_path):
                 root_path = os.path.join(self.cwd, root_path)
