@@ -289,7 +289,7 @@ def replace_line_arrows(line):
 
 C_TYPES = (
     r"(?:void|char|short|int|long|f32|d64|u8|u16|u32|u64|"
-    r"||i32|int64_t|bytes|uintptr_t|intptr_t|bool|unsigned|signed|"
+    r"||i32|int64_t|bytes|pointer|intptr_t|bool|unsigned|signed|"
     r"unsigned\s+char|unsigned\s+short|unsigned\s+int|unsigned\s+long|"
     r"struct\s+[A-Za-z_]\w*|const\s+[A-Za-z_]\w*|[A-Za-z_]\w*)"
 )
@@ -364,9 +364,8 @@ MEMORY_ALLOC_OWNER = "vex/re/nio/mem.c"
 
 def is_constructor(name):
     """Class_N (what Object() dispatches to) or init(): the only allocators."""
-    return bool(CONSTRUCTOR_NAME.fullmatch(name)) or name == "init" or name.endswith(
-        "_init"
-    )
+    return (bool(CONSTRUCTOR_NAME.fullmatch(name)) or name == "init"
+            or re.search(r"_init(?:[A-Z0-9_]|$)", name) is not None)
 
 
 
