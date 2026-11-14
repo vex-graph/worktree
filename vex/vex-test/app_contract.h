@@ -1,9 +1,7 @@
 #ifndef VEX_APP_CONTRACT_H
 #define VEX_APP_CONTRACT_H
 
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
+#include "vex.h"
 
 // app_contract.h — the seam between an application's HOST and its RELOADABLE
 // MODULE.

@@ -13,6 +13,7 @@
 // Teardown order (top-down): module detach -> frame -> application -> loader.
 // ============================================================================
 
+#include "vex.h"
 #include "app_contract.h"
 
 #include "hotcwap/hot.h"
@@ -20,7 +21,6 @@
 #include "darling/frame/frame.h"
 #include "lifetime/core/application.h"
 
-#include <stdint.h>
 #include <stdio.h>
 #include <time.h>
 

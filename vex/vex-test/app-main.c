@@ -25,6 +25,7 @@
 //     Hot_shutdown_module     -> last call before dlclose
 // ============================================================================
 
+#include "vex.h"
 #include "app_contract.h"
 
 #include "c23/overload.h"
@@ -34,7 +35,6 @@
 #include "ui/element.h"
 
 #include <math.h>
-#include <stdint.h>
 #include <string.h>
 
 // following the directory going forward:
