@@ -82,6 +82,15 @@ get_filename_component(VEXGRAPH_VEXC_ROOT "${VEXGRAPH_ROOT}/lib" ABSOLUTE)
 if(IS_DIRECTORY "${VEXGRAPH_VEXC_ROOT}")
     list(APPEND VEXGRAPH_INCLUDE_ROOTS "${VEXGRAPH_VEXC_ROOT}")
 endif()
+
+# rangoon (`rust`) sits at the repository root beside vex/ and lib/. Its C ABI
+# headers are the Rust surface's contract; the root and include/ make the
+# `relational_engine/...` form resolve without a vex/ prefix.
+get_filename_component(VEXGRAPH_RANGOON_ROOT "${VEXGRAPH_ROOT}/rust" ABSOLUTE)
+if(IS_DIRECTORY "${VEXGRAPH_RANGOON_ROOT}")
+    list(APPEND VEXGRAPH_INCLUDE_ROOTS "${VEXGRAPH_RANGOON_ROOT}"
+        "${VEXGRAPH_RANGOON_ROOT}/include")
+endif()
 file(GLOB vex_entries LIST_DIRECTORIES true RELATIVE "${VEXGRAPH_ROOT}/vex"
     "${VEXGRAPH_ROOT}/vex/*")
 foreach(entry IN LISTS vex_entries)
@@ -126,6 +135,14 @@ if(IS_DIRECTORY "${VEXGRAPH_VEXC_ROOT}")
     file(GLOB_RECURSE VEXGRAPH_VEXC_SOURCES CONFIGURE_DEPENDS
         "${VEXGRAPH_VEXC_ROOT}/*.c")
     list(APPEND VEXGRAPH_SOURCES ${VEXGRAPH_VEXC_SOURCES})
+endif()
+
+# rangoon's production C is the name-search primitive the Rust registry calls.
+# Its test clients and target/ output are not part of the code model.
+if(IS_DIRECTORY "${VEXGRAPH_RANGOON_ROOT}")
+    file(GLOB_RECURSE VEXGRAPH_RANGOON_SOURCES CONFIGURE_DEPENDS
+        "${VEXGRAPH_RANGOON_ROOT}/search/*.c")
+    list(APPEND VEXGRAPH_SOURCES ${VEXGRAPH_RANGOON_SOURCES})
 endif()
 
 list(FILTER VEXGRAPH_SOURCES EXCLUDE REGEX "/(\\.b|cmake-build[^/]*|CMakeFiles|\\.git)/")
