@@ -35,12 +35,12 @@ typedef AppScene *(*AppAttachFn)(Frame *frame);
 
 // Advance the scene one frame on the owner thread. `nowSeconds` is the host
 // clock (never a frame count).
-typedef void (*AppFrameFn)(AppScene *scene, d64 nowSeconds);
+typedef fn (*AppFrameFn)(AppScene *scene, d64 nowSeconds);
 
 // Drop the module's references and release anything the MODULE owns. Panels
 // attached with Frame_add are owned by the Frame; the host clears them with
 // Frame_removePanels, so this must never free them. Called before a swap and at
 // shutdown, while the outgoing image is still mapped.
-typedef void (*AppDetachFn)(AppScene *scene);
+typedef fn (*AppDetachFn)(AppScene *scene);
 
 #endif // VEX_APP_CONTRACT_H

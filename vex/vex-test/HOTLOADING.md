@@ -94,7 +94,7 @@ The host's job in step 5 is small and is the only place the app tree is
 rebuilt:
 
 ```c
-static void onReload(Application *app, u32 loaded, void *userdata) {
+static fn onReload(Application *app, u32 loaded, any userdata) {
     Host *host = userdata;
     if (host->detach) host->detach(host->scene);   // old module still mapped
     Frame_removePanels(host->frame);               // belt and braces

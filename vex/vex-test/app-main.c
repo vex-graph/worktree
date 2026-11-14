@@ -84,7 +84,7 @@ static const Color s_cardColor[APP_CARD_COUNT] = {
 // CORE FUNCTIONS (PUBLIC & PRIVATE)
 
 // Drops the module's references to panels the host frame owns. Never frees.
-static void sceneForget(struct AppScene *scene) {
+static fn sceneForget(struct AppScene *scene) {
     for (u32 i = 0; i < APP_CARD_COUNT; i++)
         (*scene).cards[i] = nullptr;
     (*scene).cardCount = 0;
@@ -152,7 +152,7 @@ AppScene *App_attach(Frame *frame) {
 }
 
 /** Advances one frame: the card row breathes, the selected card lifts. */
-void App_frame(AppScene *scene, d64 nowSeconds) {
+fn App_frame(AppScene *scene, d64 nowSeconds) {
     if (!scene || !(*scene).frame) 
         return;
 
@@ -177,7 +177,7 @@ void App_frame(AppScene *scene, d64 nowSeconds) {
 }
 
 /** Drops module references; the frame still owns (and later frees) the panels. */
-void App_detach(AppScene *scene) {
+fn App_detach(AppScene *scene) {
     if (!scene) 
         return;
 
@@ -187,7 +187,7 @@ void App_detach(AppScene *scene) {
 // ── loader exports ──────────────────────────────────────────────────────────
 
 /** Module initialization export (the loader reaches App_attach for real work). */
-bool Hot_init_module(void) {
+bool Hot_init_module() {
     s_scene.pulseBias = 0.0f;
 
     s_scene.selected = 0;
@@ -200,12 +200,12 @@ bool Hot_init_module(void) {
 }
 
 /** Last call before dlclose: the frame has already released its own panels. */
-void Hot_shutdown_module(void) {
+fn Hot_shutdown_module() {
     sceneForget(&s_scene);
 }
 
 /** Writes the v2 logical state blob. Plain values only. */
-bool Hot_save(void *buf, bytes cap, bytes *outLen) {
+bool Hot_save(any buf, bytes cap, bytes *outLen) {
     if (!buf || !outLen || cap < APP_STATE_SIZE) 
         return false;
 
@@ -229,7 +229,7 @@ bool Hot_save(void *buf, bytes cap, bytes *outLen) {
 }
 
 /** Restores a v2 blob, or a v1 legacy blob promoted in place. */
-bool Hot_restore(const void *buf, bytes len) {
+bool Hot_restore(const_any buf, bytes len) {
     if (!buf) 
         return false;
 
@@ -265,8 +265,8 @@ bool Hot_restore(const void *buf, bytes len) {
 }
 
 /** Converts a supported legacy blob to the v2 layout, or copies a fitting one. */
-bool Hot_migrate(const char *oldVersion, const void *oldBuf, bytes oldLen,
-                 void *newBuf, bytes newCap, bytes *outLen) {
+bool Hot_migrate(const char *oldVersion, const_any oldBuf, bytes oldLen,
+                 any newBuf, bytes newCap, bytes *outLen) {
     if (!oldVersion || !oldBuf || !newBuf || !outLen || newCap < APP_STATE_SIZE) 
         return false;
 
@@ -297,7 +297,7 @@ bool Hot_migrate(const char *oldVersion, const void *oldBuf, bytes oldLen,
 }
 
 /** Static descriptor of this module (name, schema, exports, dependencies). */
-const char *Hot_manifest(void) {
+const char *Hot_manifest() {
     return "{\"name\": \"gallery_app\", \"version\": \"2.0.0\", "
            "\"type_ids\": [{\"name\": \"GalleryState\", \"value\": 3}], "
            "\"exports\": [\"App_attach\", \"App_frame\", \"App_detach\", "
@@ -308,25 +308,25 @@ const char *Hot_manifest(void) {
 }
 
 // LOADER ABI EXPORT — row layout must match hot/hot.c:
-//   { const char *name; void *fn; } entries[], count via Hot_getExports.
+//   { const char *name; any fn; } entries[], count via Hot_getExports.
 typedef struct HotModuleExport {
     const char *name;
-    void *fn;
+    any fn;
 } HotModuleExport;
 
 static const HotModuleExport s_exports[] = {
-    { "App_attach",           (void*) App_attach },
-    { "App_frame",            (void*) App_frame },
-    { "App_detach",           (void*) App_detach },
-    { "Hot_init_module",      (void*) Hot_init_module },
-    { "Hot_shutdown_module",  (void*) Hot_shutdown_module },
-    { "Hot_save",             (void*) Hot_save },
-    { "Hot_restore",          (void*) Hot_restore },
-    { "Hot_migrate",          (void*) Hot_migrate },
+    { "App_attach",           (any) App_attach },
+    { "App_frame",            (any) App_frame },
+    { "App_detach",           (any) App_detach },
+    { "Hot_init_module",      (any) Hot_init_module },
+    { "Hot_shutdown_module",  (any) Hot_shutdown_module },
+    { "Hot_save",             (any) Hot_save },
+    { "Hot_restore",          (any) Hot_restore },
+    { "Hot_migrate",          (any) Hot_migrate },
 };
 
 /** Returns this module's static trampoline export table and optional row count. */
-const void *Hot_getExports(u32 *outCount) {
+const_any Hot_getExports(u32 *outCount) {
     if (outCount) 
         (*outCount) = (u32) (sizeof s_exports / sizeof s_exports[0]);
 
