@@ -20,7 +20,7 @@ cmake_minimum_required(VERSION 3.24)
 # like the rest of .idea/), not in CMake targets.
 # ============================================================================
 
-project(vexgraph-ecosystem LANGUAGES C)
+project(vex-lib LANGUAGES C)
 set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED YES)
 set(CMAKE_C_EXTENSIONS YES)
@@ -137,7 +137,29 @@ add_library(vexgraph_index OBJECT EXCLUDE_FROM_ALL ${VEXGRAPH_SOURCES}
         vex/re/re.h
         vex/re/nio/nio.h
         lib/lang/lang.h
-        vex/re/nio/arena.c)
+        vex/re/nio/arena.c
+        vex/re/substrate/relational/cell.c
+        vex/re/substrate/relational/relational.c
+        vex/re/substrate/relational/shelf.c
+        vex/re/substrate/relational/symbol_table.c
+        vex/re/substrate/relational/cell.h
+        vex/re/substrate/relational/relational.h
+        vex/re/substrate/relational/shelf.h
+        vex/re/substrate/relational/symbol_table.h
+        vex/re/substrate/variable/var.c
+        vex/re/substrate/variable/variable_hash_map.c
+        vex/re/substrate/variable/variable_mini_map.c
+        vex/re/substrate/variable/variable_pool.c
+        vex/re/substrate/variable/variable_slot.c
+        vex/re/substrate/variable/var.h
+        vex/re/substrate/variable/variable.h
+        vex/re/substrate/variable/variable_hash_map.h
+        vex/re/substrate/variable/variable_mini_map.h
+        vex/re/substrate/variable/variable_pool.h
+        vex/re/substrate/variable/variable_slot.h
+        vex/re/substrate/substrate.h
+        vex/vexspoke/vexspoke.h
+        vex/_main/main.c)
 if(EXISTS "${VEXGRAPH_VEXC_ROOT}/debug/main.c")
     target_sources(vexgraph_index PRIVATE "${VEXGRAPH_VEXC_ROOT}/debug/main.c")
 endif()
