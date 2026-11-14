@@ -320,7 +320,15 @@ VOID_ALIAS_OWNER = "lib/lang/primitive.h"
 # Empty parameter lists are `()`. `(fn)` names `void` through the typedef and is
 # the same noise as `(void)`; `fn` keeps its one other job, the discard, where
 # `(fn)` is followed by an expression rather than `;`, `,`, `)` or `{`.
+# A parenthesized `fn` that follows a control keyword is a test of a
+# function-pointer local (`if (fn)`, `while (fn)`), not a parameter list.
 RE_EMPTY_PARAMS = re.compile(r"\(\s*fn\s*\)(?=\s*[;{),])")
+RE_EMPTY_PARAMS_CONTROL = re.compile(r"(?:\bif|\bwhile|\bswitch|\bfor|\breturn)\s*$")
+
+
+def is_control_paren(code, at):
+    """True when the `(` at `at` belongs to a control keyword, not a declarator."""
+    return bool(RE_EMPTY_PARAMS_CONTROL.search(code[:at]))
 
 # `void**` is `any*`, and so is `fn**` — `fn` is `void` through the typedef, so
 # both spellings name an untyped pointer. The depth lives in the stars.
@@ -641,8 +649,11 @@ class Linter:
                     "Primitive Spelling Law (void keyword)", rel, lno, raw_line,
                     "'void' is spelled 'fn' in return position and 'any' as a pointer; the alias header is the one place it is defined"))
 
-            if RE_EMPTY_PARAMS.search(code):
-                fixed_line = RE_EMPTY_PARAMS.sub("()", raw_line)
+            empty = RE_EMPTY_PARAMS.search(code)
+            if empty and not is_control_paren(code, empty.start()):
+                fixed_line, _ = rewrite_code(
+                    raw_line, state_before,
+                    lambda s: RE_EMPTY_PARAMS.sub("()", s))
                 violations.append(self.violation(
                     "Primitive Spelling Law (empty params)", rel, lno, raw_line,
                     "Empty parameter lists are '()'; '(fn)' is the same noise as '(void)'",
