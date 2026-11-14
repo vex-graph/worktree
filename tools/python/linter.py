@@ -317,6 +317,11 @@ RE_CONST_ANY = re.compile(r"\bconst\s+any\b")
 RE_VOID_KEYWORD = re.compile(r"\bvoid\b")
 VOID_ALIAS_OWNER = "lib/lang/primitive.h"
 
+# Empty parameter lists are `()`. `(fn)` names `void` through the typedef and is
+# the same noise as `(void)`; `fn` keeps its one other job, the discard, where
+# `(fn)` is followed by an expression rather than `;`, `,`, `)` or `{`.
+RE_EMPTY_PARAMS = re.compile(r"\(\s*fn\s*\)(?=\s*[;{),])")
+
 # `void**` is `any*`, and so is `fn**` — `fn` is `void` through the typedef, so
 # both spellings name an untyped pointer. The depth lives in the stars.
 RE_VOID_POINTER = re.compile(r"\b(?:void|fn)\s*\*")
@@ -635,6 +640,15 @@ class Linter:
                 violations.append(self.violation(
                     "Primitive Spelling Law (void keyword)", rel, lno, raw_line,
                     "'void' is spelled 'fn' in return position and 'any' as a pointer; the alias header is the one place it is defined"))
+
+            if RE_EMPTY_PARAMS.search(code):
+                fixed_line = RE_EMPTY_PARAMS.sub("()", raw_line)
+                violations.append(self.violation(
+                    "Primitive Spelling Law (empty params)", rel, lno, raw_line,
+                    "Empty parameter lists are '()'; '(fn)' is the same noise as '(void)'",
+                    fixable=fixed_line != raw_line))
+                if fix and self.fix_enabled("Primitive Spelling Law (empty params)") and fixed_line != raw_line:
+                    raw_line, modified = fixed_line, True
 
             chain = self.check_two_layer_cap(rel, code, lno, raw_line)
             if chain:
