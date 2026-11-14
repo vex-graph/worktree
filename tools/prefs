@@ -276,7 +276,7 @@ def cmd_find(root: Path, needle: str, sources: list[Path], limit: int = 40) -> i
 
 def repo_lawbooks(root: Path) -> list[Path]:
     books: list[Path] = []
-    for top in ("vex", "lib"):
+    for top in ("vex", "lib", "rust"):
         base = root / top
         if not base.is_dir():
             continue

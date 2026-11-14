@@ -37,5 +37,8 @@ vex/*
 # `lib/` is the same kind of checkout as the `vex/*` children.
 lib/
 
+# `rust/` (rangoon) is the same kind of checkout as the `vex/*` children.
+rust/
+
 # code compilations
 code.txt

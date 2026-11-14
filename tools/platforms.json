@@ -20,6 +20,19 @@
       ],
       "remote": "https://github.com/vex-graph/worktree.git"
     },
+    "rust": {
+      "role": "lifetime",
+      "subsystem": "rangoon",
+      "support": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "proven": [
+        "macos"
+      ],
+      "remote": "https://github.com/vex-graph/rangoon.git"
+    },
     "vex/lifetime": {
       "role": "lifetime",
       "subsystem": "lifetime",
