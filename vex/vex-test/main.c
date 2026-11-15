@@ -62,8 +62,8 @@ static fn hostAttach(Host *host) {
 // Hot-reload notification. The outgoing image is still mapped in the retire
 // ring, so calling the OLD detach here is safe; then the new image rebuilds.
 static fn hostReload(Application *app, u32 loaded, any userdata) {
-    (fn) app;
-    (fn) loaded;
+    (discard) app;
+    (discard) loaded;
     Host *host = userdata;
     if ((*host).detach)
         (*host).detach((*host).scene);
@@ -74,13 +74,13 @@ static fn hostReload(Application *app, u32 loaded, any userdata) {
 
 // One frame: hand the clock to the module, which owns all drawing.
 static fn hostTick(Application *app, any userdata) {
-    (fn) app;
+    (discard) app;
     Host *host = userdata;
     if ((*host).frameFn && (*host).scene)
         (*host).frameFn((*host).scene, hostNow());
 }
 
-int main() {
+i32 main() {
     // 1. mount the install ladder (fail-closed, one-shot).
     if (!MANIFEST(MANIFEST_APP_DATA, "vexgraph", APP_LIBRARY))
         return 1;
