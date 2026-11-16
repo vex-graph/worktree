@@ -347,19 +347,58 @@ MEMORY_ALLOC_TIERS = (
     "vex/re/",                 # lifetime: the allocator itself
     "vex/vexspoke/",           # core
     "vex/determinant/",        # core
-    "vex/graphvex/",           # core
+    "vex/graphvex/api/",       # core
+    "vex/graphvex/darling/",   # core
     "vex/language/",           # core
     "vex/samplerate/",         # core
-    "vex/darling/",            # core
     "vex/harness/",            # core
     "vex/sesh/",               # core
+    "vex/darkbase/",           # core / app
     "vex/job/",                # tool (not alloc-exempt)
 )
 RE_MEMORY_ALLOC = re.compile(r"\bMemory_alloc\s*\(")
 RE_FUNCTION_DEF = re.compile(
     r"^\s*(?:static\s+|inline\s+|const\s+|extern\s+|_Noreturn\s+)*"
     r"[A-Za-z_][A-Za-z0-9_]*[\s\*]+([A-Za-z_][A-Za-z0-9_]*)\s*\(")
+RE_ACCESSOR_DEF = re.compile(
+    r"^\s*(?:(?:static|inline|const|extern|_Noreturn|struct|enum|union|unsigned|signed)\s+)*"
+    r"[A-Za-z_][A-Za-z0-9_]*[\s\*]+([A-Za-z_][A-Za-z0-9_]*)\s*\(")
+RE_DEREF_FIELD = re.compile(r"\(\*[^()\n]+\)\.\s*([A-Za-z_]\w*)")
+RE_FIELD_WRITE_AFTER = re.compile(
+    r"^(?:\s*\[[^\]]*\])*\s*(?:=(?!=)|[+\-*/%&|^]=|<<=|>>=|\+\+|--)")
+RE_FIELD_WRITE_BEFORE = re.compile(r"(?:\+\+|--)\s*$")
+RE_SETTER_NAME = re.compile(r"^[A-Z]\w*_set([A-Z]\w*)$")
+RE_GETTER_NAME = re.compile(r"^[A-Z]\w*_([a-z]\w*)$")
 CONTROL_WORDS = {"if", "for", "while", "switch", "return", "sizeof", "do", "else"}
+
+
+def is_getter_accessor(fn_name, role, field):
+    """True when the enclosing function is a ;;GETTER or Class_field getter."""
+    if role == "GETTER":
+        return not (fn_name and RE_SETTER_NAME.match(fn_name))
+    if not fn_name:
+        return False
+    m = RE_GETTER_NAME.match(fn_name)
+    if not m:
+        return False
+    prop = m.group(1)
+    if re.match(r"^(?:get|set)[A-Z]", prop):
+        return False
+    return prop == field or prop == field + "Mut"
+
+
+def is_setter_accessor(fn_name, role, field):
+    """True when the enclosing function is a ;;SETTER Class_setField setter."""
+    if not fn_name:
+        return False
+    m = RE_SETTER_NAME.match(fn_name)
+    if not m:
+        return False
+    if role == "SETTER":
+        return True
+    prop = m.group(1)
+    camel = prop[0].lower() + prop[1:]
+    return camel == field or prop.lower() == field.lower()
 
 
 # The only constructor is the one the Object() macro dispatches to: Class_N.
@@ -395,7 +434,19 @@ def is_release_site(name):
             or name.endswith(RELEASE_SUFFIXES) or is_constructor(name))
 # The allocator implementation is the one place that may allocate freely: it
 # is what Memory_alloc is, not a caller of it.
-MEMORY_ALLOC_OWNER = "vex/re/nio/mem.c"
+MEMORY_ALLOC_OWNERS = (
+    "vex/re/nio/mem.c",
+    "vex/re/nio/arena.c",
+    "vex/re/nio/transient.c",
+    "vex/re/struct/",
+    "vex/re/substrate/",
+    "vex/re/type/",
+)
+
+
+def is_alloc_owner(rel):
+    """True for the RE allocator and its internal substrate/struct containers."""
+    return rel in MEMORY_ALLOC_OWNERS or rel.startswith(MEMORY_ALLOC_OWNERS[3:])
 
 
 def is_constructor(name):
@@ -457,27 +508,39 @@ class Linter:
             return None
         inc = m.group(1)
 
-        tiers = (
+        roles = (
+            ("lib/",
+             ["lifetime/", "re/", "nio/", "vexspoke/", "darling/", "hotcwap/",
+              "hot/", "api/", "determinant/", "samplerate/", "language/",
+              "sesh/", "harness/", "darkbase/", "primeagen/", "semicolon/"],
+             "lifetime (floor)"),
             ("vex/lifetime/",
-             ["darling/", "api/", "hot/"],
+             ["darling/", "api/", "hot/", "hotcwap/", "determinant/",
+              "samplerate/", "language/", "sesh/", "harness/", "darkbase/",
+              "primeagen/", "semicolon/"],
              "lifetime (substrate)"),
             ("vex/re/",
-             ["darling/", "hotcwap/", "window/", "hot/", "api/"],
+             ["vexspoke/", "oop/", "util/", "darling/", "hotcwap/", "window/",
+              "hot/", "api/", "determinant/", "samplerate/", "language/",
+              "sesh/", "harness/", "darkbase/", "primeagen/", "semicolon/"],
              "lifetime (allocator/storage)"),
             ("vex/vexspoke/",
              ["darling/", "hotcwap/", "window/", "hot/", "api/",
               "vulkan/vk_iosurface.h", "vulkan/vk_scene.h",
-              "vulkan/vk_view.h", "vulkan/sdf_gpu.h"],
+              "vulkan/vk_view.h", "vulkan/sdf_gpu.h", "primeagen/", "semicolon/"],
              "core (compute)"),
-            ("vex/darling/",
-             ["api/"],
+            ("vex/graphvex/darling/",
+             ["api/", "primeagen/", "semicolon/"],
              "core (UI)"),
+            ("vex/graphvex/api/",
+             ["darling/", "hotcwap/", "hot/", "primeagen/", "semicolon/"],
+             "core (GPU driver)"),
         )
-        for prefix, prohibited, label in tiers:
+        for prefix, prohibited, label in roles:
             if not rel.startswith(prefix):
                 continue
             for p in prohibited:
-                if inc.startswith(p):
+                if inc.startswith(p) and not (is_test_path(rel) and inc.startswith("darling/test/")):
                     return self.violation(
                         "Vertical Integration Law (Layer Inversion)",
                         rel, lno, line,
@@ -504,15 +567,31 @@ class Linter:
         function = ""
         function_floor = 0
         pending = ""
+        accessor_fn = ""
+        accessor_floor = 0
+        pending_accessor = ""
+        accessor_role = ""
+        pending_role = ""
         depth = 0
         for lno, raw_line in enumerate(lines, 1):
             state_before = in_multiline
             code, in_multiline = strip_comments_and_strings(raw_line, in_multiline)
 
+            if ";;GETTER" in code:
+                pending_role = "GETTER"
+            elif ";;SETTER" in code:
+                pending_role = "SETTER"
+
             definition = RE_FUNCTION_DEF.match(code)
             if definition and not function and definition.group(1) not in CONTROL_WORDS:
                 pending = definition.group(1)
             active = function or pending
+
+            acc_def = RE_ACCESSOR_DEF.match(code)
+            if acc_def and not accessor_fn and acc_def.group(1) not in CONTROL_WORDS:
+                pending_accessor = acc_def.group(1)
+            active_accessor = accessor_fn or pending_accessor
+            active_role = accessor_role or pending_role
 
             # A prototype names Memory_alloc but calls nothing: skip it.
             declaration = (
@@ -520,7 +599,7 @@ class Linter:
             )
             if (RE_MEMORY_ALLOC.search(code) and not declaration
                     and not is_test_path(rel)
-                    and rel != MEMORY_ALLOC_OWNER):
+                    and not is_alloc_owner(rel)):
                 if not rel.startswith(MEMORY_ALLOC_TIERS):
                     violations.append(self.violation(
                         "Relational Memory Law (Allocation site)", rel, lno,
@@ -535,7 +614,7 @@ class Linter:
                         f"init() (found in '{active or 'file scope'}')"))
 
             if (RE_MEMORY_FREE.search(code) and not is_test_path(rel)
-                    and rel != MEMORY_ALLOC_OWNER and not is_deconstruct
+                    and not is_alloc_owner(rel) and not is_deconstruct
                     and not is_release_site(active)):
                 violations.append(self.violation(
                     "Relational Memory Law (Release site)", rel, lno, raw_line,
@@ -665,15 +744,31 @@ class Linter:
             if chain:
                 violations.append(chain)
 
+            violations.extend(self.check_field_accessor(
+                rel, code, lno, raw_line, active_accessor, active_role))
+
             opens = code.count("{")
             closes = code.count("}")
             if not function and pending and opens > 0:
                 function = pending
                 function_floor = depth
                 pending = ""
+            if not accessor_fn and pending_accessor and opens > 0:
+                accessor_fn = pending_accessor
+                accessor_role = pending_role
+                accessor_floor = depth
+                pending_accessor = ""
+                pending_role = ""
             depth += opens - closes
             if function and depth <= function_floor:
                 function = ""
+            if accessor_fn and depth <= accessor_floor:
+                accessor_fn = ""
+                accessor_role = ""
+            if (";" in code and ";;GETTER" not in code and ";;SETTER" not in code
+                    and not accessor_fn and opens == 0):
+                pending_accessor = ""
+                pending_role = ""
 
             new_lines.append(raw_line)
 
@@ -711,6 +806,32 @@ class Linter:
                 "Semantic Consistency Law (Access depth)", rel, lno, raw_line,
                 "Member chain traverses 3+ layers; hoist a local.")
         return None
+
+    def check_field_accessor(self, rel, code, lno, raw_line, active_fn, active_role):
+        """Enforce the Semantic Consistency Law (Field accessor)."""
+        found = []
+        for m in RE_DEREF_FIELD.finditer(code):
+            field = m.group(1)
+            after = code[m.end():]
+            before = code[:m.start()]
+            is_write = bool(RE_FIELD_WRITE_AFTER.match(after)
+                            or RE_FIELD_WRITE_BEFORE.search(before))
+            cap_field = field[0].upper() + field[1:] if field else "Field"
+            if is_write:
+                if not is_setter_accessor(active_fn, active_role, field):
+                    found.append(self.violation(
+                        "Semantic Consistency Law (Field accessor)",
+                        rel, lno, raw_line,
+                        f"Direct '(*ptr).{field} = ...' write outside setter; "
+                        f"use 'Class_set{cap_field}(ptr, params)'"))
+            else:
+                if not is_getter_accessor(active_fn, active_role, field):
+                    found.append(self.violation(
+                        "Semantic Consistency Law (Field accessor)",
+                        rel, lno, raw_line,
+                        f"Direct '(*ptr).{field}' read outside getter; "
+                        f"use 'Class_{field}(ptr)'"))
+        return found
 
     def scan_text(self):
         """No Section Sign Law: U+00A7 is forbidden in tracked text."""
