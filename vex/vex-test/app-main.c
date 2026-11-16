@@ -3,26 +3,29 @@
 // this is another main for hotloading process that needs to be inserted into an executable to be replaced easily
 //
 // ============================================================================
-// THE RELOADABLE APPLICATION (app-main.c)
+// ;;DEFINITION: THE RELOADABLE APPLICATION (app-main.c)
 // ============================================================================
 // Compiled to a `.dylib` (type: "module") and swapped in place by hotcwap.
-// It owns the app's BEHAVIOR and its small logical state; it never owns the
-// process, the OS window, or the Frame. The host (main.c) calls into this file
-// only through app_contract.h:
+// It owns the app's BEHAVIOR and its small logical state (`s_scene`); it never
+// owns the process, the OS window, or the Frame. The host (main.c) calls into
+// this file only through app_contract.h:
 //
 //     App_attach(frame)  -> build the panel tree into the host's frame
 //     App_frame(scene, t)-> advance one frame (draw is the frame's job)
 //     App_detach(scene)  -> drop references before the image is unloaded
 //
-// Panels attached with Frame_addPanel are OWNED by the Frame (darling R4).
-// App_detach therefore never frees them: it only forgets them, and the host's
-// Frame_removePanels is what actually releases them.
+// ;;OVERVIEW: OWNERSHIP & SWAP CONTRACT
+// ============================================================================
+// Panels attached with Frame_add are OWNED by the Frame (darling, core role).
+// App_detach therefore never frees them: it only forgets them via sceneForget,
+// and the host's Frame_removePanels is what actually releases them.
 //
-// The swap contract hotcwap reads off this image:
-//     Hot_getExports  -> export table (the loader adopts it on dlopen)
-//     Hot_save/Hot_restore    -> carry logical state across a generation
-//     Hot_migrate             -> convert an older blob to this schema
-//     Hot_shutdown_module     -> last call before dlclose
+// Static storage (`AppScene s_scene`) holds borrowed Frame/Panel handles plus
+// v2 state (`pulseBias`, `selected`, `phase`). Swap exports read by hotcwap:
+//     Hot_init_module / Hot_shutdown_module
+//     Hot_getExports                  -> static trampoline export table
+//     Hot_save / Hot_restore          -> v1/v2 logical state serialization
+//     Hot_migrate / Hot_manifest      -> v1 -> v2 promotion and descriptor
 // ============================================================================
 
 #include "vex.h"
