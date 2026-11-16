@@ -50,6 +50,7 @@ step "allocation gate"      "$python" -B tools/python/alloc_gate.py check
 step "allocation sites"     "$python" -B tools/python/linter.py --rule "Allocation site" --baseline tools/allocation-sites-baseline.json --no-color
 step "release sites"        "$python" -B tools/python/linter.py --rule "Release site" --baseline tools/release-sites-baseline.json --no-color
 step "string sites"         "$python" -B tools/python/linter.py --rule "String Law" --baseline tools/string-sites-baseline.json --no-color
+step "field accessors"      "$python" -B tools/python/linter.py --rule "Field accessor" --baseline tools/field-accessors-baseline.json --no-color
 step "secret scan"          secret_scan
 
 # CI tests `origin`, never this working tree. A green local gate on commits that

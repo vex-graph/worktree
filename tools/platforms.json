@@ -72,7 +72,7 @@
       ],
       "remote": "https://github.com/vex-lib/vexspoke.git"
     },
-    "vex/graphvex": {
+    "vex/graphvex/api": {
       "role": "core",
       "subsystem": "graphvex",
       "support": [
@@ -118,7 +118,7 @@
       "proven": [],
       "remote": "https://github.com/vex-lib/samplerate.git"
     },
-    "vex/scene": {
+    "vex/graphvex/meld": {
       "role": "core",
       "subsystem": "scene",
       "support": [
@@ -130,7 +130,7 @@
       "remote": "https://github.com/vex-lib/meld.git",
       "required": false
     },
-    "vex/darling": {
+    "vex/graphvex/darling": {
       "role": "core",
       "subsystem": "darling",
       "support": [

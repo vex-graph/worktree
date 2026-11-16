@@ -1,18 +1,12 @@
 {
   "counts": {
-    "linter::Semantic Consistency Law (Access depth)": 85,
+    "linter::Semantic Consistency Law (Field accessor)": 16118,
+    "linter::Relational Memory Law (Allocation site)": 100,
+    "linter::String Law (libc string call)": 577,
+    "linter::Relational Memory Law (Release site)": 104,
     "linter::Living Documentation Law": 49,
-    "linter::Semantic Consistency Law (Cast and pointer spelling)": 109,
-    "linter::Semantic Consistency Law (Reference form)": 64,
-    "linter::Canonical Include Paths Law": 24,
-    "linter::Vertical Integration Law (Layer Inversion)": 1,
-    "linter::Primitive Spelling Law (fn return)": 3482,
-    "linter::Primitive Spelling Law (const_any)": 105,
-    "linter::Primitive Spelling Law (void pointer)": 57,
-    "arrange::Semantic Consistency Law (Control flow: single-statement braces)": 293,
-    "arrange::Semantic Consistency Law (Control flow: statement separation)": 55479,
-    "arrange::Semantic Consistency Law (Control flow: body on the header line)": 1555,
-    "arrange::Semantic Consistency Law (Control flow: header space)": 7835,
-    "alloc_gate::Relational Memory Law (libc allocation outside the engine)": 11
+    "arrange::Semantic Consistency Law (Control flow: single-statement braces)": 248,
+    "arrange::Semantic Consistency Law (Control flow: body on the header line)": 1355,
+    "alloc_gate::Relational Memory Law (libc allocation outside the engine)": 9
   }
 }

@@ -428,6 +428,14 @@ def prompt_text(root: Path) -> str:
         "Read the complete owning lawbook before work in that repository: "
         "`./tools/prefs repo <name>`. Each file's own body stays on disk.\n\n"
         + "\n".join(repo_registry(root)),
+        "## Canonical templates — `metadata/gists/preferences/`\n\n"
+        "Read the matching template before authoring or restructuring a file:\n\n"
+        "- `metadata/gists/preferences/template.c` — one class per `.c` file shape (`;;DEFINITION`, `;;OVERVIEW`, fixed section order, inline `#if defined(VEX_PLATFORM_*)`)\n"
+        "- `metadata/gists/preferences/main-template.c` — application entry (`create<Object>()` helpers, wire -> start -> stop -> reverse free -> `return 0`)\n"
+        "- `metadata/gists/preferences/overview-template.c` — self-contained `.c` `;;DEFINITION` + `;;OVERVIEW` blueprint\n"
+        "- `metadata/gists/preferences/interactable-app-template.c` — `app`-role interactable/superapp template (`AppState`, `create<Widget>()`, Hotcwap airlock)\n"
+        "- `metadata/gists/preferences/interactables-preferences.md` — `app`-role exclusive application laws\n"
+        "- `metadata/gists/preferences/repo-preferences-template.md` — `<repo>-preferences.md` lawbook skeleton",
     ]
     return "\n\n".join(sections)
 
