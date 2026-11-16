@@ -3,11 +3,20 @@
 // this is for hotcwap designing process
 //
 // ============================================================================
-// THE HOST / OPENER (main.c)
+// ;;DEFINITION: THE HOST / OPENER (main.c)
 // ============================================================================
-// The frozen shell. It boots, owns the OS window and the Application lifetime,
-// binds the reloader, and never draws a pixel. Everything visible lives in the
-// reloadable module (app-main.c) and is resolved through app_contract.h.
+// The frozen app shell. It boots, mounts the Manifest install ladder, owns the
+// OS Frame and Application lifetime, binds the hotcwap reloader, and never
+// draws a pixel. Everything visible lives in the reloadable module (app-main.c)
+// and is resolved through app_contract.h (`App_attach`, `App_frame`,
+// `App_detach`).
+//
+// ;;OVERVIEW: LIFECYCLE & RELOAD DISPATCH
+// ============================================================================
+// `Host` holds the loader handle (`HotModule`), window (`Frame`), `Application`,
+// module scene handle, and resolved function pointers (`hostAttach`). On hot
+// reload (`hostReload`), it calls the outgoing module's `App_detach`, clears
+// Frame panels via `Frame_removePanels`, and re-attaches the new image.
 //
 // Boot order (bottom-up):  manifest -> loader -> window -> application -> run.
 // Teardown order (top-down): module detach -> frame -> application -> loader.
