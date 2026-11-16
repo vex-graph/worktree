@@ -218,7 +218,7 @@ def analyze(path, text):
         if not statement.endswith(";"):
             continue
         header = lines[index].rstrip()
-        header = re.sub(r"\{\s*$", "", header).rstrip() + " "
+        header = re.sub(r"\{\s*$", "", header).rstrip()
         replacements[index] = [header]
         deletions.add(close)
         violations.append(violation(
@@ -241,7 +241,7 @@ def analyze(path, text):
                 pass  # body on the next line
             elif tail.endswith(";") and "{" not in tail and "}" not in tail:
                 body = lines[index][head_end:].strip()
-                header = lines[index][:head_end].rstrip() + " "
+                header = lines[index][:head_end].rstrip()
                 replacements[index] = [header, " " * (indent_of(lines[index]) + 3) + body]
                 violations.append(violation(
                     path, index + 1, lines[index],
@@ -265,91 +265,11 @@ def analyze(path, text):
                 or split_control(code[body_index]) or ELSE.match(code[body_index])):
             continue
 
-        header = lines[index].rstrip("\n")
-        if not header.endswith((" ", "\t")):
-            replacements[index] = [header + " "]
-            violations.append(violation(
-                path, index + 1, lines[index], "header space"))
         gaps = range(index + 1, body_index)
         if gaps and all(not lines[gap].strip() for gap in gaps):
             deletions.update(gaps)
             violations.append(violation(
                 path, index + 1, lines[index], "header body gap"))
-
-        # The control statement ends with its single body statement; the next
-        # sibling needs one blank line after it.
-        if (code[body_index].strip().endswith(";")
-                and in_statement_block(contexts, index)):
-            follower = body_index + 1
-            if (follower < total and lines[follower].strip()
-                    and code[follower].strip()
-                    and before[follower] == before[index]
-                    and indent_of(lines[follower]) == indent_of(lines[index])):
-                follow = code[follower].strip()
-                if not follow.startswith(("}", "else", ";", ")", ",")):
-                    insertions.setdefault(follower, []).append("")
-                    violations.append(violation(
-                        path, follower + 1, lines[follower],
-                        "statement separation"))
-
-    # ── a closed block followed immediately by a sibling statement ─────────
-    for index, line in enumerate(code):
-        if line.strip() != "}":
-            continue
-        if not contexts[index] or contexts[index][-1] != "block":
-            continue
-        follower = index + 1
-        if follower >= total or not lines[follower].strip():
-            continue
-        if not code[follower].strip():
-            continue
-        if (before[follower] != after[index]
-                or indent_of(lines[follower]) != indent_of(line)):
-            continue
-        follow = code[follower].strip()
-        if follow.startswith(("}", "else", ";", ")", ",")):
-            continue
-        insertions.setdefault(follower, []).append("")
-        violations.append(violation(
-            path, follower + 1, lines[follower], "statement separation"))
-
-    # ── sequential statements: one blank line between them ─────────────────
-    for index, line in enumerate(code):
-        if not line.rstrip().endswith(";"):
-            continue
-        stripped = line.lstrip()
-        if stripped.startswith("#"):
-            continue
-        if (stripped.startswith(("for", "while"))
-                and not line.rstrip().endswith(";")):
-            continue
-        if index > 0 and lines[index - 1].rstrip().endswith("\\"):
-            continue  # macro continuation
-        if lines[index].rstrip().endswith("\\"):
-            continue
-        if not in_statement_block(contexts, index):
-            continue
-        if index + 1 >= total:
-            continue
-        follower = index + 1
-        if not lines[follower].strip():
-            continue
-        if not code[follower].strip():
-            continue  # comment immediately after: leave it alone
-        if before[follower] != before[index]:
-            continue
-        if indent_of(lines[follower]) != indent_of(lines[index]):
-            continue
-        follow = code[follower].strip()
-        if follow.startswith(("}", "else", "case ", "default:", "{", "#",
-                              ".", "->", "+", "-", "*", "/", "%", "&", "|",
-                              "?", ":", ",", "]")):
-            continue
-        if follow.startswith("while") and line.lstrip().startswith("}"):
-            continue
-        insertions.setdefault(follower, []).append("")
-        violations.append(violation(
-            path, follower + 1, lines[follower], "statement separation"))
 
     return violations, replacements, deletions, insertions
 
